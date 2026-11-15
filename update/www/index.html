@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;600;800&display=swap">
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07080b;font-family:Rajdhani,"Segoe UI",system-ui,sans-serif;color:#e8f4ff;touch-action:none;overscroll-behavior:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07080b;font-family:Rajdhani,"Segoe UI",system-ui,sans-serif;color:#e8f4ff;touch-action:manipulation;overscroll-behavior:none}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .hud{position:fixed;inset:0;pointer-events:none;display:none}
 .pan{background:rgba(14,16,22,.5);border:1px solid rgba(0,217,255,.45);border-radius:10px;backdrop-filter:blur(2px)}
@@ -216,7 +216,7 @@ select{background:#1c1f25;color:#e8f4ff;border:1px solid rgba(0,217,255,.5);bord
 .cinfo p{margin:0;font-size:12px;line-height:1.45;color:#c4c8ce}.cinfo p b{color:#e8f4ff}
 .stat{display:flex;align-items:center;gap:8px;font-size:11px;color:#8fd8ff}.stat span{width:62px}.stat .prog{flex:1}
 #rot{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#07080b;z-index:30;text-align:center;padding:30px;font-size:18px}
-@media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
+@media (orientation:portrait) and (pointer:coarse){body.playing #rot{display:flex}}
 @media (max-height:430px){.hub{height:100%}.side{padding:10px;gap:6px}.side p.d{display:none}.pane{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
 
 /* ===== THÈME NEON 3.2 ===== */
@@ -311,6 +311,46 @@ html,body{font-weight:600;font-size:15px;letter-spacing:.02em}
 #pTap{position:absolute;left:50%;bottom:36px;transform:translateX(-50%);font-family:Orbitron,sans-serif;font-size:9px;letter-spacing:.3em;color:#7ff6ff;opacity:.7;animation:pulse 1.8s infinite;white-space:nowrap}
 #pSkip{position:absolute;right:16px;top:max(14px,env(safe-area-inset-top));padding:9px 16px;border:1px solid rgba(0,229,255,.5);background:rgba(6,11,22,.6);color:#dff8ff;font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:.15em;clip-path:var(--chs);cursor:pointer}
 @media (max-width:700px){#pCard{width:56vw}#pCard p{display:none}}
+
+/* ===== ÉCRANS DE TOUTES TAILLES (téléphone plié, déplié, tablette) ===== */
+.htop{z-index:3}
+.card,#end .card{max-height:calc(100vh - 20px);overflow:auto;touch-action:pan-y}
+.clist,.cinfo,.pbody,.pane,.hgrid,.hcards{touch-action:pan-y;-webkit-overflow-scrolling:touch}
+/* paysage peu haut (téléphone plié en paysage) */
+@media (max-height:520px) and (orientation:landscape){
+  .htop{top:4px}.htop .lv{width:34px;height:34px;font-size:15px}.ib{width:34px;height:34px;font-size:15px}.hinfo{min-width:110px}.hinfo b{font-size:11px}.cur{padding:4px 9px;font-size:11px}
+  .hcol{top:50px;bottom:8px;gap:6px;justify-content:flex-start}
+  .tile{width:min(17vh,84px);gap:1px;padding:4px}.tile i{font-size:min(6vh,26px)}.tile b{font-size:7px}.tile small{display:none}
+  .hbot{gap:3px}#mHero{font-size:18px}.stars{font-size:13px}#hTheme,.hname small{font-size:8px}
+  .hbtns .play{min-width:150px;min-height:40px;font-size:15px}.sb.big{min-height:38px;font-size:9px}
+  #tapHint{top:52px}
+  .card{padding:12px 16px;gap:8px}.card h1{font-size:22px}#login .card .logo .a{font-size:20px!important}#login .card p{font-size:11px}
+  .fld input{min-height:36px;padding:6px 10px}.play{min-height:40px;font-size:15px}
+  .pcard{max-height:100%}.phead{padding:6px 10px 6px 14px}.phead h2{font-size:15px}.pbody{padding:10px;gap:8px}
+  .mcard{min-height:150px;padding:12px}.mcard i{font-size:28px}
+  #pCard h1{font-size:30px}#pCard p{display:none}#pCard li{padding:4px 8px;font-size:12px}
+  .clist .hc{padding:5px 8px}.cinfo{padding:10px;gap:5px}.cinfo p{font-size:11px;margin:0}
+}
+/* portrait (téléphone plié tenu droit) : les menus restent utilisables, seul le jeu demande le paysage */
+@media (orientation:portrait){
+  .htop{flex-wrap:nowrap}.hinfo{min-width:0;flex:1}.hsp{display:none}
+  .hcol{top:62px;bottom:auto;gap:8px}.tile{width:min(22vw,88px)}.tile small{display:none}
+  .hbot{bottom:max(14px,env(safe-area-inset-bottom))}.hbtns{flex-direction:column-reverse;width:min(86vw,360px);gap:8px}.hbtns .play,.hbtns .sb{width:100%}
+  #tapHint{top:auto;bottom:220px}
+  #menu .hub{height:100%}.tabs{flex-wrap:nowrap}
+  #panel{padding:6px}#panel.side{background:rgba(5,6,9,.4);align-items:flex-end}#panel.side .pcard{width:100%;height:58%}
+  .modes{grid-template-columns:1fr}.mcard{min-height:0}
+  .hcards{grid-template-columns:repeat(2,1fr)}
+  .days{grid-template-columns:repeat(4,1fr)}
+  .chest{flex-direction:column;text-align:center}
+  .sintro{flex-direction:column;align-items:center;text-align:center}
+  .gcmp{flex-direction:column}
+  #chars{flex-direction:column;justify-content:flex-start;background:linear-gradient(180deg,rgba(7,8,11,.85),rgba(7,8,11,.2) 40%,rgba(7,8,11,.85))}
+  .clist{width:100%;max-height:34vh;flex:none}.cinfo{width:100%;align-self:stretch;max-height:42vh;margin-top:auto}
+  #pCard{left:16px;right:16px;width:auto;top:auto;bottom:70px;transform:translateY(30px)}#pCard.on{transform:none}#pCard p{display:none}
+  #parade{background:linear-gradient(180deg,rgba(2,5,12,0) 0%,rgba(2,5,12,0) 40%,rgba(2,5,12,.85) 70%)}
+  #end .card{width:94vw}
+}
 </style>
 </head>
 <body>
