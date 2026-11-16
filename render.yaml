@@ -1,0 +1,11 @@
+# Serveur en ligne de Neon Vanguard sur Render (offre gratuite)
+services:
+  - type: web
+    name: neon-vanguard-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
+    autoDeploy: true
