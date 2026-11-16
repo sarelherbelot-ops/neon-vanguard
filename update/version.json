@@ -1,14 +1,12 @@
 {
-  "version": "3.12.0",
+  "version": "3.13.0",
   "date": "2026-11-16",
   "notes": [
-    "Thorgar entièrement refait : un vrai visage qui change d'expression, un corps réaliste, la hache tenue à deux mains",
-    "Titan-7 entièrement refait : méca de guerre blindé, peinture usée, lance-missiles, canon rotatif, visage mécanique expressif",
-    "Nouvel accueil : heure, batterie, rang, dernière partie, fiche d'identité des héros, vue de près du visage, répliques des héros",
-    "Carrière et rangs : statistiques réelles, historique des parties, trophées de Recrue à Légende",
-    "Avant le combat : présentation des deux équipes et compte à rebours ; à la fin : tableau des scores complet, médailles, détail de l'XP",
-    "Annonces en partie (premier sang, dernière minute, balle de match) et option pour afficher les images par seconde",
-    "Corrigé : le héros pouvait rester couché à l'accueil après une partie finie en plein saut"
+    "Volt refait : soldat réaliste avec visage expressif, treillis camouflé, porte-plaques, casque et sac",
+    "Kaïra refaite : ninja réaliste avec visage expressif, bandeau, écharpe, katana dans le dos",
+    "Kael Varn refait : chevalier androïde en armure de céramique, heaume aux yeux lumineux, demi-cape",
+    "Grakk, Elyndra, Zyrra et Nyx : nouveaux visages qui bougent selon l'humeur (yeux, arcades, mâchoire)",
+    "Portraits des héros refaits dans les menus"
   ],
   "native": 230,
   "base": "www/",
@@ -21,6 +19,8 @@
     "fonts/rajdhani-latin-700-normal.woff2",
     "game.bundle.js",
     "h-mhheavy.js",
+    "h-mhman.js",
+    "h-mhwoman.js",
     "h-ual.js",
     "hardwood2_diffuse.jpg",
     "hdr-data.js",
