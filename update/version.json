@@ -1,15 +1,15 @@
 {
- "version": "3.4.1",
+ "version": "3.5.0",
  "date": "2026-11-16",
  "notes": [
-  "Écrans adaptés à toutes les tailles de téléphone (Fold plié ou déplié, petits écrans, tablettes)",
-  "Menus utilisables aussi en mode portrait (le jeu se joue toujours en paysage)",
-  "Toutes les pages défilent au doigt (Héros, Équipement, Défis, Options…)",
-  "Réglages et déconnexion toujours accessibles en haut de l'accueil",
-  "Nouvelle intro : présentation des 9 héros avec leur décor, leur arme et leurs pouvoirs",
-  "3 modes de jeu : 5 contre 5, Tous contre tous et Histoire",
-  "Une histoire pour chaque héros : 5 vagues d'ennemis (10, 20, 30, 40, 50) puis un boss géant",
-  "Nouveaux ennemis : rôdeurs, tireurs, brutes et 9 boss (Broyeur Mk-IX, Oni de fer, Amiral Néant…)"
+  "Musique : un thème pour l'accueil, un pour les combats, un pour les boss",
+  "Réglages du son séparés : volume de la musique et volume des effets",
+  "Un son d'arme différent pour chaque héros, et moins de sons en même temps",
+  "Accueil : une seule barre de menus à gauche, qui défile",
+  "Tous les héros sont de face sur l'accueil",
+  "Magie : cercle magique, éclairs de lumière et vrais projectiles quand tu touches ton héros",
+  "Un effet magique différent pour chaque héros (accueil et intro)",
+  "Ombres au sol, déplacements plus vivants, traînées lumineuses, robots ennemis avec lueurs"
  ],
  "native": 230,
  "base": "www/",
