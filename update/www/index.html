@@ -351,6 +351,24 @@ html,body{font-weight:600;font-size:15px;letter-spacing:.02em}
   #parade{background:linear-gradient(180deg,rgba(2,5,12,0) 0%,rgba(2,5,12,0) 40%,rgba(2,5,12,.85) 70%)}
   #end .card{width:94vw}
 }
+
+/* ===== ACCUEIL 3.5 : une seule barre de menus, à gauche, qui défile ===== */
+.hleft{top:62px;bottom:10px;left:max(8px,env(safe-area-inset-left));width:clamp(190px,24vw,250px);justify-content:flex-start;gap:8px;overflow-y:auto;overflow-x:hidden;padding:4px 10px 14px 2px;pointer-events:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14px,#000 calc(100% - 26px),transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 14px,#000 calc(100% - 26px),transparent 100%)}
+.hleft::-webkit-scrollbar{display:none}
+.hleft .tile{width:100%;aspect-ratio:auto;flex:none;min-height:62px;display:grid;grid-template-columns:44px 1fr;grid-template-rows:auto auto;column-gap:10px;row-gap:1px;align-items:center;justify-items:start;text-align:left;padding:9px 12px;overflow:visible}
+.hleft .tile i{grid-row:1/3;font-size:30px;justify-self:center}
+.hleft .tile b{font-size:10px;align-self:end;text-align:left}
+.hleft .tile small{display:block!important;font-size:11px;align-self:start;text-align:left;color:#7ff6ff}
+.hleft .tile .bd{top:6px;right:8px}
+.hleft .tile:active{transform:translateX(4px)}
+#home{background:linear-gradient(90deg,rgba(2,5,12,.72) 0%,rgba(2,5,12,.35) 20%,rgba(2,5,12,0) 34%),linear-gradient(0deg,rgba(2,5,12,.8) 0%,rgba(2,5,12,0) 26%)}
+.hbot{left:clamp(190px,24vw,250px)}
+#tapHint{left:calc(50% + clamp(95px,12vw,125px))}
+.hbtns .play{min-width:240px}
+@media (max-height:520px) and (orientation:landscape){.hleft{top:46px;bottom:4px;gap:5px;width:clamp(170px,22vw,210px)}.hleft .tile{min-height:46px;padding:5px 10px;grid-template-columns:34px 1fr}.hleft .tile i{font-size:22px}.hleft .tile b{font-size:8px}.hleft .tile small{font-size:9px}.hbot{left:clamp(170px,22vw,210px)}}
+@media (orientation:portrait){.hleft{top:62px;bottom:150px;width:150px;gap:6px}.hleft .tile{min-height:52px;padding:6px 8px;grid-template-columns:30px 1fr;column-gap:6px}.hleft .tile i{font-size:22px}.hleft .tile b{font-size:8px}.hleft .tile small{font-size:9px}.hbot{left:0}#tapHint{left:calc(50% + 70px);bottom:auto;top:70px}.hbtns{flex-direction:column}}
+#home.shifted .hleft{display:none}
 </style>
 </head>
 <body>
@@ -390,22 +408,23 @@ html,body{font-weight:600;font-size:15px;letter-spacing:.02em}
     <div class="hinfo"><b id="mName">Volt</b><span id="mXp">0 / 400 XP</span><div class="prog"><div id="mXpB"></div></div></div>
     <div class="hsp"></div>
     <div class="cur"><span class="shards" id="mSh">0</span> ✦</div>
-    <button class="ib" id="hSet" title="Réglages">⚙</button><button class="ib" id="logout" title="Déconnexion">⏏</button>
+    
   </div>
   <div class="hcol hleft">
     <button class="tile" data-p="daily"><i>🎁</i><b>Cadeau du jour</b><small id="tDaily"></small><em class="bd" id="bDaily"></em></button>
     <button class="tile" data-p="stars"><i>⭐</i><b>Défis étoiles</b><small id="tStars"></small><em class="bd" id="bStars"></em></button>
     <button class="tile" data-p="defis"><i>🎯</i><b>Défis</b><small id="tDefis"></small><em class="bd" id="bDefis"></em></button>
-  </div>
-  <div class="hcol hright">
     <button class="tile" data-p="chest"><i>🧰</i><b>Coffre du mardi</b><small id="tChest"></small><em class="bd" id="bChest"></em></button>
     <button class="tile" data-p="heroes"><i>🦸</i><b>Héros</b><small id="tHeroes"></small><em class="bd" id="bHeroes"></em></button>
     <button class="tile" data-p="gear"><i>⚔️</i><b>Équipement</b><small id="tGear"></small><em class="bd" id="bGear"></em></button>
+    <button class="tile" id="hAtelier"><i>🛡️</i><b>Armures &amp; améliorations</b><small>Tenues et bonus du héros</small></button>
+    <button class="tile" id="hSet"><i>⚙️</i><b>Réglages</b><small>Options · mises à jour</small></button>
+    <button class="tile" id="logout"><i>⏏️</i><b>Déconnexion</b><small>Changer de compte</small></button>
   </div>
   <div id="tapHint">TOUCHE TON HÉROS</div>
   <div class="hbot">
     <div class="hname"><span id="hTheme"></span><span id="mHero"></span><div class="stars" id="hStars"></div><small id="hGearTxt"></small></div>
-    <div class="hbtns"><button class="sb big" id="hAtelier">ARMURES &amp; AMÉLIORATIONS</button><button class="play" id="playBtn">JOUER</button></div>
+    <div class="hbtns"><button class="play" id="playBtn">JOUER</button></div>
     <span id="load"></span>
   </div>
 </div>
