@@ -1,11 +1,12 @@
 {
-  "version": "3.10.0",
+  "version": "3.11.0",
   "date": "2026-11-16",
   "notes": [
-    "Héros plus détaillés : plaques, rivets, sangles, armes rangées, talismans, chaînes, crânes et runes propres à chaque héros",
-    "Armures à panneaux en relief pour Kael et Drakar",
-    "Moins d'éblouissement à l'accueil : on voit mieux les héros",
-    "Rappel 3.9 : salto, vol, esquive, combos aux poings, plongeon explosif, pièces visibles à chaque achat"
+    "Jeu plus fluide : deux fois moins d'objets à dessiner, et la finesse s'adapte si le téléphone peine",
+    "Mouvements des héros : accélération et freinage en douceur, jambes repliées en saut, saltos groupés, écrasement à l'atterrissage",
+    "Caméra qui suit le héros en douceur",
+    "Bugs graphiques corrigés : Titan-7 regarde enfin devant lui, capes refaites (on voit le héros de dos), anneaux et sceaux posés au sol, sac à dos de Volt",
+    "Les bots tournent et se déplacent plus naturellement"
   ],
   "native": 230,
   "base": "www/",
