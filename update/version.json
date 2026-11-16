@@ -1,17 +1,19 @@
 {
-  "version": "3.13.0",
+  "version": "3.14.0",
   "date": "2026-11-16",
   "notes": [
-    "Volt refait : soldat réaliste avec visage expressif, treillis camouflé, porte-plaques, casque et sac",
-    "Kaïra refaite : ninja réaliste avec visage expressif, bandeau, écharpe, katana dans le dos",
-    "Kael Varn refait : chevalier androïde en armure de céramique, heaume aux yeux lumineux, demi-cape",
-    "Grakk, Elyndra, Zyrra et Nyx : nouveaux visages qui bougent selon l'humeur (yeux, arcades, mâchoire)",
-    "Portraits des héros refaits dans les menus"
+    "3 cartes agrandies : la Ville, la Grotte de cristal et l'Île du Lagon",
+    "Nouveau réglage : style Réaliste, Mixte ou Dessin animé",
+    "Ville : les voitures sont remplacées par des jardinières",
+    "Décors refaits sur les 9 cartes de héros (bambous, planète, volcan, cristaux, ruches, engrenages…)",
+    "Ombres plus nettes et plus stables, sol de l'accueil qui ne scintille plus",
+    "Mode En ligne : le bouton est là, le serveur sera branché dans une prochaine version"
   ],
   "native": 230,
   "base": "www/",
   "files": [
     "brick_diffuse.jpg",
+    "fonts/bangers-latin-400-normal.woff2",
     "fonts/orbitron-latin-700-normal.woff2",
     "fonts/orbitron-latin-900-normal.woff2",
     "fonts/rajdhani-latin-500-normal.woff2",
