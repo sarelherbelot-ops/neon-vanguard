@@ -1,14 +1,11 @@
 {
-  "version": "3.8.0",
+  "version": "3.10.0",
   "date": "2026-11-16",
   "notes": [
-    "3 héros ultimes : Drakar, Miraë et Vorgath, niveau 30 dès le départ (il faut posséder les 9 héros)",
-    "Niveaux des héros : de 1 à 30, +1 % de vie et de dégâts par niveau",
-    "Boutique : armes, pouvoirs à acheter et à échanger, effets visuels pour chaque héros",
-    "9 cartes, une par héros, au choix avant la partie",
-    "2 tenues par héros à débloquer par défis",
-    "Évolution des héros à chaque étoile, forme légendaire à 5 étoiles",
-    "Accueil : ruban LED blanc fixe, plus de clignotement"
+    "Héros plus détaillés : plaques, rivets, sangles, armes rangées, talismans, chaînes, crânes et runes propres à chaque héros",
+    "Armures à panneaux en relief pour Kael et Drakar",
+    "Moins d'éblouissement à l'accueil : on voit mieux les héros",
+    "Rappel 3.9 : salto, vol, esquive, combos aux poings, plongeon explosif, pièces visibles à chaque achat"
   ],
   "native": 230,
   "base": "www/",
