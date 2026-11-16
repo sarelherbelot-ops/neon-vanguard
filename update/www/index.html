@@ -369,6 +369,17 @@ html,body{font-weight:600;font-size:15px;letter-spacing:.02em}
 @media (max-height:520px) and (orientation:landscape){.hleft{top:46px;bottom:4px;gap:5px;width:clamp(170px,22vw,210px)}.hleft .tile{min-height:46px;padding:5px 10px;grid-template-columns:34px 1fr}.hleft .tile i{font-size:22px}.hleft .tile b{font-size:8px}.hleft .tile small{font-size:9px}.hbot{left:clamp(170px,22vw,210px)}}
 @media (orientation:portrait){.hleft{top:62px;bottom:150px;width:150px;gap:6px}.hleft .tile{min-height:52px;padding:6px 8px;grid-template-columns:30px 1fr;column-gap:6px}.hleft .tile i{font-size:22px}.hleft .tile b{font-size:8px}.hleft .tile small{font-size:9px}.hbot{left:0}#tapHint{left:calc(50% + 70px);bottom:auto;top:70px}.hbtns{flex-direction:column}}
 #home.shifted .hleft{display:none}
+.evo{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.evo i{font-style:normal;flex:1 1 150px;padding:4px 7px;border-left:3px solid #2a3442;background:rgba(255,255,255,.03);opacity:.5}
+.evo i b{display:block;font-size:11px;color:#9fb0c4}.evo i span{font-size:10px;color:#7f8ea0;line-height:1.2;display:block}
+.evo i.got{opacity:1;border-left-color:var(--c)}.evo i.got b{color:var(--c)}.evo i.next{opacity:1;border-left-color:#fff;background:rgba(255,255,255,.07)}.evo i.next b{color:#fff}
+.srow{align-items:flex-start}
+#tapHint{animation:none!important;opacity:.75;transition:opacity 1s}
+.mapsel{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.mapsel b{font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:.15em;color:#7ff6ff;margin-right:4px}
+.chipm{pointer-events:auto;padding:7px 10px;border:1px solid rgba(0,229,255,.3);background:rgba(0,229,255,.06);color:#cfe0f2;font-family:Rajdhani,sans-serif;font-weight:700;font-size:12px;clip-path:var(--chs);cursor:pointer}.chipm.on{background:linear-gradient(100deg,#00e5ff,#8a5cff);color:#021018;border-color:transparent}
+.tlv{text-align:center;font-family:Orbitron,sans-serif;font-size:9px;letter-spacing:.12em;color:var(--c);margin-top:-2px}
+.ulth{margin:8px 0 0;font-family:Orbitron,sans-serif;font-size:15px;letter-spacing:.2em;text-align:center;color:#ffd23f;text-shadow:0 0 14px rgba(255,210,63,.7)}
+.hcards.ult .tcard{background:linear-gradient(170deg,color-mix(in srgb,var(--c) 35%,#1a1408) 0%,#0d0e13 60%);box-shadow:0 0 18px rgba(255,210,63,.35);border-color:#ffd23f}
+.shh{margin:6px 0 0;font-family:Orbitron,sans-serif;font-size:12px;letter-spacing:.15em;color:#7ff6ff;border-bottom:1px solid rgba(0,229,255,.25);padding-bottom:4px}
 </style>
 </head>
 <body>
@@ -417,7 +428,8 @@ html,body{font-weight:600;font-size:15px;letter-spacing:.02em}
     <button class="tile" data-p="chest"><i>🧰</i><b>Coffre du mardi</b><small id="tChest"></small><em class="bd" id="bChest"></em></button>
     <button class="tile" data-p="heroes"><i>🦸</i><b>Héros</b><small id="tHeroes"></small><em class="bd" id="bHeroes"></em></button>
     <button class="tile" data-p="gear"><i>⚔️</i><b>Équipement</b><small id="tGear"></small><em class="bd" id="bGear"></em></button>
-    <button class="tile" id="hAtelier"><i>🛡️</i><b>Armures &amp; améliorations</b><small>Tenues et bonus du héros</small></button>
+    <button class="tile" data-p="shop"><i>🔫</i><b>Boutique d'armement</b><small id="tShop"></small></button>
+    <button class="tile" id="hAtelier"><i>🛡️</i><b>Tenues &amp; améliorations</b><small id="tOutfit">Tenues à débloquer par défis</small></button>
     <button class="tile" id="hSet"><i>⚙️</i><b>Réglages</b><small>Options · mises à jour</small></button>
     <button class="tile" id="logout"><i>⏏️</i><b>Déconnexion</b><small>Changer de compte</small></button>
   </div>
