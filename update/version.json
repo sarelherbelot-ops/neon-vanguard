@@ -1,12 +1,14 @@
 {
- "version": "3.28.0",
+ "version": "3.29.0",
  "date": "2026-11-17",
  "notes": [
+  "Coups plus satisfaisants : chiffres de dégâts qui sautent et se cumulent (jaune à la tête, orange au corps à corps)",
+  "Étincelle d'impact, micro-pause sur les tirs à la tête, le corps à corps et les éliminations",
+  "Secousse d'écran plus douce et naturelle, la cible sursaute quand elle est touchée",
+  "Flèche rouge au bord de l'écran : tu vois d'où vient le tir qui te touche",
+  "Nouveaux sons d'impact : choc, « ding » à la tête, explosion grave au kill",
   "Héros deux fois moins rapides (3,3 m/s) : déplacements plus posés, pour toi comme pour les adversaires",
-  "Les pieds restent posés au sol et les pas s'adaptent à la nouvelle vitesse",
-  "Pieds posés au sol : les héros réalistes posent vraiment leurs pieds (plus de glissade ni de pieds qui flottent)",
-  "Les pas suivent la vitesse réelle, les genoux plient vers l'avant, les pieds suivent les pentes et les marches",
-  "Pendant un saut, à cheval ou en mourant, l'animation habituelle reprend en douceur"
+  "Les pieds restent posés au sol et les pas s'adaptent à la nouvelle vitesse"
  ],
  "native": 230,
  "base": "www/",
