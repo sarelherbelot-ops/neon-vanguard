@@ -1,14 +1,13 @@
 {
- "version": "3.29.0",
+ "version": "3.30.0",
  "date": "2026-11-17",
  "notes": [
+  "Corrigé : la lumière blanche/jaune qui restait figée après les tirs et les effets",
+  "Corrigé : plus aucun ralenti quand on tire ou qu'on frappe",
+  "On voit enfin quand on touche : la cible s'illumine en rouge, croix de touche plus grande et plus longue",
+  "Chiffres de dégâts et étincelles plus fluides (mis à jour à chaque image)",
   "Coups plus satisfaisants : chiffres de dégâts qui sautent et se cumulent (jaune à la tête, orange au corps à corps)",
-  "Étincelle d'impact, micro-pause sur les tirs à la tête, le corps à corps et les éliminations",
-  "Secousse d'écran plus douce et naturelle, la cible sursaute quand elle est touchée",
-  "Flèche rouge au bord de l'écran : tu vois d'où vient le tir qui te touche",
-  "Nouveaux sons d'impact : choc, « ding » à la tête, explosion grave au kill",
-  "Héros deux fois moins rapides (3,3 m/s) : déplacements plus posés, pour toi comme pour les adversaires",
-  "Les pieds restent posés au sol et les pas s'adaptent à la nouvelle vitesse"
+  "Étincelle d'impact, micro-pause sur les tirs à la tête, le corps à corps et les éliminations"
  ],
  "native": 230,
  "base": "www/",
