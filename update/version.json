@@ -1,15 +1,14 @@
 {
- "version": "3.18.0",
+ "version": "3.19.0",
  "date": "2026-11-17",
  "notes": [
-  "Héros d'essai : le Paladin, premier héros en 3D généré par IA (à choisir dans Héros, tout en bas de la liste)",
+  "En combat : les 12 héros passent en version 3D réaliste (modèles générés par IA) et le rendu devient réaliste",
+  "L'accueil, la boutique et les menus gardent leur style coloré",
   "VERSION DÉMO : tous les héros, sorts et montures restent ouverts",
   "Nouvelle interface : accueil, boutique et menus en gros boutons colorés, bouton JOUER en bas à droite",
   "Combat : jauge de mana et barre de 5 sorts (frappe, 3 sorts, ultime) avec coût et temps de recharge",
   "Sorts à équiper dans la fiche de chaque héros (ses 2 sorts + 8 sorts communs)",
-  "Une monture par héros (chien robot, renard, dragon…) : bouton MONTURE, +55 % de vitesse",
-  "Héros plus rapides à pied, jeu allégé pour viser 60 images par seconde",
-  "Style peint amélioré : ciel et nuages peints sur toutes les cartes"
+  "Une monture par héros (chien robot, renard, dragon…) : bouton MONTURE, +55 % de vitesse"
  ],
  "native": 230,
  "base": "www/",
