@@ -1,8 +1,9 @@
 {
- "version": "3.17.0",
+ "version": "3.18.0",
  "date": "2026-11-17",
  "notes": [
-  "VERSION DÉMO : tous les héros, tous les sorts et toutes les montures sont ouverts pour les essais",
+  "Héros d'essai : le Paladin, premier héros en 3D généré par IA (à choisir dans Héros, tout en bas de la liste)",
+  "VERSION DÉMO : tous les héros, sorts et montures restent ouverts",
   "Nouvelle interface : accueil, boutique et menus en gros boutons colorés, bouton JOUER en bas à droite",
   "Combat : jauge de mana et barre de 5 sorts (frappe, 3 sorts, ultime) avec coût et temps de recharge",
   "Sorts à équiper dans la fiche de chaque héros (ses 2 sorts + 8 sorts communs)",
