@@ -548,6 +548,11 @@ button{transition:transform .2s cubic-bezier(.3,2.4,.5,1)}button:active{transfor
   .phead h2,#pTitle{font-size:19px!important}.play{font-size:18px!important;min-height:40px}}
 @media (orientation:portrait){.sysb{display:none}.hinfo{min-width:120px!important}.hcol.hleft{grid-template-columns:repeat(5,min(17vw,72px))!important;left:0!important;right:0!important;top:70px!important;bottom:auto!important;width:auto!important;max-width:none!important;overflow:visible!important;padding:0!important;justify-content:center!important;align-content:start!important}#home .hleft .tile{width:min(17vw,72px)!important;height:min(17vw,72px)!important}.hcol.hright{display:none}.hbtns{position:static;align-items:stretch!important;width:min(86vw,360px)!important}.hbtns #playBtn{min-height:64px!important}}
 .demoB{position:absolute;left:50%;top:max(6px,env(safe-area-inset-top));transform:translateX(-50%);padding:1px 10px;border:2px solid #0b0d16;border-radius:8px;background:#ff3d6e;color:#fff;font:400 12px Bangers,sans-serif;letter-spacing:.1em;opacity:.85;pointer-events:none;z-index:3}#start .demoB{top:auto;bottom:10px;left:auto;right:12px;transform:none}
+/* montures : carte avec image, nom, héros */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}.mtc{display:flex;flex-direction:column;gap:3px;padding:6px;border:3px solid #0b0d16;border-radius:16px;background:linear-gradient(180deg,#4a6fe0,#2b46a8);box-shadow:0 5px 0 #0b0d16;color:#fff;text-align:left;cursor:pointer;font-family:Rajdhani,sans-serif}
+.mtc img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;border:2px solid #0b0d16}.mtc b{font-family:Bangers,sans-serif;font-weight:400;font-size:20px;letter-spacing:.04em;text-shadow:0 2px 0 #0b0d16}.mtc span{font-size:11px;color:#e3ecff;line-height:1.2}.mtc em{font-style:normal;font-size:11px;font-weight:700;color:#ffe24a}.mtc.me{background:linear-gradient(180deg,#ffd84a,#f08a12)}.mtc.me span{color:#3a2500}
+@media (max-height:520px) and (orientation:landscape){.hcol.hleft{grid-template-columns:repeat(3,auto)!important;align-content:start!important;width:auto!important;overflow:visible!important;top:max(62px,15vh)!important;gap:6px 6px!important}#home .hleft .tile{width:min(16vh,66px)!important;height:min(16vh,66px)!important;aspect-ratio:1!important}#home .tile i{font-size:min(5.4vh,22px)!important}#home .tile b{font-size:8.5px!important}}
+@media (orientation:portrait){.hcol.hleft{grid-template-columns:repeat(6,min(14.5vw,62px))!important}#home .hleft .tile{width:min(14.5vw,62px)!important;height:min(14.5vw,62px)!important}}
 </style>
 </head>
 <body>
@@ -601,6 +606,7 @@ button{transition:transform .2s cubic-bezier(.3,2.4,.5,1)}button:active{transfor
     <button class="tile" data-p="defis"><i>🎯</i><b>Défis</b><small id="tDefis"></small><em class="bd" id="bDefis"></em></button>
     <button class="tile" data-p="chest"><i>🧰</i><b>Coffre du mardi</b><small id="tChest"></small><em class="bd" id="bChest"></em></button>
     <button class="tile" data-p="heroes"><i>🦸</i><b>Héros</b><small id="tHeroes"></small><em class="bd" id="bHeroes"></em></button>
+    <button class="tile" data-p="mounts"><i>🐉</i><b>Montures</b><small>Voir les montures</small></button>
     <button class="tile" data-p="gear"><i>⚔️</i><b>Équipement</b><small id="tGear"></small><em class="bd" id="bGear"></em></button>
     <button class="tile" data-p="shop"><i>🔫</i><b>Boutique d'armement</b><small id="tShop"></small></button>
     <button class="tile" id="hAtelier"><i>🛡️</i><b>Tenues &amp; améliorations</b><small id="tOutfit">Tenues à débloquer par défis</small></button>

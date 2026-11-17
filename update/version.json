@@ -1,14 +1,14 @@
 {
- "version": "3.23.0",
+ "version": "3.24.0",
  "date": "2026-11-17",
  "notes": [
+  "Déplacements refaits : vraie course, pas de côté et recul, pieds qui ne glissent plus, bras qui balancent",
+  "Tirs bien visibles : balles, boules d'énergie et rayons plus gros avec traînée, éclair et lumière au canon, étincelles à l'impact",
+  "Nouvelle icône Montures à l'accueil : toutes les montures en image, touche-en une pour la voir en grand",
   "Héros plus détaillés : textures deux fois plus fines, modèles plus précis et surfaces lisses (plus de facettes)",
   "Matières réelles conservées (métal, cuir, tissu) et lumière qui suit ta caméra pour bien voir ton héros",
   "Les héros réalistes ne portent plus d'accessoires ajoutés : ils sont identiques à leur photo",
-  "Caméra de combat et de l'accueil plus proche du héros",
-  "Nouvelles photos des héros (versions réalistes) partout dans le jeu",
-  "Balles bien visibles : traits lumineux qui filent jusqu'à la cible",
-  "Cercle au sol sous chaque héros : rouge = ennemi, bleu = allié, or = toi"
+  "Caméra de combat et de l'accueil plus proche du héros"
  ],
  "native": 230,
  "base": "www/",
@@ -65,6 +65,18 @@
   "real/volt.glb",
   "real/vorgath.glb",
   "real/zyrra.glb",
-  "img/h/paladin.jpg"
+  "img/h/paladin.jpg",
+  "img/m/drakar.jpg",
+  "img/m/elyndra.jpg",
+  "img/m/grakk.jpg",
+  "img/m/kael.jpg",
+  "img/m/kaira.jpg",
+  "img/m/mirae.jpg",
+  "img/m/nyx.jpg",
+  "img/m/thorgar.jpg",
+  "img/m/titan.jpg",
+  "img/m/volt.jpg",
+  "img/m/vorgath.jpg",
+  "img/m/zyrra.jpg"
  ]
 }
