@@ -553,18 +553,6 @@ button{transition:transform .2s cubic-bezier(.3,2.4,.5,1)}button:active{transfor
 .mtc img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;border:2px solid #0b0d16}.mtc b{font-family:Bangers,sans-serif;font-weight:400;font-size:20px;letter-spacing:.04em;text-shadow:0 2px 0 #0b0d16}.mtc span{font-size:11px;color:#e3ecff;line-height:1.2}.mtc em{font-style:normal;font-size:11px;font-weight:700;color:#ffe24a}.mtc.me{background:linear-gradient(180deg,#ffd84a,#f08a12)}.mtc.me span{color:#3a2500}
 @media (max-height:520px) and (orientation:landscape){.hcol.hleft{grid-template-columns:repeat(3,auto)!important;align-content:start!important;width:auto!important;overflow:visible!important;top:max(62px,15vh)!important;gap:6px 6px!important}#home .hleft .tile{width:min(16vh,66px)!important;height:min(16vh,66px)!important;aspect-ratio:1!important}#home .tile i{font-size:min(5.4vh,22px)!important}#home .tile b{font-size:8.5px!important}}
 @media (orientation:portrait){.hcol.hleft{grid-template-columns:repeat(6,min(14.5vw,62px))!important}#home .hleft .tile{width:min(14.5vw,62px)!important;height:min(14.5vw,62px)!important}}
-/* ===== Combat : barre de vie + mana en haut à gauche, carte et défi en dessous, viseur central retiré (cible verrouillée en jeu) ===== */
-#hud #hp{left:max(8px,env(safe-area-inset-left));top:6px;bottom:auto;width:min(340px,40vw);padding:6px 10px 6px 6px;gap:9px;border-radius:14px;border:3px solid #0b0d16;background:linear-gradient(180deg,rgba(28,38,80,.92),rgba(12,16,36,.92));box-shadow:0 4px 0 #0b0d16}
-#hud #hp .pic{position:relative;flex:none;width:52px;height:52px}#hud #hp .pic img{width:52px;height:52px;border-radius:12px;object-fit:cover;object-position:50% 12%;border:2px solid #ffd23f;background:#222}
-#hud #hp .pic .lv{position:absolute;right:-6px;bottom:-6px;width:22px!important;height:22px!important;font-size:11px!important}
-#hud #hp .n{font-size:12px;color:#fff;letter-spacing:.06em}
-#hud #hpb{height:14px;border-radius:7px;border:2px solid #0b0d16;background:#3a0f12}#hud #hpv{background:linear-gradient(180deg,#7dff6a,#2fbf3a)}
-#hpt,#mpt{position:absolute;inset:0;font:700 10px/12px Rajdhani,sans-serif;text-align:center;color:#fff;text-shadow:0 1px 2px #000,0 0 3px #000}
-#hud #mp{height:11px;border-radius:6px;border:2px solid #0b0d16}#mpt{font-size:9px;line-height:8px}
-#fxs{display:flex;gap:3px;margin-top:3px;min-height:16px}#fxs i{font-style:normal;font-size:11px;line-height:16px;min-width:16px;padding:0 3px;border-radius:5px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);color:#fff;text-align:center}
-#hud #mini{left:max(8px,env(safe-area-inset-left));top:auto;bottom:auto;top:96px;width:86px;height:86px}#hud #chal{left:calc(max(8px,env(safe-area-inset-left)) + 94px);top:96px;max-width:190px}
-#hud #cross{display:none}#hud #scope{display:none!important}
-@media (max-height:520px){#hud #hp{width:min(300px,36vw);padding:4px 8px 4px 4px}#hud #hp .pic,#hud #hp .pic img{width:42px;height:42px}#hud #mini{top:80px;width:74px;height:74px}#hud #chal{top:80px;left:calc(max(8px,env(safe-area-inset-left)) + 82px)}}
 </style>
 </head>
 <body>
@@ -582,7 +570,7 @@ button{transition:transform .2s cubic-bezier(.3,2.4,.5,1)}button:active{transfor
   <div id="hit"><i style="transform:rotate(45deg) translateX(-12px)"></i><i style="transform:rotate(-45deg) translateX(-12px)"></i><i style="transform:rotate(45deg) translateX(12px)"></i><i style="transform:rotate(-45deg) translateX(12px)"></i></div>
   <div id="confirm"><div id="cK"></div><div id="cP"></div></div>
   <div id="dead"><b>TU ES ÉLIMINÉ</b><span id="deadTxt"></span></div>
-  <div id="hp" class="pan"><div class="pic"><img id="hPic" alt=""><div class="lv" id="hLv">1</div></div><div class="col"><div class="n" id="hName">VOLT</div><div class="bar" id="hpb"><div id="hpv"></div><div id="shv"></div><span id="hpt"></span></div><div class="bar" id="mp"><div id="mpv"></div><span id="mpt">100 / 100</span></div><div id="xpv"><div></div></div><div id="fxs"></div></div></div>
+  <div id="hp" class="pan"><div class="lv" id="hLv">1</div><div class="col"><div class="n" id="hName">VOLT</div><div class="bar"><div id="hpv"></div><div id="shv"></div></div><div class="bar" id="mp"><div id="mpv"></div><span id="mpt">100 / 100</span></div><div id="xpv"><div></div></div></div></div>
   <div id="swap" class="pan" style="pointer-events:none"><div class="wn" id="wName">ARME</div><div class="am"><span id="am">30</span> <small id="amMax">/ 30</small></div></div>
   <div id="joyHint"></div>
   <div id="joy"><div id="thumb"></div></div>
