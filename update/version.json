@@ -1,14 +1,14 @@
 {
- "version": "3.21.0",
+ "version": "3.22.0",
  "date": "2026-11-17",
  "notes": [
+  "Nouvelles photos des héros (versions réalistes) partout dans le jeu",
+  "Balles bien visibles : traits lumineux qui filent jusqu'à la cible",
+  "Cercle au sol sous chaque héros : rouge = ennemi, bleu = allié, or = toi",
+  "Hors ligne : départ et réapparition au hasard n'importe où sur la carte",
+  "Les feuillages ne cachent plus ton héros quand la caméra passe dans un arbre",
   "Héros refaits : vrais modèles 3D texturés tout autour (face, dos, côtés), bien plus détaillés",
-  "Tout le jeu reste en rendu réaliste, l'interface garde son style coloré",
-  "VERSION DÉMO : tous les héros, sorts et montures restent ouverts",
-  "Nouvelle interface : accueil, boutique et menus en gros boutons colorés, bouton JOUER en bas à droite",
-  "Combat : jauge de mana et barre de 5 sorts (frappe, 3 sorts, ultime) avec coût et temps de recharge",
-  "Sorts à équiper dans la fiche de chaque héros (ses 2 sorts + 8 sorts communs)",
-  "Une monture par héros (chien robot, renard, dragon…) : bouton MONTURE, +55 % de vitesse"
+  "Tout le jeu reste en rendu réaliste, l'interface garde son style coloré"
  ],
  "native": 230,
  "base": "www/",
@@ -64,6 +64,7 @@
   "real/titan.glb",
   "real/volt.glb",
   "real/vorgath.glb",
-  "real/zyrra.glb"
+  "real/zyrra.glb",
+  "img/h/paladin.jpg"
  ]
 }
