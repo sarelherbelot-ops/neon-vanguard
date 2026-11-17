@@ -1,14 +1,14 @@
 {
- "version": "3.22.0",
+ "version": "3.23.0",
  "date": "2026-11-17",
  "notes": [
+  "Héros plus détaillés : textures deux fois plus fines, modèles plus précis et surfaces lisses (plus de facettes)",
+  "Matières réelles conservées (métal, cuir, tissu) et lumière qui suit ta caméra pour bien voir ton héros",
+  "Les héros réalistes ne portent plus d'accessoires ajoutés : ils sont identiques à leur photo",
+  "Caméra de combat et de l'accueil plus proche du héros",
   "Nouvelles photos des héros (versions réalistes) partout dans le jeu",
   "Balles bien visibles : traits lumineux qui filent jusqu'à la cible",
-  "Cercle au sol sous chaque héros : rouge = ennemi, bleu = allié, or = toi",
-  "Hors ligne : départ et réapparition au hasard n'importe où sur la carte",
-  "Les feuillages ne cachent plus ton héros quand la caméra passe dans un arbre",
-  "Héros refaits : vrais modèles 3D texturés tout autour (face, dos, côtés), bien plus détaillés",
-  "Tout le jeu reste en rendu réaliste, l'interface garde son style coloré"
+  "Cercle au sol sous chaque héros : rouge = ennemi, bleu = allié, or = toi"
  ],
  "native": 230,
  "base": "www/",
