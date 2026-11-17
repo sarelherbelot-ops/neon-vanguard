@@ -1,13 +1,14 @@
 {
- "version": "3.30.0",
+ "version": "3.31.0",
  "date": "2026-11-17",
  "notes": [
+  "Niveaux des bots (parties hors ligne) : Facile, Moyen, Difficile, Très difficile — à choisir dans Modes de jeu",
+  "Portée des armes affichée : sur la fiche du héros, la boutique et sous le nombre de balles",
+  "Réticule intelligent : rouge sur un ennemi, avec la distance et les dégâts (vert 100 %, orange réduits, gris trop loin)",
+  "Les tirs à distance perdent de la force après leur portée efficace (jusqu'à 50 %), et s'arrêtent à la portée max",
   "Corrigé : la lumière blanche/jaune qui restait figée après les tirs et les effets",
   "Corrigé : plus aucun ralenti quand on tire ou qu'on frappe",
-  "On voit enfin quand on touche : la cible s'illumine en rouge, croix de touche plus grande et plus longue",
-  "Chiffres de dégâts et étincelles plus fluides (mis à jour à chaque image)",
-  "Coups plus satisfaisants : chiffres de dégâts qui sautent et se cumulent (jaune à la tête, orange au corps à corps)",
-  "Étincelle d'impact, micro-pause sur les tirs à la tête, le corps à corps et les éliminations"
+  "On voit enfin quand on touche : la cible s'illumine en rouge, croix de touche plus grande et plus longue"
  ],
  "native": 230,
  "base": "www/",

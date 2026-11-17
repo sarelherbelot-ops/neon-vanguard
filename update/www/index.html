@@ -47,6 +47,10 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07080b;fon
 #swap{position:absolute;right:10px;top:26%;padding:6px 10px;pointer-events:auto;text-align:right;min-width:120px}
 #swap .wn{font-size:11px;font-weight:700;color:#8fd8ff;letter-spacing:.04em}
 #swap .am{font-size:20px;font-weight:800}#swap small{font-size:11px;color:#cbbd96}
+#swap .wr{font-size:10px;font-weight:700;color:#bfe9b0;letter-spacing:.03em;margin-top:1px}
+#rng{position:absolute;left:50%;top:50%;transform:translate(-50%,22px);font:800 12px Rajdhani,sans-serif;letter-spacing:.04em;padding:1px 7px;border-radius:6px;background:rgba(0,0,0,.45);white-space:nowrap;opacity:0;pointer-events:none}
+#cross.tg i{background:#ff3b30}#cross.far i{background:rgba(160,160,160,.9)}
+.rng{color:#bfe9b0}
 #joy{position:absolute;width:126px;height:126px;margin:-63px;border-radius:50%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.22);display:none}
 #thumb{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px;border-radius:50%;background:rgba(255,255,255,.3);border:2px solid rgba(255,255,255,.5)}
 #joyHint{position:absolute;left:9%;bottom:20%;width:104px;height:104px;border-radius:50%;border:2px dashed rgba(255,255,255,.16)}
@@ -566,12 +570,12 @@ button{transition:transform .2s cubic-bezier(.3,2.4,.5,1)}button:active{transfor
   <div id="score" class="pan"><span class="t b" id="sB">0</span><span id="clk">4:00</span><span class="t r" id="sR">0</span></div>
   <div id="toast" class="pan"><b id="toastT"></b><span id="toastS"></span></div>
   <div id="feed"></div>
-  <div id="cross"><i style="left:-13px;top:-1px;width:8px;height:2px"></i><i style="left:5px;top:-1px;width:8px;height:2px"></i><i style="left:-1px;top:-13px;width:2px;height:8px"></i><i style="left:-1px;top:5px;width:2px;height:8px"></i></div>
+  <div id="rng"></div><div id="cross"><i style="left:-13px;top:-1px;width:8px;height:2px"></i><i style="left:5px;top:-1px;width:8px;height:2px"></i><i style="left:-1px;top:-13px;width:2px;height:8px"></i><i style="left:-1px;top:5px;width:2px;height:8px"></i></div>
   <div id="hit"><i style="transform:rotate(45deg) translateX(-12px)"></i><i style="transform:rotate(-45deg) translateX(-12px)"></i><i style="transform:rotate(45deg) translateX(12px)"></i><i style="transform:rotate(-45deg) translateX(12px)"></i></div>
   <div id="confirm"><div id="cK"></div><div id="cP"></div></div>
   <div id="dead"><b>TU ES ÉLIMINÉ</b><span id="deadTxt"></span></div>
   <div id="hp" class="pan"><div class="lv" id="hLv">1</div><div class="col"><div class="n" id="hName">VOLT</div><div class="bar"><div id="hpv"></div><div id="shv"></div></div><div class="bar" id="mp"><div id="mpv"></div><span id="mpt">100 / 100</span></div><div id="xpv"><div></div></div></div></div>
-  <div id="swap" class="pan" style="pointer-events:none"><div class="wn" id="wName">ARME</div><div class="am"><span id="am">30</span> <small id="amMax">/ 30</small></div></div>
+  <div id="swap" class="pan" style="pointer-events:none"><div class="wn" id="wName">ARME</div><div class="am"><span id="am">30</span> <small id="amMax">/ 30</small></div><div class="wr" id="wRng"></div></div>
   <div id="joyHint"></div>
   <div id="joy"><div id="thumb"></div></div>
   <div class="btn sl" id="melee"><span class="ic">✊</span><span class="k">FRAPPE</span><u>1</u></div>
