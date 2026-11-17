@@ -61,6 +61,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07080b;fon
 #jump{right:calc(4% + 108px);bottom:calc(11% - 16px);width:56px;height:56px}
 #melee{right:calc(4% + 174px);bottom:calc(11% - 22px);width:58px;height:58px;font-size:20px;border-color:#ff8a3a!important;box-shadow:0 0 12px rgba(255,138,58,.35)}
 #dash{right:calc(4% + 182px);bottom:calc(11% + 50px);width:52px;height:52px;font-size:18px}
+#mount{right:calc(4% + 246px);bottom:calc(11% + 8px);width:54px;height:54px;font-size:20px;border-color:#ffd23f!important;box-shadow:0 0 12px rgba(255,210,63,.3)}
+#mount.act{background:rgba(255,210,63,.4)}
 #ab1{right:calc(4% + 116px);bottom:calc(11% + 48px);width:58px;height:58px;font-size:18px}
 #ab2{right:calc(4% + 60px);bottom:calc(11% + 112px);width:58px;height:58px;font-size:18px}
 #ult{right:calc(4% - 4px);bottom:calc(11% + 112px);width:62px;height:62px;font-size:22px;border-color:#5ff3ff}
@@ -463,6 +465,89 @@ body.toon .sb,body.toon .chipm{clip-path:none;border:2px solid #10131c;border-ra
 body.toon .tile b{font-size:12px}body.toon .sb{font-size:13px}body.toon .chipm{font-size:14px}
 body.toon #cdn{-webkit-text-stroke:3px #10131c;text-shadow:6px 6px 0 #10131c}
 body.toon .mcard{clip-path:none;border:3px solid #10131c;border-radius:12px;box-shadow:5px 5px 0 #10131c}
+
+/* ===== Combat façon jeu de rôle : barre de sorts en bas au centre, jauge de mana ===== */
+#mp{height:9px;margin-top:3px;background:rgba(10,20,50,.7);border:1px solid rgba(90,150,255,.5)}#mpv{height:100%;width:100%;background:linear-gradient(90deg,#2a6bff,#5fc0ff);transition:width .15s}
+#mpt{position:absolute;inset:0;font:700 8px/9px Rajdhani,sans-serif;text-align:center;color:#fff;text-shadow:0 1px 2px #000}#mp.low{animation:mplow .25s 2}@keyframes mplow{50%{box-shadow:0 0 0 3px #ff4a4a;border-color:#ff4a4a}}
+#hud .btn.sl{right:auto;bottom:max(8px,env(safe-area-inset-bottom));width:52px;height:52px;border-radius:9px;border:2px solid #c9a24a!important;background:linear-gradient(180deg,#3a3122,#16120b);box-shadow:0 0 0 2px #000,inset 0 0 10px rgba(0,0,0,.7)!important;font-size:21px;color:#ffe9b0;overflow:hidden}
+#hud .btn.sl::before{inset:-4px;border-radius:9px}#hud .btn.sl .k{font-size:6.5px;letter-spacing:.02em;opacity:.85;max-width:48px;overflow:hidden;white-space:nowrap}
+#hud .btn.sl .cd{border-radius:0}#hud .btn.sl.on{background:linear-gradient(180deg,#8a6a22,#3a2c10);border-color:#ffe08a!important}
+#hud .btn.sl u{position:absolute;left:3px;top:1px;font:700 9px Rajdhani,sans-serif;text-decoration:none;color:#d8c9a0;text-shadow:0 1px 1px #000}
+#hud .btn.sl .mc{position:absolute;right:3px;top:1px;font:700 9px Rajdhani,sans-serif;font-style:normal;color:#6cc0ff;text-shadow:0 1px 1px #000}
+#hud .btn.sl .ct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 20px Rajdhani,sans-serif;color:#fff;text-shadow:0 0 4px #000,0 1px 2px #000;pointer-events:none}
+#hud .btn.sl.nom{filter:saturate(.3) brightness(.7)}#hud .btn.sl.nom .mc{color:#ff6a6a}
+#melee{left:calc(50% - 142px)}#ab1{left:calc(50% - 85px)}#ab2{left:calc(50% - 28px)}#ab3{left:calc(50% + 29px)}#ult{left:calc(50% + 86px)}
+#hud #ult.sl{border-color:#ffd23f!important}#mount{right:calc(4% + 116px);bottom:calc(11% + 48px)}#dash{right:calc(4% + 176px);bottom:calc(11% - 14px)}
+/* grimoire dans la fiche du héros */
+.spb{display:flex;flex-direction:column;gap:6px}.spt{font-size:12px;color:#ffe08a}.spt small{font-weight:500;color:#9fb0c4;margin-left:6px}
+.sps{display:flex;gap:6px}.spslot{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:9px;border:2px solid #000;background:linear-gradient(180deg,var(--c),#1a1d26 140%);color:#fff;cursor:pointer;box-shadow:0 3px 0 #000}
+.spslot i{font-style:normal;font-size:20px;line-height:1}.spslot span{font-size:9px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.spslot.on{outline:3px solid #ffd23f;outline-offset:1px}
+.spl{display:flex;flex-direction:column;gap:5px}.spc{display:flex;gap:8px;align-items:center;text-align:left;padding:5px 8px;border-radius:9px;border:2px solid #000;border-left:7px solid var(--c);background:#1b2233;color:#fff;cursor:pointer;box-shadow:0 2px 0 #000}
+.spc i{font-style:normal;font-size:20px;width:26px;text-align:center;flex:none}.spc b{display:block;font-size:12px}.spc small{display:block;font-size:10px;color:#b9c4d4;line-height:1.2}.spc em{display:block;font-style:normal;font-size:9px;font-weight:700;color:var(--c)}
+.spc.on{background:#2c3a1c;border-color:#7dff4a;border-left-color:var(--c)}.spc.lk{opacity:.55}
+
+/* ===== Habillage « cartoon mobile » des écrans hors combat : gros boutons colorés, contours noirs épais, lettrage percutant, rebond au toucher ===== */
+:root{--ol:#0b0d16;--y1:#ffe24a;--y2:#ff9a1a;--b1:#3d7bff;--b2:#1c3fb8}
+button{transition:transform .2s cubic-bezier(.3,2.4,.5,1)}button:active{transform:scale(.9)!important;transition-duration:.05s}
+#home::after{display:none}#home{background:linear-gradient(0deg,rgba(8,14,40,.75) 0%,rgba(8,14,40,0) 30%),linear-gradient(180deg,rgba(8,14,40,.55) 0%,rgba(8,14,40,0) 16%)}
+.play,.sb,.tile,.cur,.lv,.rcard,.htop,.bd,.tab,.ib,.pcard,.card,.hc,.cinfo,.mcard,.gcard,.chip{clip-path:none!important}
+.tile::before,.phead h2::before,.rcard::before,.pcard::before,.card::before,.mcard::before,.gcard::before{display:none!important}
+.play,.sb,.tile b,.phead h2,#pTitle,.card h1,.clist h2,.cinfo h3,#mHero,.hinfo b,.cur,.tab,.logo .a,.tap,#reveal h2,.mcard b,.rcard b,.lv,#endT{font-family:Bangers,Orbitron,sans-serif!important;font-weight:400!important;letter-spacing:.05em!important}
+/* gros bouton principal jaune-orange */
+.play{border:4px solid var(--ol)!important;border-radius:16px!important;background:linear-gradient(180deg,var(--y1) 0%,#ffc21a 48%,var(--y2) 52%,#ff7a12 100%)!important;color:#fff!important;font-size:24px!important;-webkit-text-stroke:1.2px var(--ol);text-shadow:0 3px 0 var(--ol)!important;box-shadow:0 6px 0 var(--ol),inset 0 3px 0 rgba(255,255,255,.55)!important;min-height:50px}
+.play.online{background:linear-gradient(180deg,#6fd0ff 0%,#3d9bff 48%,#2a6fe8 52%,#1c4fc0 100%)!important}.play:disabled{filter:grayscale(.8);font-size:13px!important}
+.sb{border:3px solid var(--ol)!important;border-radius:12px!important;background:linear-gradient(180deg,#5c93ff,#2a55d4)!important;color:#fff!important;font-size:14px!important;text-shadow:0 2px 0 var(--ol);box-shadow:0 4px 0 var(--ol),inset 0 2px 0 rgba(255,255,255,.4)!important}
+.ib{border:3px solid var(--ol)!important;border-radius:12px!important;background:linear-gradient(180deg,#ff6a5a,#d42a2a)!important;color:#fff!important;font-weight:900;box-shadow:0 4px 0 var(--ol)!important}
+/* accueil : barre du haut */
+.htop{background:none!important;padding:0!important}.htop .lv{width:46px;height:46px;border-radius:14px!important;border:3px solid var(--ol);background:linear-gradient(180deg,#7ff6ff,#1c8cff)!important;color:#fff!important;-webkit-text-stroke:1px var(--ol);text-shadow:0 2px 0 var(--ol);box-shadow:0 4px 0 var(--ol)!important;font-size:24px!important}
+.hinfo{padding:4px 12px 6px;border-radius:12px;border:3px solid var(--ol);background:linear-gradient(180deg,#31489e,#1c2a66);box-shadow:0 4px 0 var(--ol);color:#cfe0ff!important}.hinfo b{font-size:18px!important;color:#fff!important;text-shadow:0 2px 0 var(--ol)}
+.prog{border-radius:6px;border:2px solid var(--ol);background:#0d1330!important;height:9px}.prog div,#xpv div{background:linear-gradient(180deg,#8dff5a,#2fc22f)!important}
+.cur{display:flex;align-items:center;gap:6px;padding:3px 14px 3px 6px!important;border:3px solid var(--ol)!important;border-radius:999px!important;background:linear-gradient(180deg,#26346e,#141c44)!important;font-size:20px!important;color:#fff;text-shadow:0 2px 0 var(--ol);box-shadow:0 4px 0 var(--ol)}
+.cur i{font-style:normal;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;border:2px solid var(--ol);background:linear-gradient(180deg,#ff8bec,#b42ad6);color:#fff}.cur.tr i{background:linear-gradient(180deg,var(--y1),var(--y2))}.shards{color:#fff!important}
+.sysb{opacity:.8}
+/* accueil : colonnes de boutons carrés */
+.hcol.hleft{display:grid!important;grid-template-columns:repeat(2,auto);align-content:center;justify-content:start;gap:9px 8px}
+.tile{border:3px solid var(--ol)!important;border-radius:16px!important;background:linear-gradient(180deg,var(--t1,#5c93ff),var(--t2,#2a55d4))!important;box-shadow:0 5px 0 var(--ol),inset 0 3px 0 rgba(255,255,255,.4),inset 0 -6px 0 rgba(0,0,0,.22)!important;color:#fff!important;width:clamp(64px,9vw,92px)!important;overflow:visible!important}
+#home .hleft .tile{display:flex!important;min-height:0!important}#home .tile i,#home .tile b{grid-area:auto!important;width:auto!important;height:auto!important}#home .tile{flex-direction:column!important;align-items:center!important;justify-content:center!important;aspect-ratio:1!important;padding:3px!important;gap:1px!important;text-align:center}#home .tile b{font-size:clamp(9.5px,1.2vw,14px)!important;text-transform:none!important;line-height:.95!important;text-shadow:0 2px 0 var(--ol);white-space:normal;max-width:100%;overflow:hidden;max-height:2em}#home .tile small{display:none!important}
+.tile i{filter:drop-shadow(0 3px 0 rgba(0,0,0,.45))!important;font-size:clamp(22px,3.2vw,34px)!important}
+.tile:nth-child(1){--t1:#ff7ab8;--t2:#d42a7a}.tile:nth-child(2){--t1:#ffd84a;--t2:#f08a12}.tile:nth-child(3){--t1:#ff7a5a;--t2:#d43a2a}.tile:nth-child(4){--t1:#c08bff;--t2:#7a3ad4}.tile:nth-child(5){--t1:#5fd0ff;--t2:#1c7ad4}
+.tile:nth-child(6){--t1:#8dff6a;--t2:#2aa83a}.tile:nth-child(7){--t1:#ffb04a;--t2:#d4651a}.tile:nth-child(8){--t1:#5ce0c8;--t2:#1a9a8a}.tile:nth-child(9){--t1:#9fb0c8;--t2:#56637c}.tile:nth-child(10){--t1:#8a93a8;--t2:#444c60}
+.bd{border-radius:50%!important;border:2px solid var(--ol);background:#ff2a2a!important;box-shadow:none!important;top:-7px!important;right:-7px!important;font-family:Bangers,sans-serif!important}
+.rcard{border:3px solid var(--ol)!important;border-radius:14px!important;background:linear-gradient(180deg,#31489e,#1c2a66)!important;box-shadow:0 4px 0 var(--ol)!important;color:#fff!important}.rcard b{font-size:15px}.rcard span{color:#cfe0ff!important}
+.hcol.hright{bottom:150px;justify-content:flex-start}
+/* accueil : bas d'écran — nom du héros au centre, gros bouton JOUER en bas à droite */
+#mHero{font-size:clamp(24px,4vw,40px)!important;-webkit-text-stroke:1.5px var(--ol);text-shadow:0 4px 0 var(--ol)!important;color:#fff!important}.hname small,#hTheme{color:#ffe9a0!important;text-shadow:0 1px 0 var(--ol);font-weight:700}
+.stars{text-shadow:0 2px 0 var(--ol)!important}
+.hbtns{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:4px;flex-direction:column!important;align-items:flex-end!important;gap:10px!important;width:auto!important}
+.hbtns #playBtn{min-width:clamp(170px,24vw,250px)!important;min-height:clamp(58px,15vh,84px)!important;font-size:clamp(30px,5vw,46px)!important;border-radius:20px!important}
+.hbtns #onlineBtn{min-width:0!important;min-height:38px!important;font-size:17px!important;padding:0 16px;border-width:3px!important;border-radius:12px!important;box-shadow:0 4px 0 var(--ol),inset 0 2px 0 rgba(255,255,255,.5)!important}
+#tapHint{font-family:Bangers,sans-serif;letter-spacing:.08em;color:#fff;text-shadow:0 2px 0 var(--ol)}
+/* fenêtres : boutique, héros, défis, réglages… */
+#panel,#reveal,#menu{background:rgba(10,18,60,.72)!important}
+.pcard,#menu .main,#login .card,.card{border:4px solid var(--ol)!important;border-radius:22px!important;background:linear-gradient(180deg,#3558c8,#22388e)!important;box-shadow:0 8px 0 var(--ol),inset 0 3px 0 rgba(255,255,255,.25)!important;overflow:hidden}
+.phead{background:linear-gradient(180deg,#27409c,#1b2c72)!important;border-bottom:4px solid var(--ol)!important}.phead h2,#pTitle,.card h1,.clist h2,#reveal h2{color:#fff!important;font-size:26px!important;-webkit-text-stroke:1.2px var(--ol);text-shadow:0 3px 0 var(--ol)!important}
+.pbody,.pane{color:#fff}.note{color:#dbe6ff!important;font-weight:600}.note b{color:var(--y1)}
+.mcard,.gcard,.hgrid>*,.pbody .rowb,.chip,.op{border:3px solid var(--ol)!important;border-radius:16px!important;background:linear-gradient(180deg,#4a6fe0,#2b46a8)!important;box-shadow:0 5px 0 var(--ol),inset 0 2px 0 rgba(255,255,255,.3)!important;color:#fff!important}
+.hgrid>*:nth-child(4n+1){background:linear-gradient(180deg,#4a8cf0,#2550b8)!important}.hgrid>*:nth-child(4n+2){background:linear-gradient(180deg,#a66bf0,#6a2fc0)!important}.hgrid>*:nth-child(4n+3){background:linear-gradient(180deg,#f0669a,#c02a64)!important}.hgrid>*:nth-child(4n){background:linear-gradient(180deg,#3fc88a,#1c8a5a)!important}
+.mcard b,.gcard b,.hgrid b{text-shadow:0 2px 0 var(--ol)}.hgrid small,.hgrid span,.mcard span,.gcard span,.gcard small{color:#eaf1ff!important}
+.op{padding:8px 12px;font-weight:700}.op select,.op input[type=range]{accent-color:#ffc21a}
+.tab{border:3px solid var(--ol)!important;border-radius:12px 12px 0 0!important;background:linear-gradient(180deg,#31489e,#1c2a66)!important;color:#cfe0ff!important;font-size:15px!important}.tab.on{background:linear-gradient(180deg,var(--y1),var(--y2))!important;color:#fff!important;text-shadow:0 2px 0 var(--ol)}
+/* fiches des héros */
+.hc{border:3px solid var(--ol)!important;border-radius:14px!important;background:linear-gradient(180deg,#31489e,#1c2a66)!important;box-shadow:0 4px 0 var(--ol)!important}.hc b{font-family:Bangers,sans-serif;font-weight:400;font-size:17px;letter-spacing:.04em;text-shadow:0 2px 0 var(--ol)}.hc span{color:#cfe0ff!important}
+.hc.on{background:linear-gradient(180deg,var(--y1),var(--y2))!important}.hc.on span{color:#3a2500!important;font-weight:700}
+.cinfo{border:4px solid var(--ol)!important;border-radius:20px!important;background:linear-gradient(180deg,#2c49ad,#1b2c72)!important;box-shadow:0 6px 0 var(--ol)!important}.cinfo h3{font-size:30px!important;color:#fff!important;-webkit-text-stroke:1.2px var(--ol);text-shadow:0 3px 0 var(--ol)}.cinfo p{color:#e3ecff!important}.cinfo .tg{color:var(--y1)!important}
+.cinfo .play{font-size:19px!important;min-height:44px}
+/* écran titre */
+#start .logo .a,#login .logo .a{font-size:clamp(40px,9vw,92px)!important;color:var(--y1)!important;-webkit-text-stroke:3px var(--ol);text-shadow:0 6px 0 var(--ol),0 0 30px rgba(255,180,40,.5)!important;background:none!important;-webkit-text-fill-color:var(--y1)}
+#login .logo .a{font-size:clamp(26px,5vw,40px)!important;-webkit-text-stroke:1.5px var(--ol);text-shadow:0 3px 0 var(--ol)!important}
+#start .logo .s,#login .logo .s{font-family:Bangers,sans-serif;color:#fff!important;letter-spacing:.2em;text-shadow:0 2px 0 var(--ol)}
+#start .tap{font-size:clamp(18px,3vw,28px);color:#fff!important;-webkit-text-stroke:1px var(--ol);text-shadow:0 3px 0 var(--ol)}
+.fld{color:#fff!important;font-weight:700}.fld input{border:3px solid var(--ol)!important;border-radius:12px!important;background:#fff!important;color:#111!important}
+@media (max-height:520px) and (orientation:landscape){.hcol.hleft{gap:6px 6px}.tile{width:min(15.4vh,74px)!important;border-radius:13px!important}#home .tile b{font-size:9px!important}#home .tile i{font-size:min(6vh,24px)!important}
+  .hcol.hright{bottom:122px}.hbtns #playBtn{min-height:58px!important}.htop .lv{width:38px;height:38px;font-size:19px!important}.hinfo{padding:1px 10px 3px}.hinfo b{font-size:14px!important}.cur{font-size:16px!important}.cur i{width:22px;height:22px;font-size:13px}
+  .phead h2,#pTitle{font-size:19px!important}.play{font-size:18px!important;min-height:40px}}
+@media (orientation:portrait){.sysb{display:none}.hinfo{min-width:120px!important}.hcol.hleft{grid-template-columns:repeat(5,min(17vw,72px))!important;left:0!important;right:0!important;top:70px!important;bottom:auto!important;width:auto!important;max-width:none!important;overflow:visible!important;padding:0!important;justify-content:center!important;align-content:start!important}#home .hleft .tile{width:min(17vw,72px)!important;height:min(17vw,72px)!important}.hcol.hright{display:none}.hbtns{position:static;align-items:stretch!important;width:min(86vw,360px)!important}.hbtns #playBtn{min-height:64px!important}}
+.demoB{position:absolute;left:50%;top:max(6px,env(safe-area-inset-top));transform:translateX(-50%);padding:1px 10px;border:2px solid #0b0d16;border-radius:8px;background:#ff3d6e;color:#fff;font:400 12px Bangers,sans-serif;letter-spacing:.1em;opacity:.85;pointer-events:none;z-index:3}#start .demoB{top:auto;bottom:10px;left:auto;right:12px;transform:none}
 </style>
 </head>
 <body>
@@ -480,31 +565,34 @@ body.toon .mcard{clip-path:none;border:3px solid #10131c;border-radius:12px;box-
   <div id="hit"><i style="transform:rotate(45deg) translateX(-12px)"></i><i style="transform:rotate(-45deg) translateX(-12px)"></i><i style="transform:rotate(45deg) translateX(12px)"></i><i style="transform:rotate(-45deg) translateX(12px)"></i></div>
   <div id="confirm"><div id="cK"></div><div id="cP"></div></div>
   <div id="dead"><b>TU ES ÉLIMINÉ</b><span id="deadTxt"></span></div>
-  <div id="hp" class="pan"><div class="lv" id="hLv">1</div><div class="col"><div class="n" id="hName">VOLT</div><div class="bar"><div id="hpv"></div><div id="shv"></div></div><div id="xpv"><div></div></div></div></div>
+  <div id="hp" class="pan"><div class="lv" id="hLv">1</div><div class="col"><div class="n" id="hName">VOLT</div><div class="bar"><div id="hpv"></div><div id="shv"></div></div><div class="bar" id="mp"><div id="mpv"></div><span id="mpt">100 / 100</span></div><div id="xpv"><div></div></div></div></div>
   <div id="swap" class="pan" style="pointer-events:none"><div class="wn" id="wName">ARME</div><div class="am"><span id="am">30</span> <small id="amMax">/ 30</small></div></div>
   <div id="joyHint"></div>
   <div id="joy"><div id="thumb"></div></div>
-  <div class="btn mag" id="ult"><span class="ic">★</span><span class="k">ULTIME</span><div class="cd" id="cdU"></div></div>
-  <div class="btn mag" id="ab2"><span class="ic">⟿</span><span class="k">POUVOIR</span><div class="cd" id="cd2"></div></div>
-  <div class="btn mag" id="ab1"><span class="ic">◈</span><span class="k">POUVOIR</span><div class="cd" id="cd1"></div></div>
+  <div class="btn sl" id="melee"><span class="ic">✊</span><span class="k">FRAPPE</span><u>1</u></div>
+  <div class="btn sl mag" id="ab1"><span class="ic">◈</span><span class="k">SORT</span><div class="cd" id="cd1"></div><b class="ct"></b><i class="mc"></i><u>2</u></div>
+  <div class="btn sl mag" id="ab2"><span class="ic">⟿</span><span class="k">SORT</span><div class="cd" id="cd2"></div><b class="ct"></b><i class="mc"></i><u>3</u></div>
+  <div class="btn sl mag" id="ab3"><span class="ic">✚</span><span class="k">SORT</span><div class="cd" id="cd3"></div><b class="ct"></b><i class="mc"></i><u>4</u></div>
+  <div class="btn sl mag" id="ult"><span class="ic">★</span><span class="k">ULTIME</span><div class="cd" id="cdU"></div><u>5</u></div>
   <div class="btn" id="dash"><span class="ic">»</span><span class="k">ESQUIVE</span><div class="cd" id="cdD"></div></div>
-  <div class="btn" id="melee"><span class="ic">✊</span><span class="k">FRAPPE</span></div>
+  <div class="btn" id="mount"><span class="ic">♞</span><span class="k">MONTURE</span><div class="cd" id="cdM"></div></div>
   <div class="btn" id="jump">SAUT</div>
   <div class="btn" id="fire">TIR</div>
 </div>
 
-<div id="start"><div class="logo"><span class="a">NEON VANGUARD</span><span class="s">MAGIE · ACIER · VICTOIRE</span></div><div class="tap" id="tapTxt">CHARGEMENT…</div></div>
+<div id="start"><div class="demoB">VERSION DÉMO</div><div class="logo"><span class="a">NEON VANGUARD</span><span class="s">MAGIE · ACIER · VICTOIRE</span></div><div class="tap" id="tapTxt">CHARGEMENT…</div></div>
 <div id="intro"><div class="bars"></div><div id="iLine"></div>
   <div id="iTitle" class="logo"><span class="a">NEON VANGUARD</span><span class="s">MAGIE · ACIER · VICTOIRE</span></div>
   <div id="iFlash"></div><button id="skip">PASSER ›</button></div>
 
 <div id="home">
+  <div class="demoB">VERSION DÉMO</div>
   <div class="htop">
     <div class="lv" id="mLv">1</div>
     <div class="hinfo"><b id="mName">Volt</b><span id="mXp">0 / 400 XP</span><div class="prog"><div id="mXpB"></div></div></div>
     <div class="hsp"></div>
     <div class="sysb" id="sysB"></div>
-    <div class="cur"><span class="shards" id="mSh">0</span> ✦</div>
+    <div class="cur tr"><i>🏆</i><span id="mTr">0</span></div><div class="cur"><i>✦</i><span class="shards" id="mSh">0</span></div>
     
   </div>
   <div class="hcol hleft">
