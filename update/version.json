@@ -1,14 +1,15 @@
 {
- "version": "3.31.0",
+ "version": "3.32.0",
  "date": "2026-11-17",
  "notes": [
+  "Ambiance féerique : nouvelle musique d'accueil (harpe, cordes, chœur, clochettes) et combat plus épique (tambours, cors)",
+  "Sons d'interface magiques : tintement de cristal sur les boutons, clochettes à l'ouverture des fenêtres, parchemin au changement d'onglet",
+  "Carillon à l'ouverture des coffres et cadeaux, son métallique et runique quand on équipe une arme, une armure, un sort ou une monture",
+  "Zones d'effet lisibles : disque ROUGE pour les sorts ennemis, BLEU pour ton équipe",
+  "Poussière magique qui flotte dans toutes les arènes",
   "Niveaux des bots (parties hors ligne) : Facile, Moyen, Difficile, Très difficile — à choisir dans Modes de jeu",
   "Portée des armes affichée : sur la fiche du héros, la boutique et sous le nombre de balles",
-  "Réticule intelligent : rouge sur un ennemi, avec la distance et les dégâts (vert 100 %, orange réduits, gris trop loin)",
-  "Les tirs à distance perdent de la force après leur portée efficace (jusqu'à 50 %), et s'arrêtent à la portée max",
-  "Corrigé : la lumière blanche/jaune qui restait figée après les tirs et les effets",
-  "Corrigé : plus aucun ralenti quand on tire ou qu'on frappe",
-  "On voit enfin quand on touche : la cible s'illumine en rouge, croix de touche plus grande et plus longue"
+  "Réticule intelligent : rouge sur un ennemi, avec la distance et les dégâts (vert 100 %, orange réduits, gris trop loin)"
  ],
  "native": 230,
  "base": "www/",
