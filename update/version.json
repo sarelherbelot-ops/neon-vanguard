@@ -1,9 +1,9 @@
 {
- "version": "3.19.0",
+ "version": "3.20.0",
  "date": "2026-11-17",
  "notes": [
-  "En combat : les 12 héros passent en version 3D réaliste (modèles générés par IA) et le rendu devient réaliste",
-  "L'accueil, la boutique et les menus gardent leur style coloré",
+  "Tout le jeu passe en rendu réaliste : héros 3D réalistes à l'accueil, dans les fiches et en combat",
+  "L'interface (boutons, menus, boutique) garde sa mise en place et son style coloré",
   "VERSION DÉMO : tous les héros, sorts et montures restent ouverts",
   "Nouvelle interface : accueil, boutique et menus en gros boutons colorés, bouton JOUER en bas à droite",
   "Combat : jauge de mana et barre de 5 sorts (frappe, 3 sorts, ultime) avec coût et temps de recharge",
