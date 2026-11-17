@@ -1,11 +1,12 @@
 {
- "version": "3.27.0",
+ "version": "3.28.0",
  "date": "2026-11-17",
  "notes": [
+  "Héros deux fois moins rapides (3,3 m/s) : déplacements plus posés, pour toi comme pour les adversaires",
+  "Les pieds restent posés au sol et les pas s'adaptent à la nouvelle vitesse",
   "Pieds posés au sol : les héros réalistes posent vraiment leurs pieds (plus de glissade ni de pieds qui flottent)",
   "Les pas suivent la vitesse réelle, les genoux plient vers l'avant, les pieds suivent les pentes et les marches",
-  "Pendant un saut, à cheval ou en mourant, l'animation habituelle reprend en douceur",
-  "Caméra, barre de vie et interface inchangées (comme la 3.25.1)"
+  "Pendant un saut, à cheval ou en mourant, l'animation habituelle reprend en douceur"
  ],
  "native": 230,
  "base": "www/",
