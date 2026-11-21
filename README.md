@@ -1,3 +1,4 @@
-# Plan Nettoyage — APK
+# Plan Nettoyage
 
-Téléchargement direct : PlanNettoyage.apk
+- Appli tablette/téléphone : PlanNettoyage.apk
+- Serveur PC Windows : PlanNettoyage-Serveur.exe
