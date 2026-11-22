@@ -336,6 +336,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
       <span class="grow"></span>
       <button class="btn sec" id="htPrint">🖨 Imprimer / partager</button>
       <button class="btn ok" id="htNew">➕ Nouveau client</button>
+      <button class="btn sec" id="htFicheV">🖨 Fiche hôtel vierge</button>
     </div>
   </div>
   <div class="card"><div class="row"><h2 class="grow">🛏 Les chambres</h2><span class="meta"><span style="background:#dc2626;color:#fff;border-radius:5px;padding:0 6px">à nettoyer</span> <span style="background:#ea580c;color:#fff;border-radius:5px;padding:0 6px">à rafraîchir</span> <span style="background:#2563eb;color:#fff;border-radius:5px;padding:0 6px">occupée</span> <span style="background:#16a34a;color:#fff;border-radius:5px;padding:0 6px">prête</span></span></div><div id="htRooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px"></div></div>
@@ -1257,6 +1258,36 @@ function htRow(h,mode){const n=nuits(h),done=h.etat==='parti'||h.etat==='annule'
       ${h.absDu&&h.absAu&&h.absAu>=htDay?`<div style="margin-top:2px;color:#7c3aed;font-weight:600">🚶 Absent du ${frD(h.absDu).slice(0,5)} au ${frD(h.absAu).slice(0,5)} — la chambre reste à lui</div>`:''}
       ${h.facture?`<div style="margin-top:4px;display:inline-block;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:3px 8px;font-weight:700">🧾 AVEC FACTURE${h.mail?' → ✉ '+esc(h.mail):' — e-mail non indiqué'}</div>`:''}
       ${+h.prix&&!h.mensuel?(()=>{const P=htPrix(h);return`<div style="margin-top:2px;font-weight:700">💶 ${eur(P.tot)}${P.tx?` <span class="meta" style="font-weight:500">(dont taxe de séjour ${eur(P.tx)})</span>`:h.sansTaxe?' <span class="meta" style="font-weight:500">(sans taxe de séjour)</span>':''} · ${h.booking?'<span style="background:#003580;color:#fff;border-radius:5px;padding:0 5px">Booking</span> ':''}${P.reste<=0?'<span style="color:#16a34a">✔ payé</span>':`<span style="color:#dc2626">${h.booking?'taxe de séjour à encaisser':'reste à payer'} ${eur(P.reste)}</span>`}</div>`})():''}</div></div>`}
+/* ---- fiche hôtel imprimable (remplie depuis la fiche client, ou vierge) ---- */
+function ficheCharte(){const t=String(taxeTaux().toFixed(2));return CFG.charte||`Les annulations doivent être effectuées 48 h à l'avance, sinon le montant sera facturé.
+Animal de compagnie admis : 5 CHF par nuit par animal.
+Petit déjeuner en supplément : 12 CHF.
+Taxe de séjour : ${t} CHF par nuit et par personne.
+
+Cher client, nous vous rappelons que la consommation de drogues est strictement interdite dans notre établissement.
+Les chambres sont non-fumeur.
+De plus, nous vous prions de respecter les horaires du restaurant : du lundi au vendredi de 8h30 à 23h00, le samedi de 9h00 à 23h00, afin d'assurer une expérience agréable pour tous nos clients.
+
+Nous vous remercions de votre compréhension. En cas de non-respect de ces règles, des mesures appropriées pourront être prises. Nous vous souhaitons un agréable séjour parmi nous.`}
+function ficheHTML(h){const B='color:#1d4ed8;font-weight:700;font-family:sans-serif;margin-left:8px';const v=x=>x?`<span style="${B}">${esc(String(x))}</span>`:'';
+  let duree='',taxe='',total='';
+  if(h){const P=htPrix(h),n=P.n;
+    duree=h.mensuel?'au mois — depuis le '+frD(h.arr):isRes(h)?'résident — depuis le '+frD(h.arr):n+' nuit'+(n>1?'s':'')+' — du '+frD(h.arr)+' au '+frD(h.dep);
+    if(!h.mensuel){taxe=h.sansTaxe?'sans taxe de séjour':P.tx?`CHF ${P.tx.toFixed(2)}  (${P.tp} pers. × ${n} nuit${n>1?'s':''} × ${taxeTaux().toFixed(2)})`:'';
+      if(+h.prix)total=h.booking?`Chambre payée par Booking — reste la taxe : CHF ${P.tx.toFixed(2)}`:(P.tx?`CHF ${P.ch.toFixed(2)} + CHF ${P.tx.toFixed(2)} = CHF ${P.tot.toFixed(2)}`:`CHF ${P.tot.toFixed(2)}`)+(+h.paye?`  (déjà payé CHF ${(+h.paye).toFixed(2)})`:'')}}
+  const r=h&&(CFG.rooms||[]).find(x=>chKey(x.n)===chKey(h.ch));
+  const L=[['Nom',h&&h.nom],['Contact',h&&h.tel],['E-mail',h&&h.mail],['Adresse',''],['Signature',''],['Numéro de chambre',h&&(h.ch+(r&&r.t?' — '+r.t:''))],['Nombre de personnes',h&&h.nb],['Durée du séjour',duree],['Petit déjeuner',''],['Facture restaurant',''],['Taxe de séjour',taxe],['Animaux','']];
+  const TD='border:1.3px solid #333;padding:6px 8px;font-weight:700;font-size:12.5pt;height:21px';
+  const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:3.5mm">${b.split('\n').map(l=>`<p style="margin:0 0 1.5mm;line-height:1.35">${esc(l)}</p>`).join('')}</div>`).join('');
+  return`<div style="font-family:Calibri,Carlito,'DejaVu Sans',Arial,sans-serif;font-size:12pt;color:#111">
+  <div style="text-align:center;font-size:21pt;color:#555;margin:0 0 6mm">${esc(CFG.nom||'')}</div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 4mm 2mm;font-size:17pt;font-weight:700"><span>Fiche hôtel</span><span>Date : ${h?`<span style="${B}">${frD(h.arr)}</span>`:'____________________'}</span></div>
+  <table style="width:100%;border-collapse:collapse">${L.map(([k,x])=>`<tr><td style="${TD}">${k} :${v(x)}</td></tr>`).join('')}</table>
+  <table style="width:100%;border-collapse:collapse;margin-top:7mm"><tr><td style="${TD}">Total :${v(total)}</td></tr></table>
+  <h2 style="font-size:16pt;margin:7mm 0 0">Charte Hôtel :</h2>${ch}
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:7mm;gap:10mm"><div><p style="margin:0 0 1.5mm">Pour le room-service, adressez-vous au personnel du restaurant.</p><p style="margin:0">Nos sincères salutations, ${esc(CFG.nom||'')}.</p></div><div style="width:65mm;font-weight:700;font-size:13pt;border-bottom:1px solid #333;padding-bottom:13mm;flex:none">Signature</div></div></div>`}
+function printFiche(h){$('#printArea').innerHTML='<style>@page{size:A4;margin:13mm 18mm}</style>'+ficheHTML(h);outDoc(h?'Fiche hôtel '+h.nom:'Fiche hôtel vierge',0)}
+$('#htFicheV').onclick=()=>printFiche(null);
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
@@ -1303,7 +1334,7 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
       <div id="hTot" style="margin-top:6px;font-weight:700"></div><div class="meta">Taxe de séjour : ${eur(taxeTaux())} par personne et par nuit (modifiable en bas de l'onglet Hôtel).</div></div>
     <p class="meta" id="hNuits"></p>
     ${f?`<label>État<select id="hEtat">${Object.entries({'':'À venir','arrive':'✔ Arrivé','parti':'🧳 Parti','annule':'✖ Annulé'}).map(([k,v])=>`<option value="${k}" ${h.etat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}
-    <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}${f&&h.mensuel?'<button class="btn ok" id="hPay">💶 Mois payé</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
+    <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}${f&&h.mensuel?'<button class="btn ok" id="hPay">💶 Mois payé</button>':''}${f?'<button class="btn sec" id="hFiche">🖨 Fiche hôtel</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
   ()=>{const upd=()=>{const r=$('#hRes').checked;$('#hDep').disabled=r;const a=$('#hArr').value,b=$('#hDep').value;
       {const tmp={arr:a,dep:r?RESID:b,prix:$('#hPrix').value,nb:$('#hNb').value,taxeP:$('#hTaxP').value,sansTaxe:$('#hSansTx').checked,paye:$('#hPaye').value,booking:$('#hBook').checked},P=htPrix(tmp,(a&&(r||b>a))?nuits(tmp):0);
        $('#hTot').innerHTML=+tmp.prix?`${P.n} nuit(s) × ${eur(tmp.prix)} = ${eur(P.ch)}${tmp.sansTaxe?' · sans taxe de séjour':` + taxe ${P.tp} pers. × ${P.n} nuit(s) × ${eur(taxeTaux())} = ${eur(P.tx)}`}<br>Total : <span style="font-size:18px">${eur(P.tot)}</span>${P.bk?` · chambre payée par Booking ${eur(P.ch)}`:''} · payé ${eur(P.pay)} · <span style="color:${P.reste>0?'#dc2626':'#16a34a'}">${P.reste>0?(P.bk?'taxe de séjour à encaisser ':'reste ')+eur(P.reste):'✔ tout est payé'}</span>${r?' <span class="meta">(résident : calculé jusqu\'à aujourd\'hui)</span>':''}`:'<span class="meta">Indique le prix par nuit pour calculer le total.</span>'}
@@ -1317,6 +1348,7 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
       else{(HTL[mo]=HTL[mo]||[]).push({id:'ht'+Date.now().toString(36),...v,etat:'',ts:Date.now()});saveHt(mo)}
       closeInfo();htDay=v.arr;refresh();toast('Client enregistré ✔')};
     if(f&&$('#hPay'))$('#hPay').onclick=()=>{closeInfo();payMonth(h)};
+    if(f&&$('#hFiche'))$('#hFiche').onclick=()=>{closeInfo();printFiche(h)};
     if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
 $('#htNew').onclick=()=>editHotel(null);
 $('#htTxBtn').onclick=async()=>{const a=await askAuth('Modifier la taxe de séjour',['admin']);if(!a)return;const v=prompt('Taxe de séjour en CHF par personne et par nuit :',String(taxeTaux()).replace('.',','));if(v==null)return;const n=parseFloat(v.replace(',','.'));if(isNaN(n)||n<0)return toast('Montant invalide');CFG.taxe=n;put('cfg',CFG);renderHotel();toast('Taxe de séjour : '+eur(n))};
