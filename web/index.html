@@ -2133,6 +2133,12 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   CLOUD.__gh=all['gh:state']||null;
   startSync();
   if(localStorage.getItem('pn_autoupd')!=='0'){setTimeout(()=>checkUpdate(false),5000);setInterval(()=>checkUpdate(false),6*3600e3)}
+  window.addEventListener('hashchange',()=>{if((location.hash||'').startsWith('#inscription'))location.reload()});
+  /* lien d'inscription : …/web/#inscription=compte → appareil remis à zéro puis connexion au compte du restaurant */
+  {const m=/^#inscription(?:=([A-Za-z0-9_.-]+))?/.exec(location.hash||'');if(m){const acc=(m[1]||'').toLowerCase();
+    if(!sessionStorage.getItem('pn_insc')){sessionStorage.setItem('pn_insc',acc||'-');try{await clearAll()}catch(e){}const keep=sessionStorage.getItem('pn_insc');localStorage.clear();sessionStorage.setItem('pn_insc',keep);location.reload();return}
+    history.replaceState(null,'',location.pathname);const ac=sessionStorage.getItem('pn_insc');sessionStorage.removeItem('pn_insc');
+    setTimeout(()=>{openSyncModal(true);setTimeout(()=>{if($('#cgAcc')&&ac&&ac!=='-')$('#cgAcc').value=ac;if($('#cgUser'))$('#cgUser').value='';},50)},300)}}
   if(!CFG.users.some(u=>u.role==='admin'&&u.hash))await firstAdmin();
   // rafraîchit si l'appli reste ouverte après minuit
   let lastT=todayS();setInterval(()=>{const t=todayS();if(t!==lastT){if(curDay===lastT)curDay=t;lastT=t;refresh()}},60000);
