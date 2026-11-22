@@ -357,7 +357,8 @@ h2{font-size:19px;margin:0}
 </section>
 <section id="v-chat" class="hidden">
   <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px;padding:0;overflow:hidden">
-    <div class="row" style="padding:10px 14px;border-bottom:1px solid var(--line)"><b class="grow">💬 Messages restaurant ↔ Sarel</b><span class="meta" id="chMe"></span></div>
+    <div class="row" style="padding:10px 14px;border-bottom:1px solid var(--line)"><b class="grow">💬 Messages restaurant ↔ Sarel</b><span class="meta" id="chMe"></span><button class="btn ghost sm hidden" id="chBg">🔔 Notifications</button></div>
+    <div id="chBgWarn" class="hidden" style="background:#fef3c7;border-bottom:1px solid #f59e0b;padding:8px 14px;font-size:14px"></div>
     <div id="chList" style="flex:1;overflow-y:auto;padding:12px 14px;background:#f8fafc"></div>
     <div class="row" style="padding:10px;border-top:1px solid var(--line);gap:8px;align-items:flex-end">
       <select id="chFrom" style="width:150px"></select>
@@ -1155,11 +1156,30 @@ $('#cmPrint').onclick=()=>{const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[],ck=
     <div style="margin-top:6px;font-size:11px"><b>ARTICLES SUPPLÉMENTAIRES / NOTES PATRON :</b><div style="white-space:pre-line;border:1px solid #999;min-height:40px;padding:4px;margin-top:3px">${esc(o.extra||'')}</div></div></div>`;
   outDoc('Commande '+cmZone+' '+frD(cmDay),0)};
 
+/* ---- notifications même quand l'appli est en arrière-plan (téléphone) ---- */
+const BG=()=>{const v=localStorage.getItem('pn_bg');return v==null?MAIN():v==='1'};
+function bgApply(){if(!native()||!Android.bgStart)return;try{if(BG())Android.bgStart();else Android.bgStop()}catch(e){}}
+function bgStatus(){if(!native()||!Android.notifOk)return null;let n=true,b=true;try{n=Android.notifOk();b=Android.batteryFree()}catch(e){}return{n,b,on:BG()}}
+function bgWarn(){const w=$('#chBgWarn'),st=bgStatus();if(!w)return;$('#chBg').classList.toggle('hidden',!st);if(!st){w.classList.add('hidden');return}
+  const pb=[];if(!st.on)pb.push('les notifications en arrière-plan sont désactivées sur cet appareil');if(!st.n)pb.push('Android bloque les notifications de l\'appli');if(st.on&&!st.b)pb.push('l\'économie de batterie peut retarder les messages');
+  w.classList.toggle('hidden',!pb.length);w.innerHTML=pb.length?'⚠ '+pb.join(' · ')+' — <a href="#" id="chFix" style="font-weight:700">régler</a>':'';if($('#chFix'))$('#chFix').onclick=e=>{e.preventDefault();bgSetup()}}
+function bgSetup(){const st=bgStatus()||{n:true,b:true,on:BG()};
+  info(`<h2>🔔 Notifications sur cet appareil</h2><p>Pour recevoir les messages et les rappels <b>même quand l'appli est fermée ou l'écran éteint</b> :</p>
+    <div class="row" style="margin:8px 0"><span class="grow">1. Recevoir en arrière-plan</span><b style="color:${st.on?'#16a34a':'#dc2626'}">${st.on?'✔ activé':'désactivé'}</b><button class="btn sec sm" id="bgT">${st.on?'Désactiver':'Activer'}</button></div>
+    <div class="row" style="margin:8px 0"><span class="grow">2. Autoriser les notifications</span><b style="color:${st.n?'#16a34a':'#dc2626'}">${st.n?'✔ autorisé':'bloqué'}</b>${st.n?'':'<button class="btn sec sm" id="bgN">Autoriser</button>'}</div>
+    <div class="row" style="margin:8px 0"><span class="grow">3. Pas de mise en veille par la batterie</span><b style="color:${st.b?'#16a34a':'#ea580c'}">${st.b?'✔ ok':'à régler'}</b>${st.b?'':'<button class="btn sec sm" id="bgB">Régler</button>'}</div>
+    <p class="meta">Une petite notification « Réception des messages activée » reste dans la barre du téléphone : c'est elle qui garde l'appli éveillée. Écran éteint, un message peut mettre jusqu'à une ou deux minutes à arriver.</p>
+    <div class="row"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`,
+  ()=>{$('#bgT').onclick=()=>{localStorage.setItem('pn_bg',BG()?'0':'1');bgApply();closeInfo();bgSetup();bgWarn()};
+    if($('#bgN'))$('#bgN').onclick=()=>{Android.askNotif();closeInfo();setTimeout(()=>{bgSetup();bgWarn()},4000)};
+    if($('#bgB'))$('#bgB').onclick=()=>{Android.askBattery();closeInfo();setTimeout(()=>{bgSetup();bgWarn()},6000)}})}
+$('#chBg').onclick=bgSetup;
+
 /* ===================== MESSAGES (tablette ↔ téléphone) ===================== */
 function msgAll(){const L=[];for(const mo in MSG)for(const m of MSG[mo]||[])L.push(m);return L.sort((a,b)=>a.ts-b.ts)}
 const chSeen=()=>+(localStorage.getItem('pn_chSeen')||0);
 function chMyName(){if(MAIN()){const a=(CFG.users||[]).find(u=>u.role==='admin');return a?a.nom:'Responsable'}return localStorage.getItem('pn_chFrom')||''}
-function renderChat(){const L=msgAll().filter(m=>m.ts>Date.now()-60*864e5),box=$('#chList'),me=DEV;
+function renderChat(){bgWarn();const L=msgAll().filter(m=>m.ts>Date.now()-60*864e5),box=$('#chList'),me=DEV;
   const sel=$('#chFrom'),names=[...new Set((CFG.users||[]).map(u=>u.nom))];
   if(MAIN()){sel.innerHTML=`<option>${esc(chMyName())}</option>`;sel.disabled=true;$('#chMe').textContent='Téléphone principal'}
   else{const cur=chMyName();sel.innerHTML='<option value="">Qui écrit ?</option>'+names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('');sel.disabled=false;$('#chMe').textContent=''}
@@ -1933,7 +1953,7 @@ async function syncOnce(){if(!cloudOn()||syncBusy)return;syncBusy=true;
 function startSync(){clearInterval(syncTimer);DK=localStorage.getItem('pn_dk');
   const a0=ACC();if(a0&&!a0.ns){nsFor(a0.user).then(ns=>{a0.ns=ns;localStorage.setItem('pn_acc',JSON.stringify(a0));startSync()});return}
   if(!cloudOn())return setSync('off');
-  GH=CLOUD.__gh||{seq:0,revs:{}};if(!GH.revs)GH.revs={};setSync('wait','Synchronisation…');syncOnce();syncTimer=setInterval(()=>{if(!document.hidden)syncOnce()},4000)}
+  GH=CLOUD.__gh||{seq:0,revs:{}};if(!GH.revs)GH.revs={};setSync('wait','Synchronisation…');syncOnce();syncTimer=setInterval(()=>{if(!document.hidden||Date.now()-(window.__hs||0)>15000){if(document.hidden)window.__hs=Date.now();syncOnce()}},4000)}
 
 /* ---- compte ---- */
 async function wrapUser(nom,pw,cle,table){const id=nom.trim().toLowerCase(),s1=rnd(16),s2=rnd(16),ak=await authKey(pw,s2);
@@ -2018,7 +2038,7 @@ function openSyncModal(fromStart){
       catch(e){ok.disabled=false;$('#syncStatus').textContent=e.message||String(e);toast(e.message||'Erreur')}};
     const off=$('#cgOff');if(off)off.onclick=async()=>{closeInfo();if(!await askAuth('Déconnecter la sauvegarde en ligne',['admin']))return;
       localStorage.removeItem('pn_dk');localStorage.removeItem('pn_acc');clearInterval(syncTimer);DK=null;setSync('off');toast('Déconnecté')};
-    const md=$('#cgMainDev');if(md)md.onchange=e=>{localStorage.setItem('pn_main',e.target.checked?'1':'0');if(e.target.checked){localStorage.setItem('pn_follow','0');$('#cgFollow').checked=false}devT=0;kick();toast(e.target.checked?'Cet appareil est le principal':'Cet appareil n\'est plus le principal')};
+    const md=$('#cgMainDev');if(md)md.onchange=e=>{localStorage.setItem('pn_main',e.target.checked?'1':'0');if(localStorage.getItem('pn_bg')==null)setTimeout(bgApply,300);if(e.target.checked){localStorage.setItem('pn_follow','0');$('#cgFollow').checked=false}devT=0;kick();toast(e.target.checked?'Cet appareil est le principal':'Cet appareil n\'est plus le principal')};
     const fo=$('#cgFollow');if(fo)fo.onchange=e=>{localStorage.setItem('pn_follow',e.target.checked?'1':'0');if(e.target.checked){localStorage.setItem('pn_main','0');$('#cgMainDev').checked=false}devT=0;kick();toast(e.target.checked?'Cet appareil suit le téléphone':'Cet appareil ne suit plus le téléphone')};
     const mn=$('#cgMain');if(mn)mn.onclick=async()=>{mn.disabled=true;mn.textContent='Récupération…';try{const n=await followMain();toast('✔ Planning et réglages repris du téléphone ('+n+' éléments)')}catch(e){LASTERR=errTxt(e);toast('⚠ '+LASTERR)}mn.disabled=false;mn.textContent='⬇ Reprendre maintenant ce qui est sur le téléphone'};
     const now=$('#cgNow');if(now)now.onclick=async()=>{now.disabled=true;now.textContent='Synchronisation…';try{await fullSync(true);toast(LASTERR?'⚠ '+($('#syncDot').title||LASTERR):'✔ Synchronisé — l\'autre appareil se met à jour dès que l\'appli y est ouverte')}catch(e){LASTERR=errTxt(e);toast('⚠ '+(e.status===401?'Mot de passe changé : déconnecte puis reconnecte cet appareil':LASTERR))}now.disabled=false;now.textContent='Synchroniser maintenant';closeInfo();openSyncModal()}})}
@@ -2077,6 +2097,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   if(migrateCfg())put('cfg',CFG);
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   if(!localStorage.getItem('pn_chNotif')){chNotified=Date.now();localStorage.setItem('pn_chNotif',chNotified)}
+  setTimeout(bgApply,2500);
   applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);setTimeout(recapCheck,4000);setInterval(recapCheck,600000);
   $('#sync2').onclick=syncBoth;$('#syBtn').onclick=()=>openSyncModal();$('#syncDot').onclick=()=>openSyncModal();
   $('#upCheck').onclick=()=>checkUpdate(true);$('#upAuto').onchange=e=>localStorage.setItem('pn_autoupd',e.target.checked?'1':'0');
