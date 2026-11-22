@@ -334,6 +334,7 @@ h2{font-size:19px;margin:0}
       <button class="btn ok" id="htNew">➕ Nouveau client</button>
     </div>
   </div>
+  <div class="card"><div class="row"><h2 class="grow">🛏 Les chambres</h2><span class="meta"><span style="background:#dc2626;color:#fff;border-radius:5px;padding:0 6px">à faire</span> <span style="background:#2563eb;color:#fff;border-radius:5px;padding:0 6px">occupée</span> <span style="background:#16a34a;color:#fff;border-radius:5px;padding:0 6px">prête</span></span></div><div id="htRooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px"></div></div>
   <div class="card"><h2>🛎 Arrivées</h2><div id="htArr"></div></div>
   <div class="card"><h2>🧳 Départs</h2><div id="htDep"></div></div>
   <div class="card"><h2>🏨 Clients présents</h2><div id="htIn"></div></div>
@@ -575,7 +576,8 @@ const dayObj=s=>DAYS[s]||(DAYS[s]={tasks:{}});
 function isClosed(s){const o=DAYS[s];if(o&&o.closed!==undefined)return o.closed;return !CFG.open.includes(wd(s))}
 function due(s){if(isClosed(s))return [];const w=wd(s);return CFG.tasks.filter(t=>t.type==='Q'||t.jour===w)}
 const ZONES={salle:'🍽 Nettoyage salle',cuisine:'👨‍🍳 Nettoyage cuisine',temp:'🌡 Températures',recep:'📦 Réception'};
-let RCP={},RSV={},HTL={}; // HTL['2026-12'] = séjours dont l'arrivée est dans ce mois
+let RCP={},RSV={},HTL={},MEN={}; // MEN['2026-12'] = [{id,ch,date,ts,by}] ménage des chambres fait
+ // HTL['2026-12'] = séjours dont l'arrivée est dans ce mois
  // RSV['2026-12'] = [{id,date,heure,nom,tel,nb,note,etat,ts}]
 const tz=t=>t.zone||'salle';
 function dueZ(s,z){return due(s).filter(t=>tz(t)===z)}
@@ -948,7 +950,7 @@ $('#cCsvM').onclick=()=>{const[a,b]=monthRange();csvRange(a,b,`nettoyage_${calY}
 $('#cCsvY').onclick=()=>csvRange(calY+'-01-01',calY+'-12-31','nettoyage_'+calY);
 
 /* ===================== SAUVEGARDE AUTOMATIQUE (chaque soir) ===================== */
-function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL})}
+function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN})}
 async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:addD(T,-30);
   const body=await dossierHTML(a,T,['salle','cuisine','temp','recep','plan','heures']);
   const rs=[];for(const mo of Object.keys(RSV).sort())for(const r of (RSV[mo]||[]).slice().sort((x,y)=>(x.date+x.heure).localeCompare(y.date+y.heure)))rs.push(r);
@@ -984,6 +986,35 @@ setInterval(()=>{const n=new Date();if(n.getHours()>=23)autoBackup(false)},5*600
 setTimeout(async()=>{if(!native()){const d=await pcDirGet();if(d&&d.queryPermission&&(await d.queryPermission({mode:'readwrite'}))!=='granted')pcBar(true)}},4000);
 setTimeout(()=>{const last=localStorage.getItem('pn_autobk')||'';if(last<addD(todayS(),-1)||new Date().getHours()>=23)autoBackup(false)},20000);
 
+/* ---- chambres : état et ménage ---- */
+const chKey=c=>String(c||'').trim().toLowerCase();
+function menOf(){const L=[];for(const mo in MEN)for(const r of MEN[mo]||[])L.push(r);return L}
+function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.ch)===k);
+  const occ=S.find(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti'),depToday=S.find(h=>h.dep===d),arr=S.find(h=>h.arr===d);
+  let lastDep='';for(const h of S){const out=h.etat==='parti'&&h.dep>d?d:h.dep;if(out<=d&&out>lastDep&&out>=addD(d,-14))lastDep=out}
+  const men=lastDep?menOf().filter(r=>chKey(r.ch)===k&&r.date>=lastDep).sort((a,b)=>b.ts-a.ts)[0]:null;
+  const sale=!!lastDep&&!men&&!(occ&&occ.arr>lastDep);
+  return{occ,depToday,arr,sale,men,lastDep}}
+function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
+  const bg=st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
+  const who=st.occ?`${esc(st.occ.nom)}<br>jusqu'au ${frD(st.occ.dep).slice(0,5)}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'';
+  const nxt=st.arr&&!st.occ?`<div style="margin-top:3px;font-size:12px">🛎 arrive : ${esc(st.arr.nom)}${st.arr.heure?' '+esc(st.arr.heure):''}</div>`:'';
+  return`<div data-room="${esc(r.n)}" style="background:${bg};color:#fff;border-radius:12px;padding:10px;cursor:pointer;min-height:112px;${st.sale?'box-shadow:0 0 0 3px #fecaca':''}">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:24px">${esc(r.n)}</b><span style="font-size:12px;opacity:.9">${esc(r.t)}</span></div>
+    <div style="font-weight:800;margin-top:2px">${lab}</div><div style="font-size:12px;opacity:.95">${who}</div>${nxt}
+    ${st.men&&!st.occ?`<div style="font-size:11px;opacity:.9;margin-top:3px">✔ ménage fait ${hhmm(st.men.ts)}${st.men.by?' — '+esc(st.men.by):''}</div>`:''}</div>`}).join('')}
+function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>x.n===n)||{n,t:''};
+  if(st.sale){info(`<h2>🧹 Chambre ${esc(n)} — ${esc(r.t)}</h2><p style="font-size:17px">Le ménage de la chambre <b>${esc(n)}</b> est-il terminé ?</p><p class="meta">Départ ${st.depToday?'de '+esc(st.depToday.nom)+' ':''}le ${frD(st.lastDep)}.</p>
+      <label>Fait par (facultatif)<input id="mnBy" placeholder="prénom" autocomplete="off" value="${esc(localStorage.getItem('pn_mnBy')||'')}"></label>
+      <div class="row" style="margin-top:12px"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="mnOk" style="min-width:200px">✔ Ménage fait</button></div>`,
+      ()=>{$('#mnOk').onclick=()=>{const by=$('#mnBy').value.trim();localStorage.setItem('pn_mnBy',by);const now=Date.now(),T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7);
+        (MEN[mo]=MEN[mo]||[]).push({id:'mn'+now.toString(36),ch:n,date:dd,ts:now,by});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('✔ Chambre '+n+' prête')}});return}
+  if(st.men&&!st.occ){info(`<h2>Chambre ${esc(n)} — ${esc(r.t)}</h2><p>Ménage noté fait à ${hhmm(st.men.ts)}${st.men.by?' par '+esc(st.men.by):''}.</p><div class="row"><button class="btn danger" id="mnUndo">Annuler le ménage (remettre en rouge)</button><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`,
+      ()=>{$('#mnUndo').onclick=()=>{const mo=st.men.date.slice(0,7);MEN[mo]=(MEN[mo]||[]).filter(x=>x.id!==st.men.id);if(MEN[mo].length)put('mn:'+mo,MEN[mo]);else{delete MEN[mo];del('mn:'+mo)}closeInfo();refresh()}});return}
+  if(st.occ)return editHotel(st.occ.id);
+  const h={arr:d,dep:addD(d,1),ch:n};editHotel(null,h)}
+function roomsToClean(){return(CFG.rooms||[]).filter(r=>roomState(r.n,todayS()).sale)}
+
 /* ===================== HÔTEL ===================== */
 let htDay=todayS();
 function htAll(){const L=[];for(const mo in HTL)for(const h of HTL[mo]||[])L.push(h);return L}
@@ -1003,6 +1034,7 @@ function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const pres=A.filter(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti').sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   $('#htDate').value=d;$('#htTitle').textContent=longD(d);
   $('#htSub').textContent=`${arr.length} arrivée(s) · ${dep.length} départ(s) · ${pres.length} chambre(s) occupée(s) cette nuit`;
+  $('#htRooms').innerHTML=roomsHTML(d);document.querySelectorAll('#htRooms [data-room]').forEach(el=>el.onclick=()=>roomClick(el.dataset.room));
   $('#htArr').innerHTML=arr.length?arr.map(h=>htRow(h,'arr')).join(''):'<p class="meta">Aucune arrivée ce jour-là.</p>';
   $('#htDep').innerHTML=dep.length?dep.map(h=>htRow(h,'dep')).join(''):'<p class="meta">Aucun départ ce jour-là.</p>';
   $('#htIn').innerHTML=pres.length?pres.map(h=>htRow(h,'in')).join(''):'<p class="meta">Aucun client cette nuit.</p>';
@@ -1011,10 +1043,10 @@ function renderHotel(){const d=htDay,A=htAll().filter(actif);
   document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));bindTel($('#v-hotel'))}
 function findHt(id){for(const mo in HTL){const h=(HTL[mo]||[]).find(x=>x.id===id);if(h)return{mo,h}}return null}
 function htConflit(v,id){return htAll().filter(h=>actif(h)&&h.id!==id&&h.etat!=='parti'&&String(h.ch).trim().toLowerCase()===String(v.ch).trim().toLowerCase()&&h.arr<v.dep&&v.arr<h.dep)}
-function editHotel(id){const f=id?findHt(id):null,h=f?f.h:{arr:htDay,dep:addD(htDay,1),heure:'',ch:'',nom:'',tel:'',nb:2,note:'',etat:''};
+function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr:htDay,dep:addD(htDay,1),heure:'',ch:'',nom:'',tel:'',nb:2,note:'',etat:''},pre||{});
   info(`<h2>${f?'🏨 Client':'➕ Nouveau client'}</h2>
     <div class="row"><label class="grow">Arrivée<input type="date" id="hArr" value="${esc(h.arr)}"></label><label class="grow">Départ<input type="date" id="hDep" value="${esc(h.dep)}"></label><label style="width:110px">Heure d'arrivée<input type="time" id="hHeure" value="${esc(h.heure||'')}"></label></div>
-    <div class="row"><label style="width:140px">Chambre<input id="hCh" value="${esc(h.ch)}" placeholder="ex : 12" autocomplete="off"></label><label style="width:110px">Personnes<input type="number" id="hNb" min="1" value="${esc(h.nb)}"></label><label class="grow">Nom du client<input id="hNom" value="${esc(h.nom)}" placeholder="ex : M. et Mme Martin" autocomplete="off"></label></div>
+    <div class="row"><label style="width:210px">Chambre<input id="hCh" list="hChL" value="${esc(h.ch)}" placeholder="n°" autocomplete="off"><datalist id="hChL">${(CFG.rooms||[]).map(r=>`<option value="${esc(r.n)}">${esc(r.n)} — ${esc(r.t)}</option>`).join('')}</datalist></label><label style="width:110px">Personnes<input type="number" id="hNb" min="1" value="${esc(h.nb)}"></label><label class="grow">Nom du client<input id="hNom" value="${esc(h.nom)}" placeholder="ex : M. et Mme Martin" autocomplete="off"></label></div>
     <label>Téléphone<input id="hTel" type="tel" value="${esc(h.tel)}" placeholder="06 12 34 56 78" autocomplete="off"></label>
     <label>Remarque<input id="hNote" value="${esc(h.note||'')}" placeholder="ex : lit bébé, petit-déjeuner, arrivée tardive…"></label>
     <p class="meta" id="hNuits"></p>
@@ -1085,9 +1117,11 @@ $('#rsPrint').onclick=()=>{const d=rsDay,L=resaOf(d),T='style="border:1px solid 
   outDoc('Réservations '+frD(d),0)};
 /* rappels : bandeau du jour, fenêtre une fois par jour, rappel 30 min avant */
 function resaBanner(){const b=$('#resaBar');if(!b)return;const T=todayS(),L=resaOf(T).filter(r=>!r.etat),A=htAll().filter(h=>h.arr===T&&!h.etat),D=htAll().filter(h=>h.dep===T&&h.etat!=='parti'&&h.etat!=='annule');
-  if(!L.length&&!A.length&&!D.length){b.classList.add('hidden');return}b.classList.remove('hidden');
+  const Z=roomsToClean();
+  if(!L.length&&!A.length&&!D.length&&!Z.length){b.classList.add('hidden');return}b.classList.remove('hidden');
   b.innerHTML=(L.length?`<span data-go="resa">📞 <b>Réservations aujourd'hui (${L.length}) :</b> `+L.map(r=>`<b>${esc(r.heure)}</b> ${esc(r.nom)} (${r.nb||'?'} pers.)`).join(' · ')+'</span>':'')+
-    (A.length||D.length?`<div data-go="hotel" style="${L.length?'margin-top:4px':''}">🏨 <b>Hôtel :</b> ${A.length?`${A.length} arrivée(s) — `+A.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}${A.length&&D.length?' · ':''}${D.length?`${D.length} départ(s) — `+D.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}</div>`:'');
+    (A.length||D.length?`<div data-go="hotel" style="${L.length?'margin-top:4px':''}">🏨 <b>Hôtel :</b> ${A.length?`${A.length} arrivée(s) — `+A.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}${A.length&&D.length?' · ':''}${D.length?`${D.length} départ(s) — `+D.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}</div>`:'')+
+    (Z.length?`<div data-go="hotel" style="margin-top:4px;color:#dc2626;font-weight:700">🧹 Chambres à nettoyer : ${Z.map(r=>esc(r.n)).join(', ')}</div>`:'');
   b.querySelectorAll('[data-go]').forEach(el=>el.onclick=ev=>{ev.stopPropagation();if(el.dataset.go==='hotel'){htDay=T;show('hotel')}else{rsDay=T;show('resa')}});b.onclick=null}
 function resaPopup(force){const T=todayS(),L=resaOf(T).filter(r=>r.etat!=='annule');if(!L.length||(!force&&localStorage.getItem('pn_resaPop')===T))return;
   localStorage.setItem('pn_resaPop',T);
@@ -1225,12 +1259,12 @@ $('#pSave').onclick=async()=>{
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
-$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL}),'application/json');
+$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN}),'application/json');
 $('#pRestoreBtn').onclick=()=>$('#pRestore').click();
 $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=async()=>{try{const x=JSON.parse(r.result);if(!x.cfg||!x.days)throw 0;
     if(!confirm(`Remplacer toutes les données par cette sauvegarde (${Object.keys(x.days).length} jours) ?`))return;
-    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
+    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
@@ -1604,7 +1638,7 @@ function deepMerge(a,b){if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Arra
 /* qui gagne quand les deux appareils ont modifié la même chose */
 function resolve(k,loc,o){const pre=kPre(k),rt=o.t||0,lt=MT[k]||0;
   if(loc==null)return{v:o.v,rw:1};if(o.v==null)return{v:loc,rw:0};
-  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
+  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
   if(k==='cfg'||pre==='pl'){if(MAIN()&&o.f)return{v:loc,rw:0};if(FOLLOW()||rt>lt)return{v:o.v,rw:1};return{v:loc,rw:0}}
   if(pre==='w')return rt>lt?{v:deepMerge(loc,o.v),rw:0}:{v:deepMerge(o.v,loc),rw:0};
   return rt>lt?{v:o.v,rw:1}:{v:loc,rw:0}}
@@ -1617,14 +1651,14 @@ function kick(){clearTimeout(kickT);kickT=setTimeout(syncOnce,300)}
 function cloudPut(k,v){if(!cloudOn())return;OUT.add(k);saveOut();kick()}
 function photoQueue(id,delOp){if(!cloudOn())return;OUTPH.add((delOp?'-':'')+id);saveOut();kick()}
 function setCloud(k,v){CLOUD[k]=v;localPut('cl:'+k,v==null?null:v)}
-function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,dv:DV}[pre];return m?m[key]:null}
-function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);return L}
+function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,dv:DV}[pre];return m?m[key]:null}
+function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);return L}
 function removedIds(k,v){const c=CLOUD[k];if(!c)return[];
   if(kPre(k)==='d'){const a=(c.tasks)||{},b=(v&&v.tasks)||{};return Object.keys(a).filter(x=>!(x in b))}
-  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
+  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
 function mergeVals(k,loc,rem,rm){const pre=kPre(k);rm=new Set(rm||[]);
   if(pre==='d'&&loc&&rem){const t={...(rem.tasks||{}),...(loc.tasks||{})};rm.forEach(i=>delete t[i]);const o={...rem,...loc,tasks:t};if(rem.temps||loc.temps)o.temps={...(rem.temps||{}),...(loc.temps||{})};return o}
-  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
+  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
   return loc??rem}
 /* même personne créée sur deux appareils (ids différents) : on garde une seule fiche et on rattache ses pointages */
 function remapUsers(oldC,nv){if(!oldC||!oldC.users||!nv||!nv.users)return;const byName={},map={};for(const u of nv.users)byName[u.nom.trim().toLowerCase()]=u.id;
@@ -1637,7 +1671,7 @@ function applyRemote(k,v){
   if(k==='cfg'){if(!v)return;remapUsers(CFG,v);CFG=v;if(migrateCfg()){localPut(k,CFG);OUT.add('cfg');saveOut();kick()}else localPut(k,v);applyCfg();refreshSoon();
     if(faResolve&&CFG.users&&CFG.users.some(u=>u.role==='admin'&&u.hash)){$('#mAuth').classList.add('hidden');$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');$('#aJoin').classList.add('hidden');const r=faResolve;faResolve=null;r()}
     return}
-  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,dv:DV}[pre];if(!map)return;
+  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,dv:DV}[pre];if(!map)return;
   if(v==null){delete map[key];localDel(k)}else{map[key]=v;localPut(k,v)}}
 let rfT=null;function refreshSoon(){clearTimeout(rfT);rfT=setTimeout(()=>{if(VIEW!=='params'&&$('#mSign').classList.contains('hidden')&&$('#mCam').classList.contains('hidden'))refresh()},300)}
 
@@ -1747,7 +1781,7 @@ async function followMain(){if(!cloudOn())return toast('Connecte d\'abord la sau
     for(const d in PTS){let c=0;for(const e of PTS[d]||[])if(map[e.emp]){e.emp=map[e.emp];c=1}if(c){MT['pt:'+d]=Date.now();localPut('pt:'+d,PTS[d]);OUT.add('pt:'+d)}}
     applyRemote('cfg',nv);MT.cfg=cfgNew.t||0;setCloud('cfg',cfgNew.v);OUT.delete('cfg');if(JSON.stringify(nv.users)!==JSON.stringify(cfgNew.v.users))OUT.add('cfg');n++}
   for(const[k,o]of vals){const pre=kPre(k),loc=localValue(k);
-    if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'){const m=loc!=null?mergeVals(k,loc,o.v,[]):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
+    if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'){const m=loc!=null?mergeVals(k,loc,o.v,[]):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
     else if(pre==='w'){const m=loc!=null?deepMerge(loc,o.v):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
     else{applyRemote(k,o.v);setCloud(k,o.v);OUT.delete(k)}
     MT[k]=o.t||0;n++}
@@ -1817,7 +1851,7 @@ function renderUpd(){$('#upVer').textContent='Version installée : n° '+(APPV||
   $('#syTxt').textContent=cloudOn()?('✔ Activée sur cet appareil ('+DEVNAME()+')'):'Pas encore activée sur cet appareil'}
 
 /* mise à niveau de la configuration (aussi appliquée à celle reçue par la synchro) */
-function migrateCfg(){let ch=0;if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
+function migrateCfg(){let ch=0;if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Simple'],['3','Familiale + cuisine'],['4','Double'],['5','Double'],['6','Simple'],['7','Familiale sans cuisine'],['8','Double'],['9','Simple']].map(([n,t])=>({n,t}));ch=1}if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
   if(!CFG.users||!CFG.users.length){CFG.users=DEFUSERS.map(([nom,role],i)=>({id:'u'+i,nom,role}));delete CFG.pin;delete CFG.emps;ch=1}
   if(!CFG.pauseInit){CFG.users.forEach(u=>{if(u.pause==null)u.pause=0});
     CFG.pauseInit=1;ch=1}
@@ -1835,7 +1869,7 @@ function migrateCfg(){let ch=0;if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hyg
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   const all=await idbAll();
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
-  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k]}
+  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
   applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);
   $('#sync2').onclick=syncBoth;$('#syBtn').onclick=()=>openSyncModal();$('#syncDot').onclick=()=>openSyncModal();
