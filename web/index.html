@@ -362,7 +362,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
     <div id="chBgWarn" class="hidden" style="background:#fef3c7;border-bottom:1px solid #f59e0b;padding:8px 14px;font-size:14px"></div>
     <div id="chList" style="flex:1;overflow-y:auto;padding:12px 14px;background:#f8fafc"></div>
     <div class="row" style="padding:10px;border-top:1px solid var(--line);gap:8px;align-items:flex-end">
-      <select id="chFrom" style="width:150px"></select>
+      <div style="display:flex;flex-direction:column;gap:4px;width:150px"><select id="chFrom"></select><input id="chPwd" type="password" placeholder="🔒 Mot de passe" autocomplete="off"></div>
       <textarea id="chTxt" rows="2" class="grow" placeholder="Écris ton message ou ta question…" style="resize:none"></textarea>
       <button class="btn ok" id="chSend" style="min-width:100px;font-size:17px">Envoyer ➤</button>
     </div>
@@ -1201,10 +1201,10 @@ const chSeen=()=>+(localStorage.getItem('pn_chSeen')||0);
 function chMyName(){if(MAIN()){const a=(CFG.users||[]).find(u=>u.role==='admin');return a?a.nom:'Responsable'}return localStorage.getItem('pn_chFrom')||''}
 function renderChat(){bgWarn();{const a=(CFG.users||[]).find(u=>u.role==='admin');$('#chTitle').textContent='💬 Messages restaurant ↔ '+(a?a.nom:'responsable')}const L=msgAll().filter(m=>m.ts>Date.now()-60*864e5),box=$('#chList'),me=DEV;
   const sel=$('#chFrom'),names=[...new Set((CFG.users||[]).map(u=>u.nom))];
-  if(MAIN()){sel.innerHTML=`<option>${esc(chMyName())}</option>`;sel.disabled=true;$('#chMe').textContent='Téléphone principal'}
+  $('#chPwd').classList.toggle('hidden',MAIN());if(MAIN()){sel.innerHTML=`<option>${esc(chMyName())}</option>`;sel.disabled=true;$('#chMe').textContent='Téléphone principal'}
   else{const cur=chMyName();sel.innerHTML='<option value="">Qui écrit ?</option>'+names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('');sel.disabled=false;$('#chMe').textContent=''}
   let last='';box.innerHTML=L.length?L.map(m=>{const mine=m.dev===me,d=ymd(new Date(m.ts)),sep=d!==last?`<div style="text-align:center;margin:10px 0 4px" class="meta">${longD(d)}</div>`:'';last=d;
-    return sep+`<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:4px 0"><div style="max-width:75%;background:${mine?'#dcfce7':'#fff'};border:1px solid ${mine?'#86efac':'var(--line)'};border-radius:14px;padding:7px 11px;font-size:16px"><div style="font-size:12px;font-weight:700;color:${mine?'#15803d':'#2563eb'}">${esc(m.from||'?')}</div><div style="white-space:pre-wrap">${esc(m.txt)}</div><div class="meta" style="text-align:right;font-size:11px;margin:2px 0 0">${hhmm(m.ts)}</div></div></div>`}).join('')
+    return sep+`<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:4px 0"><div style="max-width:75%;background:${mine?'#dcfce7':'#fff'};border:1px solid ${mine?'#86efac':'var(--line)'};border-radius:14px;padding:7px 11px;font-size:16px"><div style="font-size:12px;font-weight:700;color:${mine?'#15803d':'#2563eb'}">${esc(m.from||'?')}${m.ok?' <span title="confirmé par mot de passe">🔒✔</span>':''}</div><div style="white-space:pre-wrap">${esc(m.txt)}</div><div class="meta" style="text-align:right;font-size:11px;margin:2px 0 0">${hhmm(m.ts)}</div></div></div>`}).join('')
     :'<p class="meta" style="text-align:center;margin-top:40px">Aucun message. Écris ta question en bas : elle arrive sur le téléphone du responsable en quelques secondes.</p>';
   box.scrollTop=box.scrollHeight;localStorage.setItem('pn_chSeen',Date.now());chBadge()}
 function chBadge(){const n=msgAll().filter(m=>m.dev!==DEV&&m.ts>chSeen()).length,b=document.querySelector('nav button[data-v=chat]');if(!b)return;
@@ -1214,10 +1214,15 @@ function chatCheck(){const N=msgAll().filter(m=>m.dev!==DEV&&m.ts>chNotified);
   if(N.length){chNotified=Math.max(...N.map(m=>m.ts));localStorage.setItem('pn_chNotif',chNotified);const m=N[N.length-1];
     if(VIEW!=='chat'){toastRed('💬 '+(m.from||'?')+' : '+m.txt.slice(0,80));if(native()&&Android.notify)try{Android.notify('💬 Message de '+(m.from||'?'),m.txt.slice(0,200))}catch(e){}}}
   if(VIEW==='chat')renderChat();else chBadge()}
-$('#chSend').onclick=()=>{const t=$('#chTxt').value.trim();if(!t)return;const from=MAIN()?chMyName():$('#chFrom').value;if(!from)return toast('Choisis d\'abord qui écrit');
-  if(!MAIN())localStorage.setItem('pn_chFrom',from);const now=Date.now(),mo=ymd(new Date(now)).slice(0,7);
-  (MSG[mo]=MSG[mo]||[]).push({id:'m'+now.toString(36)+Math.random().toString(36).slice(2,5),ts:now,from,dev:DEV,txt:t});put('ms:'+mo,MSG[mo]);$('#chTxt').value='';renderChat();
+$('#chSend').onclick=async()=>{const t=$('#chTxt').value.trim();if(!t)return;const from=MAIN()?chMyName():$('#chFrom').value;if(!from)return toast('Choisis d\'abord qui écrit');
+  if(!MAIN()){const u=(CFG.users||[]).find(x=>x.nom===from);if(!u)return toast('Compte inconnu');
+    if(!u.hash)return toast('Pas de mot de passe pour '+from+' : à créer dans les Réglages');
+    if(!await checkPwd(u,$('#chPwd').value)){$('#chPwd').value='';$('#chPwd').focus();return toast('Mot de passe incorrect : message non envoyé')}
+    $('#chPwd').value='';localStorage.setItem('pn_chFrom',from)}
+  const now=Date.now(),mo=ymd(new Date(now)).slice(0,7);
+  (MSG[mo]=MSG[mo]||[]).push({id:'m'+now.toString(36)+Math.random().toString(36).slice(2,5),ts:now,from,dev:DEV,txt:t,ok:1});put('ms:'+mo,MSG[mo]);$('#chTxt').value='';renderChat();
   if(!cloudOn())toast('⚠ La sauvegarde en ligne n\'est pas activée : le message ne part pas sur le téléphone')};
+$('#chPwd').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#chSend').click()}};
 $('#chTxt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#chSend').click()}};
 
 /* ===================== HÔTEL ===================== */
