@@ -1078,7 +1078,9 @@ setTimeout(()=>{const last=localStorage.getItem('pn_autobk')||'';if(last<addD(to
 const chKey=c=>String(c||'').trim().toLowerCase();
 function menOf(){const L=[];for(const mo in MEN)for(const r of MEN[mo]||[])L.push(r);return L}
 function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.ch)===k);
-  const occ=S.find(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti'),depToday=S.find(h=>h.dep===d),arr=S.find(h=>h.arr===d);
+  /* occupée seulement quand le client est là : arrivée passée, ou marqué « arrivé » le jour même */
+  const occ=S.find(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti'&&(h.arr<d||h.etat==='arrive')),depToday=S.find(h=>h.dep===d),arr=S.find(h=>h.arr===d&&h.etat!=='arrive');
+  const soon=occ?null:S.filter(h=>h.arr>d&&h.etat!=='parti').sort((a,b)=>a.arr.localeCompare(b.arr))[0]||null;
   let lastDep='';for(const h of S){const out=h.etat==='parti'&&h.dep>d?d:h.dep;if(out<=d&&out>lastDep&&out>=addD(d,-14))lastDep=out}
   const M=menOf().filter(r=>chKey(r.ch)===k),done=M.filter(r=>!r.prevu&&!r.verif).sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts),lastDone=done[0]||null;
   const men=lastDep?done.find(r=>r.date>=lastDep)||null:null;
@@ -1095,16 +1097,17 @@ function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.c
   const next=M.filter(r=>r.prevu&&r.date>d).sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   const hebdoNext=room&&room.hebdo&&lastDone?addD(lastDone.date,7):null;
   const menR=lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men;
-  return{occ,depToday,arr,sale:why.length>0,why,light,men:menR,ver:menR?verOf(menR):null,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext,hist:done.slice(0,6)}}
+  return{occ,depToday,arr,soon,sale:why.length>0,why,light,men:menR,ver:menR?verOf(menR):null,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext,hist:done.slice(0,6)}}
 /* vérification d'un ménage : entrée séparée {verif:1,of:id du ménage,by,uid,ok} */
 function verOf(m){if(!m)return null;return menOf().filter(r=>r.verif&&r.of===m.id).sort((a,b)=>b.ts-a.ts)[0]||null}
 const locD=t=>{const x=new Date(t);return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')};
 const verTxt=v=>v?(v.ok?'🔍 vérifiée par '+esc(v.by)+' le '+locD(v.ts)+' à '+hhmm(v.ts):'❌ refusée par '+esc(v.by)+' le '+locD(v.ts)+' à '+hhmm(v.ts)):'⏳ pas encore vérifiée';
 function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
-  const bg=st.light?'#ea580c':st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.light?'✨ À RAFRAÎCHIR':st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
+  const bg=st.light?'#ea580c':st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.light?'✨ À RAFRAÎCHIR':st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Libre — ⏳ arrivée en attente':'Libre, prête';
   const who=(st.sale?`<div style="font-weight:700">${st.why.join(' · ')}</div>`:'')+(st.occ?`${esc(st.occ.nom)}<br>${isRes(st.occ)?'🏠 résident':'jusqu\'au '+frD(st.occ.dep).slice(0,5)}${absentNow(st.occ,d)?'<br>🚶 absent, revient le '+frD(st.occ.absAu).slice(0,5):''}${st.occ.mensuel?'<br>'+(loyerState(st.occ,d).ok?'💶 mois payé ✔':'<b>💶 mois pas payé ⚠</b>'):''}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'')+
     (st.next?`<div>📅 ${st.next.kind==='rafraichir'?'rafraîchir':'ménage'} prévu le ${frD(st.next.date).slice(0,5)}</div>`:'')+(st.hebdo&&!st.sale?`<div style="opacity:.85">🔁 hebdo${st.hebdoNext?' — prochain '+frD(st.hebdoNext).slice(0,5):''}</div>`:'');
-  const nxt=st.arr&&!st.occ?`<div style="margin-top:3px;font-size:12px">🛎 arrive : ${esc(st.arr.nom)}${st.arr.heure?' '+esc(st.arr.heure):''}</div>`:'';
+  const dj=x=>{const k=Math.round((parse(x)-parse(d))/864e5);return k===1?'demain':'dans '+k+' jours'};
+  const nxt=st.arr&&!st.occ?`<div style="margin-top:3px;font-size:12px">🛎 arrive aujourd'hui : ${esc(st.arr.nom)}${st.arr.heure?' '+esc(st.arr.heure):''}</div>`:st.soon?`<div style="margin-top:3px;font-size:12px">⏳ en attente : ${esc(st.soon.nom)} arrive ${dj(st.soon.arr)} (${frD(st.soon.arr).slice(0,5)})</div>`:'';
   return`<div data-room="${esc(r.n)}" style="background:${bg};color:#fff;border-radius:12px;padding:10px;cursor:pointer;min-height:112px;${st.sale?'box-shadow:0 0 0 3px '+(st.light?'#fed7aa':'#fecaca'):''}">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:24px">${esc(r.n)}</b><span style="font-size:12px;opacity:.9">${esc(r.t)}</span></div>
     <div style="font-weight:800;margin-top:2px">${lab}</div><div style="font-size:12px;opacity:.95">${who}</div>${nxt}
@@ -1112,7 +1115,7 @@ function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
 function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>x.n===n)||{n,t:''};
   info(`<h2>🛏 Chambre ${esc(n)} — ${esc(r.t)}</h2>
     ${st.sale?`<p style="color:#dc2626;font-weight:700;font-size:16px">🧹 À nettoyer : ${st.why.join(' · ')}</p>`:''}
-    ${st.occ?`<p>Occupée par <b>${esc(st.occ.nom)}</b> — ${isRes(st.occ)?'🏠 résident':'départ le '+frD(st.occ.dep)}</p>`:'<p>Libre.</p>'}
+    ${st.occ?`<p>Occupée par <b>${esc(st.occ.nom)}</b> — ${isRes(st.occ)?'🏠 résident':'départ le '+frD(st.occ.dep)}</p>`:`<p>Libre.${st.arr?` <b>⏳ Arrivée en attente aujourd'hui : ${esc(st.arr.nom)}</b> <button class="btn ok sm" id="mnArr">✔ Client arrivé</button>`:st.soon?` ⏳ En attente : <b>${esc(st.soon.nom)}</b> arrive le ${frD(st.soon.arr)}.`:''}</p>`}
     ${st.men?`<p class="meta">Dernier ménage : ${frD(st.men.date)} à ${hhmm(st.men.ts)}${st.men.by?' par '+esc(st.men.by):''}</p>
     <p style="font-weight:700;color:${st.ver&&st.ver.ok?'#16a34a':'#b45309'}">${verTxt(st.ver)}</p>
     ${!st.sale&&!(st.ver&&st.ver.ok)?`<div class="row" style="gap:8px;margin:6px 0 10px"><button class="btn ok" id="mnVer" style="flex:2;font-size:16px">🔍 Chambre vérifiée</button><button class="btn" id="mnKo" style="flex:1;background:#dc2626;color:#fff">❌ À refaire</button></div>`:''}`:''}
@@ -1135,6 +1138,7 @@ function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>
     $('#mnHeb').onchange=e=>{const R=(CFG.rooms||[]).find(x=>x.n===n);if(R){if(e.target.checked)R.hebdo=1;else delete R.hebdo;put('cfg',CFG);refresh()}};
     if($('#mnUndo'))$('#mnUndo').onclick=()=>{const m=st.men,mo=m.date.slice(0,7);MEN[mo]=(MEN[mo]||[]).filter(x=>x.id!==m.id);if(MEN[mo].length)put('mn:'+mo,MEN[mo]);else{delete MEN[mo];del('mn:'+mo)}closeInfo();refresh()};
     if($('#mnCli'))$('#mnCli').onclick=()=>{closeInfo();editHotel(st.occ.id)};
+    if($('#mnArr'))$('#mnArr').onclick=()=>{const x=findHt(st.arr.id);if(x){x.h.etat='arrive';x.h.mod=Date.now();saveHt(x.mo)}closeInfo();refresh();toast('✔ Chambre '+n+' occupée')};
     if($('#mnNew'))$('#mnNew').onclick=()=>{closeInfo();editHotel(null,{arr:d,dep:addD(d,1),ch:n})}})}
 function roomsToClean(){return(CFG.rooms||[]).filter(r=>roomState(r.n,todayS()).sale)}
 
@@ -1253,14 +1257,14 @@ const actif=h=>h.etat!=='annule';
 function htRow(h,mode){const n=nuits(h),done=h.etat==='parti'||h.etat==='annule',col=h.etat==='arrive'?'#16a34a':done?'#9ca3af':'#7c3aed';
   return`<div class="row" data-ht="${h.id}" style="border:1px solid var(--line);border-left:5px solid ${col};border-radius:10px;padding:10px 12px;margin:8px 0;cursor:pointer;${done&&mode!=='dep'?'opacity:.6':''}">
     <div style="min-width:86px;text-align:center"><div class="meta" style="margin:0">Chambre</div><div style="font-size:22px;font-weight:800">${esc(h.ch||'?')}</div></div>
-    <div class="grow"><div style="font-size:17px;font-weight:700">${esc(h.nom)} <span class="meta" style="font-weight:600">· ${h.nb||'?'} pers.</span> ${h.etat?`<span class="meta">${HETAT[h.etat]}</span>`:''}</div>
+    <div class="grow"><div style="font-size:17px;font-weight:700">${h.booking?'<span style="background:#003580;color:#fff;border-radius:5px;padding:1px 7px;font-size:13px;margin-right:6px">PAYÉ PAR BOOKING'+(+h.bkMontant?' : CHF '+(+h.bkMontant).toFixed(2):'')+'</span>':''}${esc(h.nom)} <span class="meta" style="font-weight:600">· ${h.nb||'?'} pers.</span> ${h.etat?`<span class="meta">${HETAT[h.etat]}</span>`:''}</div>
       <div class="meta" style="margin:2px 0">Arrivée <b>${JOURS[wd(h.arr)].slice(0,3)} ${frD(h.arr)}</b>${h.heure?' vers '+esc(h.heure):''} → départ <b>${depTxt(h)}</b> · ${isRes(h)?'depuis '+n+' nuit'+(n>1?'s':''):n+' nuit'+(n>1?'s':'')}</div>
       <div>${telLink(h.tel)}${h.note?` <span class="meta">— ${esc(h.note)}</span>`:''}</div>
       ${h.mensuel?(()=>{const L=loyerState(h,htDay);return`<div style="margin-top:4px;font-weight:700;color:${L.ok?'#16a34a':'#dc2626'}">📅 Loyer ${moisTxt(L.m)} : ${L.ok?'✔ payé '+eur(L.tot)+' le '+L.P.map(x=>frD(ymd(new Date(x.ts))).slice(0,5)).join(', '):'⚠ pas encore payé'+(+h.loyer?' — '+eur(h.loyer):'')}</div>`})():''}
       ${h.absDu&&h.absAu&&h.absAu>=htDay?`<div style="margin-top:2px;color:#7c3aed;font-weight:600">🚶 Absent du ${frD(h.absDu).slice(0,5)} au ${frD(h.absAu).slice(0,5)} — la chambre reste à lui</div>`:''}
       ${h.facture?`<div style="margin-top:4px;display:inline-block;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:3px 8px;font-weight:700">🧾 AVEC FACTURE${h.mail?' → ✉ '+esc(h.mail):' — e-mail non indiqué'}</div>`:''}
       ${!+h.prix&&h.f_total?`<div style="margin-top:2px;font-weight:700">💶 Total : ${esc(h.f_total)}${h.f_taxe?` <span class="meta" style="font-weight:500">(taxe de séjour : ${esc(h.f_taxe)})</span>`:''}</div>`:''}
-      ${+h.prix&&!h.mensuel?(()=>{const P=htPrix(h);return`<div style="margin-top:2px;font-weight:700">💶 ${eur(P.tot)}${P.tx?` <span class="meta" style="font-weight:500">(dont taxe de séjour ${eur(P.tx)})</span>`:h.sansTaxe?' <span class="meta" style="font-weight:500">(sans taxe de séjour)</span>':''} · ${h.booking?'<span style="background:#003580;color:#fff;border-radius:5px;padding:0 5px">Booking</span> ':''}${P.reste<=0?'<span style="color:#16a34a">✔ payé</span>':`<span style="color:#dc2626">${h.booking?'taxe de séjour à encaisser':'reste à payer'} ${eur(P.reste)}</span>`}</div>`})():''}</div><button class="btn sec" data-htp="${h.id}" title="Imprimer la fiche hôtel" style="font-size:20px;padding:6px 12px;align-self:center">🖨</button></div>`}
+      ${+h.prix&&!h.mensuel?(()=>{const P=htPrix(h);return`<div style="margin-top:2px;font-weight:700">💶 ${eur(P.tot)}${P.tx?` <span class="meta" style="font-weight:500">(dont taxe de séjour ${eur(P.tx)})</span>`:h.sansTaxe?' <span class="meta" style="font-weight:500">(sans taxe de séjour)</span>':''} · ${h.booking?'<span style="background:#003580;color:#fff;border-radius:5px;padding:0 5px">Booking</span> ':''}${P.reste<=0?'<span style="color:#16a34a">✔ payé</span>':`<span style="color:#dc2626">${h.booking?'taxe de séjour à encaisser':'reste à payer'} ${eur(P.reste)}</span>`}</div>`})():''}</div>${mode==='arr'&&h.arr<=todayS()&&!h.etat?`<button class="btn ok" data-hta="${h.id}" style="align-self:center;margin-right:6px">✔ Arrivé</button>`:''}<button class="btn sec" data-htp="${h.id}" title="Imprimer la fiche hôtel" style="font-size:20px;padding:6px 12px;align-self:center">🖨</button></div>`}
 /* ---- fiche hôtel imprimable (remplie depuis la fiche client, ou vierge) ---- */
 function ficheCharte(){const t=String(taxeTaux().toFixed(2));return CFG.charte||`Les annulations doivent être effectuées 48 h à l'avance, sinon le montant sera facturé.
 Animal de compagnie admis : ${ANIM()} CHF par nuit par animal.
@@ -1287,7 +1291,7 @@ function ficheHTML(h){const B='color:#1d4ed8;font-weight:700;font-family:sans-se
   const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:3.5mm">${b.split('\n').map(l=>`<p style="margin:0 0 1.5mm;line-height:1.35">${esc(l)}</p>`).join('')}</div>`).join('');
   return`<div style="font-family:Calibri,Carlito,'DejaVu Sans',Arial,sans-serif;font-size:12pt;color:#111">
   <div style="text-align:center;font-size:21pt;color:#555;margin:0 0 6mm">${esc(CFG.nom||'')}</div>
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 4mm 2mm;font-size:17pt;font-weight:700"><span>Fiche hôtel</span><span>Date : ${h?`<span style="${B}">${frD(h.arr)}</span>`:'____________________'}</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:0 4mm 2mm;font-size:17pt;font-weight:700"><span>Fiche hôtel</span>${h&&h.booking?`<span style="border:2px solid #003580;color:#003580;font-weight:800;font-size:11pt;padding:1mm 3mm;border-radius:2mm;font-family:sans-serif">PAYÉ PAR BOOKING${+h.bkMontant?' : CHF '+(+h.bkMontant).toFixed(2):''}</span>`:''}<span>Date : ${h?`<span style="${B}">${frD(h.arr)}</span>`:'____________________'}</span></div>
   <table style="width:100%;border-collapse:collapse">${L.map(([k,x])=>`<tr><td style="${TD}">${k} :${v(x)}</td></tr>`).join('')}</table>
   <table style="width:100%;border-collapse:collapse;margin-top:7mm"><tr><td style="${TD}">Total :${v(o.total)}</td></tr></table>
   <h2 style="font-size:16pt;margin:7mm 0 0">Charte Hôtel :</h2>${ch}
@@ -1297,9 +1301,9 @@ $('#htFicheV').onclick=()=>printFiche(null);
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
-  const pres=A.filter(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti').sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
+  const pres=A.filter(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti'&&(h.arr<d||h.etat==='arrive')).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   $('#htDate').value=d;$('#htTitle').textContent=longD(d);
-  $('#htSub').textContent=`${arr.length} arrivée(s) · ${dep.length} départ(s) · ${pres.length} chambre(s) occupée(s) cette nuit`;
+  $('#htSub').textContent=`${arr.length} arrivée(s) · ${dep.length} départ(s) · ${pres.length} chambre(s) occupée(s)`;
   $('#htRooms').innerHTML=roomsHTML(d);document.querySelectorAll('#htRooms [data-room]').forEach(el=>el.onclick=()=>roomClick(el.dataset.room));
   $('#htArr').innerHTML=arr.length?arr.map(h=>htRow(h,'arr')).join(''):'<p class="meta">Aucune arrivée ce jour-là.</p>';
   $('#htDep').innerHTML=dep.length?dep.map(h=>htRow(h,'dep')).join(''):'<p class="meta">Aucun départ ce jour-là.</p>';
@@ -1307,7 +1311,7 @@ function renderHotel(){const d=htDay,A=htAll().filter(actif);
   let x='';for(let i=1;i<=7;i++){const j=addD(d,i),l=A.filter(h=>h.arr===j);if(l.length)x+=`<h3 style="margin:10px 0 2px">${longD(j)} — ${l.length} arrivée(s)</h3>`+l.map(h=>htRow(h,'arr')).join('')}
   $('#htTxTxt').textContent=eur(taxeTaux())+' par personne et par nuit ';
   $('#htNext7').innerHTML=x||'<p class="meta">Aucune arrivée prévue les 7 prochains jours.</p>';
-  document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));document.querySelectorAll('#v-hotel [data-htp]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=findHt(b.dataset.htp);if(x)printFiche(x.h)});bindTel($('#v-hotel'))}
+  document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));document.querySelectorAll('#v-hotel [data-hta]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=findHt(b.dataset.hta);if(x){x.h.etat='arrive';x.h.mod=Date.now();saveHt(x.mo);refresh();toast('✔ '+x.h.nom+' est arrivé — chambre '+x.h.ch+' occupée')}});document.querySelectorAll('#v-hotel [data-htp]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=findHt(b.dataset.htp);if(x)printFiche(x.h)});bindTel($('#v-hotel'))}
 function payMonth(h){const m=todayS().slice(0,7);
   info(`<h2>💶 Loyer — ${esc(h.nom)} (ch. ${esc(h.ch)})</h2><div class="row"><label class="grow">Mois<input type="month" id="pmM" value="${m}"></label><label class="grow">Montant payé (CHF)<input type="number" id="pmV" min="0" step="10" value="${esc(h.loyer||'')}"></label></div>
     <label>Noté par (facultatif)<input id="pmBy" value="${esc(localStorage.getItem('pn_mnBy')||'')}"></label>
@@ -1321,7 +1325,8 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
   const old=fichePrefill(h),ln=(lab,idx,val,type)=>`<tr><td style="${TD}"><div style="display:flex;align-items:center;gap:6px"><span style="white-space:nowrap">${lab} :</span><input id="${idx}" ${type?`type="${type}"`:''} value="${esc(val==null?'':String(val))}" autocomplete="off" style="${IN}"></div></td></tr>`;
   const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:8px">${b.split('\n').map(l=>`<div style="margin-bottom:3px">${esc(l)}</div>`).join('')}</div>`).join('');
   info(`<div style="background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-family:Calibri,Carlito,'Segoe UI',sans-serif">
-    <div style="text-align:center;font-size:21px;color:#555;margin-bottom:10px">${esc(CFG.nom||'')}</div>
+    <div style="text-align:center;font-size:21px;color:#555;margin-bottom:8px">${esc(CFG.nom||'')}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin:0 6px 8px;flex-wrap:wrap"><label class="row" style="gap:6px;margin:0;font-weight:700;color:#003580"><input type="checkbox" id="hBook" ${h.booking?'checked':''} style="width:auto;margin:0;transform:scale(1.3)"> 🅱️ Payé par Booking</label><span id="hBookM" class="row" style="gap:4px;align-items:center;${h.booking?'':'display:none'}">montant : CHF<input type="number" id="hBkM" min="0" step="0.5" value="${esc(h.bkMontant||'')}" placeholder="0" style="width:100px;margin:0;color:#003580;font-weight:700"></span><span id="hBookBan" style="background:#003580;color:#fff;font-weight:800;border-radius:6px;padding:4px 10px;letter-spacing:.03em;${h.booking?'':'display:none'}">PAYÉ PAR BOOKING<span id="hBkTxt">${+h.bkMontant?' : CHF '+(+h.bkMontant).toFixed(2):''}</span></span></div>
     <div style="display:flex;align-items:center;gap:8px;margin:0 6px 4px"><b style="font-size:19px">Fiche hôtel</b><button class="btn ok" id="hPrint" title="Enregistrer et imprimer" style="padding:4px 10px;font-size:18px">🖨</button><span class="grow"></span><b style="font-size:17px">Date :</b><input type="date" id="hArr" value="${esc(h.arr)}" style="${IN};flex:none;width:170px"></div>
     <table style="width:100%;border-collapse:collapse">
     ${ln('Nom','hNom',h.nom)}${ln('Contact','hTel',h.tel,'tel')}${ln('E-mail','hMail',h.mail||'','email')}${ln('Adresse','hAdr',h.adr||'')}
@@ -1337,7 +1342,6 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
       <label class="row" style="gap:8px"><input type="checkbox" id="hRes" ${isRes(h)?'checked':''} style="width:auto"> 🏠 Résident : vit dans la chambre, pas de date de départ</label>
       <div class="row"><label style="width:130px">Heure d'arrivée<input type="time" id="hHeure" value="${esc(h.heure||'')}"></label><label class="grow">Remarque<input id="hNote" value="${esc(h.note||'')}"></label></div>
       <div class="row"><label style="width:150px">Prix par nuit (CHF)<input type="number" id="hPrix" min="0" step="0.5" value="${esc(h.prix||'')}"></label><label style="width:140px">Déjà payé (CHF)<input type="number" id="hPaye" min="0" step="0.5" value="${esc(h.paye||'')}"></label></div>
-      <label class="row" style="gap:8px"><input type="checkbox" id="hBook" ${h.booking?'checked':''} style="width:auto"> 🅱️ Payé par Booking (la taxe de séjour reste à encaisser ici)</label>
       <label class="row" style="gap:8px"><input type="checkbox" id="hSansTx" ${h.sansTaxe?'checked':''} style="width:auto"> Sans taxe de séjour</label>
       <div class="row" style="gap:14px;align-items:center"><b>🧾</b><label class="row" style="gap:6px"><input type="radio" name="hFact" value="" ${h.facture?'':'checked'} style="width:auto"> sans facture</label><label class="row" style="gap:6px"><input type="radio" name="hFact" value="1" ${h.facture?'checked':''} style="width:auto"> avec facture</label></div>
       <label class="row" style="gap:8px"><input type="checkbox" id="hMens" ${h.mensuel?'checked':''} style="width:auto"> 📅 Paye au mois</label>
@@ -1350,13 +1354,14 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
       let dep=res?RESID:(nn>0?addD(arr,nn):(f&&!isRes(h)&&h.dep>arr?h.dep:null));if(!dep){toast('Durée du séjour : écris le nombre de nuits (ex : 2)');return null}
       const v={arr,dep,ch:$('#hCh').value.trim(),nb:parseInt($('#hNb').value,10)||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),mail:$('#hMail').value.trim(),adr:$('#hAdr').value.trim(),
         f_duree:dt,f_pdj:$('#hPdjT').value.trim(),f_fresto:$('#hFrT').value.trim(),f_taxe:$('#hTaxT').value.trim(),f_anim:$('#hAnimT').value.trim(),f_total:$('#hTotT').value.trim(),
-        heure:$('#hHeure').value,note:$('#hNote').value.trim(),prix:+$('#hPrix').value||0,paye:+$('#hPaye').value||0,sansTaxe:$('#hSansTx').checked,booking:$('#hBook').checked,
+        heure:$('#hHeure').value,note:$('#hNote').value.trim(),prix:+$('#hPrix').value||0,paye:+$('#hPaye').value||0,sansTaxe:$('#hSansTx').checked,booking:$('#hBook').checked,bkMontant:$('#hBook').checked?(+$('#hBkM').value||0):0,
         mensuel:$('#hMens').checked,loyer:+$('#hLoyer').value||0,absDu:$('#hAbsDu').value,absAu:$('#hAbsAu').value,facture:!!(document.querySelector('[name=hFact]:checked')||{}).value,pdj:0,anim:0,fresto:0};
       const c=htConflit(v,f?h.id:null);if(c.length&&!confirm('⚠ La chambre '+v.ch+' est déjà prise par '+c.map(x=>x.nom+' ('+frD(x.arr)+' → '+frD(x.dep)+')').join(', ')+'. Enregistrer quand même ?'))return null;
       const mo=v.arr.slice(0,7);let out=h;
       if(f){Object.assign(h,v,{etat:$('#hEtat').value,mod:Date.now()});if(mo!==f.mo){HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);(HTL[mo]=HTL[mo]||[]).push(h)}saveHt(mo)}
       else{out={id:'ht'+Date.now().toString(36),...v,etat:'',ts:Date.now()};(HTL[mo]=HTL[mo]||[]).push(out);saveHt(mo)}
-      closeInfo();htDay=v.arr;refresh();toast('Client enregistré ✔');return out};
+      closeInfo();refresh();toast(v.arr>todayS()?'Client enregistré ✔ — arrive le '+frD(v.arr)+', la chambre reste libre d\'ici là':'Client enregistré ✔');return out};
+    $('#hBook').onchange=e=>{$('#hBookBan').style.display=$('#hBookM').style.display=e.target.checked?'':'none'};$('#hBkM').oninput=()=>{const m=+$('#hBkM').value;$('#hBkTxt').textContent=m?' : CHF '+m.toFixed(2):''};
     $('#hOk').onclick=()=>save();$('#hPrint').onclick=()=>{const r=save();if(r)printFiche(r)};
     if(f&&$('#hPay'))$('#hPay').onclick=()=>{closeInfo();payMonth(h)};
     if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
