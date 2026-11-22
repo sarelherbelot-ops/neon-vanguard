@@ -999,12 +999,13 @@ function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.c
   const room=(CFG.rooms||[]).find(r=>chKey(r.n)===k);
   if(room&&room.hebdo&&!(lastDone&&lastDone.date>addD(d,-7)))why.push('ménage de la semaine');
   const P=M.filter(r=>r.prevu&&r.date<=d&&r.date>=addD(d,-14)&&!done.some(x=>x.date>=r.date&&x.ts>=r.ts-60000)).sort((a,b)=>a.date.localeCompare(b.date));
-  let refresh=false;
-  for(const prev of P){if(prev.kind==='rafraichir'){refresh=true;continue}why.push(prev.kind==='nettoyer'?'à nettoyer':'ménage prévu le '+frD(prev.date).slice(0,5))}
-  if(refresh&&!why.length)why.push('✨ à rafraîchir');
+  for(const prev of P){if(prev.kind==='rafraichir')continue;why.push(prev.kind==='nettoyer'?'à nettoyer':'ménage prévu le '+frD(prev.date).slice(0,5))}
+  /* le dernier bouton appuyé décide : « À rafraîchir » met la chambre en orange */
+  const last=P.slice().sort((a,b)=>b.ts-a.ts)[0],light=!!(last&&last.kind==='rafraichir');
+  if(light)why.unshift('✨ à rafraîchir');
   const next=M.filter(r=>r.prevu&&r.date>d).sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   const hebdoNext=room&&room.hebdo&&lastDone?addD(lastDone.date,7):null;
-  return{occ,depToday,arr,sale:why.length>0,why,light:why.length===1&&why[0]==='✨ à rafraîchir',men:lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext}}
+  return{occ,depToday,arr,sale:why.length>0,why,light,men:lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext}}
 function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
   const bg=st.light?'#ea580c':st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.light?'✨ À RAFRAÎCHIR':st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
   const who=(st.sale?`<div style="font-weight:700">${st.why.join(' · ')}</div>`:'')+(st.occ?`${esc(st.occ.nom)}<br>${isRes(st.occ)?'🏠 résident':'jusqu\'au '+frD(st.occ.dep).slice(0,5)}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'')+
