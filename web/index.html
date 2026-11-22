@@ -1089,7 +1089,7 @@ function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.c
   return{occ,depToday,arr,sale:why.length>0,why,light,men:lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext}}
 function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
   const bg=st.light?'#ea580c':st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.light?'✨ À RAFRAÎCHIR':st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
-  const who=(st.sale?`<div style="font-weight:700">${st.why.join(' · ')}</div>`:'')+(st.occ?`${esc(st.occ.nom)}<br>${isRes(st.occ)?'🏠 résident':'jusqu\'au '+frD(st.occ.dep).slice(0,5)}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'')+
+  const who=(st.sale?`<div style="font-weight:700">${st.why.join(' · ')}</div>`:'')+(st.occ?`${esc(st.occ.nom)}<br>${isRes(st.occ)?'🏠 résident':'jusqu\'au '+frD(st.occ.dep).slice(0,5)}${absentNow(st.occ,d)?'<br>🚶 absent, revient le '+frD(st.occ.absAu).slice(0,5):''}${st.occ.mensuel?'<br>'+(loyerState(st.occ,d).ok?'💶 mois payé ✔':'<b>💶 mois pas payé ⚠</b>'):''}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'')+
     (st.next?`<div>📅 ${st.next.kind==='rafraichir'?'rafraîchir':'ménage'} prévu le ${frD(st.next.date).slice(0,5)}</div>`:'')+(st.hebdo&&!st.sale?`<div style="opacity:.85">🔁 hebdo${st.hebdoNext?' — prochain '+frD(st.hebdoNext).slice(0,5):''}</div>`:'');
   const nxt=st.arr&&!st.occ?`<div style="margin-top:3px;font-size:12px">🛎 arrive : ${esc(st.arr.nom)}${st.arr.heure?' '+esc(st.arr.heure):''}</div>`:'';
   return`<div data-room="${esc(r.n)}" style="background:${bg};color:#fff;border-radius:12px;padding:10px;cursor:pointer;min-height:112px;${st.sale?'box-shadow:0 0 0 3px '+(st.light?'#fed7aa':'#fecaca'):''}">
@@ -1214,8 +1214,12 @@ function saveHt(mo){const L=HTL[mo];if(L&&L.length)put('ht:'+mo,L);else{delete H
 const RESID='9999-12-31',isRes=h=>h.dep===RESID,depTxt=h=>isRes(h)?'résident (sans date de départ)':JOURS[wd(h.dep)].slice(0,3)+' '+frD(h.dep);
 const eur=v=>'CHF '+(Math.round((+v||0)*100)/100).toFixed(2);
 const taxeTaux=()=>CFG.taxe!=null?+CFG.taxe:4.5;
-function htPrix(h,n){n=n==null?nuits(h):n;const bk=!!h.booking,ch=(+h.prix||0)*n,tp=h.sansTaxe?0:(h.taxeP!=null&&h.taxeP!==''?+h.taxeP:(+h.nb||0)),tx=h.sansTaxe?0:Math.round(tp*n*taxeTaux()*100)/100,tot=ch+tx,pay=(+h.paye||0)+(bk?ch:0);
+function htPrix(h,n){n=n==null?nuits(h):n;if(h.mensuel){const pay=(h.paiements||[]).reduce((t,x)=>t+(+x.montant||0),0);return{n,ch:0,tx:0,tp:0,tot:pay,pay,bk:false,reste:0,mens:true}}const bk=!!h.booking,ch=(+h.prix||0)*n,tp=h.sansTaxe?0:(h.taxeP!=null&&h.taxeP!==''?+h.taxeP:(+h.nb||0)),tx=h.sansTaxe?0:Math.round(tp*n*taxeTaux()*100)/100,tot=ch+tx,pay=(+h.paye||0)+(bk?ch:0);
   return{n,ch,tx,tp,tot,pay,bk,reste:Math.round((tot-pay)*100)/100}}
+const moisTxt=m=>MOIS[+m.slice(5,7)-1]+' '+m.slice(0,4);
+const paidOf=(h,m)=>(h.paiements||[]).filter(x=>x.mois===m);
+function loyerState(h,d){const m=(d||todayS()).slice(0,7),P=paidOf(h,m),tot=P.reduce((t,x)=>t+(+x.montant||0),0);return{m,P,tot,ok:P.length>0}}
+const absentNow=(h,d)=>{d=d||todayS();return h.absDu&&h.absAu&&h.absDu<=d&&d<=h.absAu};
 const nuits=h=>isRes(h)?Math.max(0,Math.round((parse(todayS())-parse(h.arr))/864e5)):Math.max(0,Math.round((parse(h.dep)-parse(h.arr))/864e5));
 const HETAT={'':'','arrive':'✔ arrivé','parti':'🧳 parti','annule':'✖ annulé'};
 const actif=h=>h.etat!=='annule';
@@ -1225,8 +1229,10 @@ function htRow(h,mode){const n=nuits(h),done=h.etat==='parti'||h.etat==='annule'
     <div class="grow"><div style="font-size:17px;font-weight:700">${esc(h.nom)} <span class="meta" style="font-weight:600">· ${h.nb||'?'} pers.</span> ${h.etat?`<span class="meta">${HETAT[h.etat]}</span>`:''}</div>
       <div class="meta" style="margin:2px 0">Arrivée <b>${JOURS[wd(h.arr)].slice(0,3)} ${frD(h.arr)}</b>${h.heure?' vers '+esc(h.heure):''} → départ <b>${depTxt(h)}</b> · ${isRes(h)?'depuis '+n+' nuit'+(n>1?'s':''):n+' nuit'+(n>1?'s':'')}</div>
       <div>${telLink(h.tel)}${h.note?` <span class="meta">— ${esc(h.note)}</span>`:''}</div>
+      ${h.mensuel?(()=>{const L=loyerState(h,htDay);return`<div style="margin-top:4px;font-weight:700;color:${L.ok?'#16a34a':'#dc2626'}">📅 Loyer ${moisTxt(L.m)} : ${L.ok?'✔ payé '+eur(L.tot)+' le '+L.P.map(x=>frD(ymd(new Date(x.ts))).slice(0,5)).join(', '):'⚠ pas encore payé'+(+h.loyer?' — '+eur(h.loyer):'')}</div>`})():''}
+      ${h.absDu&&h.absAu&&h.absAu>=htDay?`<div style="margin-top:2px;color:#7c3aed;font-weight:600">🚶 Absent du ${frD(h.absDu).slice(0,5)} au ${frD(h.absAu).slice(0,5)} — la chambre reste à lui</div>`:''}
       ${h.facture?`<div style="margin-top:4px;display:inline-block;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:3px 8px;font-weight:700">🧾 AVEC FACTURE${h.mail?' → ✉ '+esc(h.mail):' — e-mail non indiqué'}</div>`:''}
-      ${+h.prix?(()=>{const P=htPrix(h);return`<div style="margin-top:2px;font-weight:700">💶 ${eur(P.tot)}${P.tx?` <span class="meta" style="font-weight:500">(dont taxe de séjour ${eur(P.tx)})</span>`:h.sansTaxe?' <span class="meta" style="font-weight:500">(sans taxe de séjour)</span>':''} · ${h.booking?'<span style="background:#003580;color:#fff;border-radius:5px;padding:0 5px">Booking</span> ':''}${P.reste<=0?'<span style="color:#16a34a">✔ payé</span>':`<span style="color:#dc2626">${h.booking?'taxe de séjour à encaisser':'reste à payer'} ${eur(P.reste)}</span>`}</div>`})():''}</div></div>`}
+      ${+h.prix&&!h.mensuel?(()=>{const P=htPrix(h);return`<div style="margin-top:2px;font-weight:700">💶 ${eur(P.tot)}${P.tx?` <span class="meta" style="font-weight:500">(dont taxe de séjour ${eur(P.tx)})</span>`:h.sansTaxe?' <span class="meta" style="font-weight:500">(sans taxe de séjour)</span>':''} · ${h.booking?'<span style="background:#003580;color:#fff;border-radius:5px;padding:0 5px">Booking</span> ':''}${P.reste<=0?'<span style="color:#16a34a">✔ payé</span>':`<span style="color:#dc2626">${h.booking?'taxe de séjour à encaisser':'reste à payer'} ${eur(P.reste)}</span>`}</div>`})():''}</div></div>`}
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
@@ -1241,6 +1247,12 @@ function renderHotel(){const d=htDay,A=htAll().filter(actif);
   $('#htTxTxt').textContent=eur(taxeTaux())+' par personne et par nuit ';
   $('#htNext7').innerHTML=x||'<p class="meta">Aucune arrivée prévue les 7 prochains jours.</p>';
   document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));bindTel($('#v-hotel'))}
+function payMonth(h){const m=todayS().slice(0,7);
+  info(`<h2>💶 Loyer — ${esc(h.nom)} (ch. ${esc(h.ch)})</h2><div class="row"><label class="grow">Mois<input type="month" id="pmM" value="${m}"></label><label class="grow">Montant payé (CHF)<input type="number" id="pmV" min="0" step="10" value="${esc(h.loyer||'')}"></label></div>
+    <label>Noté par (facultatif)<input id="pmBy" value="${esc(localStorage.getItem('pn_mnBy')||'')}"></label>
+    <div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="pmOk">✔ Valider le paiement</button></div>`,
+  ()=>{$('#pmOk').onclick=()=>{const mm=$('#pmM').value,v=+$('#pmV').value;if(!mm||!v)return toast('Mois et montant obligatoires');const f=findHt(h.id);if(!f)return;
+    (f.h.paiements=f.h.paiements||[]).push({id:'p'+Date.now().toString(36),mois:mm,montant:v,ts:Date.now(),by:$('#pmBy').value.trim()});f.h.mod=Date.now();saveHt(f.mo);closeInfo();refresh();toast('✔ Loyer '+moisTxt(mm)+' payé : '+eur(v))}})}
 function findHt(id){for(const mo in HTL){const h=(HTL[mo]||[]).find(x=>x.id===id);if(h)return{mo,h}}return null}
 function htConflit(v,id){return htAll().filter(h=>actif(h)&&h.id!==id&&h.etat!=='parti'&&String(h.ch).trim().toLowerCase()===String(v.ch).trim().toLowerCase()&&h.arr<v.dep&&v.arr<h.dep)}
 function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr:htDay,dep:addD(htDay,1),heure:'',ch:'',nom:'',tel:'',nb:2,note:'',etat:''},pre||{});
@@ -1250,7 +1262,13 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
     <label class="row" style="gap:8px"><input type="checkbox" id="hRes" ${isRes(h)?'checked':''} style="width:auto"> 🏠 Résident : vit dans la chambre, pas de date de départ</label>
     <label>Téléphone<input id="hTel" type="tel" value="${esc(h.tel)}" placeholder="079 123 45 67" autocomplete="off"></label>
     <label>Remarque<input id="hNote" value="${esc(h.note||'')}" placeholder="ex : lit bébé, petit-déjeuner, arrivée tardive…"></label>
-    <div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px"><b>💶 Prix</b>
+    <div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px">
+      <label class="row" style="gap:8px"><input type="checkbox" id="hMens" ${h.mensuel?'checked':''} style="width:auto"> 📅 <b>Paye au mois</b> (loyer mensuel)</label>
+      <div id="hMensBox" class="row" style="gap:10px;${h.mensuel?'':'display:none'}"><label style="width:170px">Loyer par mois (CHF)<input type="number" id="hLoyer" min="0" step="10" value="${esc(h.loyer||'')}"></label>
+        <div class="grow meta" style="align-self:flex-end">${f&&h.mensuel?(h.paiements||[]).slice().sort((a,b)=>b.mois.localeCompare(a.mois)).slice(0,6).map(x=>`✔ ${moisTxt(x.mois)} : ${eur(x.montant)} (${frD(ymd(new Date(x.ts)))})`).join('<br>')||'Aucun paiement noté':''}</div></div>
+      <div class="row" style="gap:10px;margin-top:4px"><label style="width:180px">🚶 Absent du<input type="date" id="hAbsDu" value="${esc(h.absDu||'')}"></label><label style="width:180px">au (revient le)<input type="date" id="hAbsAu" value="${esc(h.absAu||'')}"></label><span class="meta grow" style="align-self:flex-end">la chambre reste à lui pendant son absence</span></div>
+    </div>
+    <div id="hPrixBox" style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px;${h.mensuel?'display:none':''}"><b>💶 Prix</b>
       <div class="row"><label style="width:150px">Prix par nuit (CHF)<input type="number" id="hPrix" min="0" step="0.5" value="${esc(h.prix||'')}" placeholder="ex : 65"></label>
         <label style="width:170px">Taxe de séjour : personnes<input type="number" id="hTaxP" min="0" value="${h.taxeP!=null&&h.taxeP!==''?esc(h.taxeP):''}" placeholder="= nb de personnes"></label>
         <label style="width:140px">Déjà payé (CHF)<input type="number" id="hPaye" min="0" step="0.5" value="${esc(h.paye||'')}" placeholder="0"></label></div>
@@ -1261,18 +1279,20 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
       <div id="hTot" style="margin-top:6px;font-weight:700"></div><div class="meta">Taxe de séjour : ${eur(taxeTaux())} par personne et par nuit (modifiable en bas de l'onglet Hôtel).</div></div>
     <p class="meta" id="hNuits"></p>
     ${f?`<label>État<select id="hEtat">${Object.entries({'':'À venir','arrive':'✔ Arrivé','parti':'🧳 Parti','annule':'✖ Annulé'}).map(([k,v])=>`<option value="${k}" ${h.etat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}
-    <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
+    <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}${f&&h.mensuel?'<button class="btn ok" id="hPay">💶 Mois payé</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
   ()=>{const upd=()=>{const r=$('#hRes').checked;$('#hDep').disabled=r;const a=$('#hArr').value,b=$('#hDep').value;
       {const tmp={arr:a,dep:r?RESID:b,prix:$('#hPrix').value,nb:$('#hNb').value,taxeP:$('#hTaxP').value,sansTaxe:$('#hSansTx').checked,paye:$('#hPaye').value,booking:$('#hBook').checked},P=htPrix(tmp,(a&&(r||b>a))?nuits(tmp):0);
        $('#hTot').innerHTML=+tmp.prix?`${P.n} nuit(s) × ${eur(tmp.prix)} = ${eur(P.ch)}${tmp.sansTaxe?' · sans taxe de séjour':` + taxe ${P.tp} pers. × ${P.n} nuit(s) × ${eur(taxeTaux())} = ${eur(P.tx)}`}<br>Total : <span style="font-size:18px">${eur(P.tot)}</span>${P.bk?` · chambre payée par Booking ${eur(P.ch)}`:''} · payé ${eur(P.pay)} · <span style="color:${P.reste>0?'#dc2626':'#16a34a'}">${P.reste>0?(P.bk?'taxe de séjour à encaisser ':'reste ')+eur(P.reste):'✔ tout est payé'}</span>${r?' <span class="meta">(résident : calculé jusqu\'à aujourd\'hui)</span>':''}`:'<span class="meta">Indique le prix par nuit pour calculer le total.</span>'}
-      $('#hNuits').textContent=r?'Résident : la chambre reste occupée sans date de fin.':a&&b&&b>a?nuits({arr:a,dep:b})+' nuit(s)':'⚠ La date de départ doit être après l\'arrivée'};['#hArr','#hDep','#hRes','#hSansTx','#hBook'].forEach(q=>$(q).onchange=upd);['#hPrix','#hNb','#hTaxP','#hPaye'].forEach(q=>$(q).oninput=upd);upd();
-    $('#hOk').onclick=()=>{const v={arr:$('#hArr').value,dep:$('#hRes').checked?RESID:$('#hDep').value,heure:$('#hHeure').value,ch:$('#hCh').value.trim(),nb:+$('#hNb').value||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),note:$('#hNote').value.trim(),prix:+$('#hPrix').value||0,paye:+$('#hPaye').value||0,taxeP:$('#hTaxP').value===''?'':+$('#hTaxP').value,sansTaxe:$('#hSansTx').checked,booking:$('#hBook').checked,mail:$('#hMail').value.trim(),facture:!!(document.querySelector('[name=hFact]:checked')||{}).value};
+      $('#hNuits').textContent=r?'Résident : la chambre reste occupée sans date de fin.':a&&b&&b>a?nuits({arr:a,dep:b})+' nuit(s)':'⚠ La date de départ doit être après l\'arrivée'};$('#hMens').onchange=e=>{$('#hMensBox').style.display=e.target.checked?'':'none';$('#hPrixBox').style.display=e.target.checked?'none':''};
+    ['#hArr','#hDep','#hRes','#hSansTx','#hBook'].forEach(q=>$(q).onchange=upd);['#hPrix','#hNb','#hTaxP','#hPaye'].forEach(q=>$(q).oninput=upd);upd();
+    $('#hOk').onclick=()=>{const v={arr:$('#hArr').value,dep:$('#hRes').checked?RESID:$('#hDep').value,heure:$('#hHeure').value,ch:$('#hCh').value.trim(),nb:+$('#hNb').value||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),note:$('#hNote').value.trim(),prix:+$('#hPrix').value||0,paye:+$('#hPaye').value||0,taxeP:$('#hTaxP').value===''?'':+$('#hTaxP').value,sansTaxe:$('#hSansTx').checked,booking:$('#hBook').checked,mensuel:$('#hMens').checked,loyer:+$('#hLoyer').value||0,absDu:$('#hAbsDu').value,absAu:$('#hAbsAu').value,mail:$('#hMail').value.trim(),facture:!!(document.querySelector('[name=hFact]:checked')||{}).value};
       if(!v.arr||!v.dep||!v.nom||!v.ch)return toast('Arrivée, départ, chambre et nom obligatoires');if(v.dep<=v.arr)return toast('La date de départ doit être après l\'arrivée');
       const c=htConflit(v,f?h.id:null);if(c.length&&!confirm('⚠ La chambre '+v.ch+' est déjà prise par '+c.map(x=>x.nom+' ('+frD(x.arr)+' → '+frD(x.dep)+')').join(', ')+'. Enregistrer quand même ?'))return;
       const mo=v.arr.slice(0,7);
       if(f){Object.assign(h,v,{etat:$('#hEtat').value,mod:Date.now()});if(mo!==f.mo){HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);(HTL[mo]=HTL[mo]||[]).push(h)}saveHt(mo)}
       else{(HTL[mo]=HTL[mo]||[]).push({id:'ht'+Date.now().toString(36),...v,etat:'',ts:Date.now()});saveHt(mo)}
       closeInfo();htDay=v.arr;refresh();toast('Client enregistré ✔')};
+    if(f&&$('#hPay'))$('#hPay').onclick=()=>{closeInfo();payMonth(h)};
     if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
 $('#htNew').onclick=()=>editHotel(null);
 $('#htTxBtn').onclick=async()=>{const a=await askAuth('Modifier la taxe de séjour',['admin']);if(!a)return;const v=prompt('Taxe de séjour en CHF par personne et par nuit :',String(taxeTaux()).replace('.',','));if(v==null)return;const n=parseFloat(v.replace(',','.'));if(isNaN(n)||n<0)return toast('Montant invalide');CFG.taxe=n;put('cfg',CFG);renderHotel();toast('Taxe de séjour : '+eur(n))};
@@ -1331,11 +1351,12 @@ $('#rsPrint').onclick=()=>{const d=rsDay,L=resaOf(d),T='style="border:1px solid 
   outDoc('Réservations '+frD(d),0)};
 /* rappels : bandeau du jour, fenêtre une fois par jour, rappel 30 min avant */
 function resaBanner(){const b=$('#resaBar');if(!b)return;const T=todayS(),L=resaOf(T).filter(r=>!r.etat),A=htAll().filter(h=>h.arr===T&&!h.etat),D=htAll().filter(h=>h.dep===T&&h.etat!=='parti'&&h.etat!=='annule');
-  const Z=roomsToClean();
-  if(!L.length&&!A.length&&!D.length&&!Z.length){b.classList.add('hidden');return}b.classList.remove('hidden');
+  const Z=roomsToClean(),LY=htAll().filter(h=>actif(h)&&h.mensuel&&h.arr<=T&&h.dep>T&&h.etat!=='parti'&&!loyerState(h,T).ok);
+  if(!L.length&&!A.length&&!D.length&&!Z.length&&!LY.length){b.classList.add('hidden');return}b.classList.remove('hidden');
   b.innerHTML=(L.length?`<span data-go="resa">📞 <b>Réservations aujourd'hui (${L.length}) :</b> `+L.map(r=>`<b>${esc(r.heure)}</b> ${esc(r.nom)} (${r.nb||'?'} pers.)`).join(' · ')+'</span>':'')+
     (A.length||D.length?`<div data-go="hotel" style="${L.length?'margin-top:4px':''}">🏨 <b>Hôtel :</b> ${A.length?`${A.length} arrivée(s) — `+A.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}${A.length&&D.length?' · ':''}${D.length?`${D.length} départ(s) — `+D.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}</div>`:'')+
-    (Z.length?`<div data-go="hotel" style="margin-top:4px;color:#dc2626;font-weight:700">🧹 Chambres à nettoyer : ${Z.map(r=>esc(r.n)).join(', ')}</div>`:'');
+    (Z.length?`<div data-go="hotel" style="margin-top:4px;color:#dc2626;font-weight:700">🧹 Chambres à nettoyer : ${Z.map(r=>esc(r.n)).join(', ')}</div>`:'')+
+    (LY.length?`<div data-go="hotel" style="margin-top:4px;color:#b45309;font-weight:700">💶 Loyer de ${moisTxt(T.slice(0,7))} pas encore payé : ${LY.map(h=>'ch. '+esc(h.ch)+' '+esc(h.nom)).join(', ')}</div>`:'');
   b.querySelectorAll('[data-go]').forEach(el=>el.onclick=ev=>{ev.stopPropagation();if(el.dataset.go==='hotel'){htDay=T;show('hotel')}else{rsDay=T;show('resa')}});b.onclick=null}
 function resaPopup(force){const T=todayS(),L=resaOf(T).filter(r=>r.etat!=='annule');if(!L.length||(!force&&localStorage.getItem('pn_resaPop')===T))return;
   localStorage.setItem('pn_resaPop',T);
