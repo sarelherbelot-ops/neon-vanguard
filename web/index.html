@@ -957,7 +957,7 @@ async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:
   const TD='style="border:1px solid #888;padding:4px 6px"';
   const resa=rs.length?`<div class="pg"><h1 style="font-size:18px">Réservations</h1><table style="border-collapse:collapse;width:100%;font-size:11px"><tr><th ${TD}>Date</th><th ${TD}>Heure</th><th ${TD}>Nom</th><th ${TD}>Pers.</th><th ${TD}>Téléphone</th><th ${TD}>Remarque</th><th ${TD}>État</th></tr>${rs.map(r=>`<tr><td ${TD}>${frD(r.date)}</td><td ${TD}>${esc(r.heure)}</td><td ${TD}>${esc(r.nom)}</td><td ${TD}>${r.nb||''}</td><td ${TD}>${esc(r.tel)}</td><td ${TD}>${esc(r.note||'')}</td><td ${TD}>${ETAT[r.etat||'']}</td></tr>`).join('')}</table></div>`:'';
   const hs=htAll().sort((x,y)=>(x.arr+x.ch).localeCompare(y.arr+y.ch));
-  const hot=hs.length?`<div class="pg"><h1 style="font-size:18px">Hôtel — clients</h1><table style="border-collapse:collapse;width:100%;font-size:11px"><tr><th ${TD}>Arrivée</th><th ${TD}>Départ</th><th ${TD}>Chambre</th><th ${TD}>Nom</th><th ${TD}>Pers.</th><th ${TD}>Téléphone</th><th ${TD}>Remarque</th><th ${TD}>État</th></tr>${hs.map(h=>`<tr><td ${TD}>${frD(h.arr)}</td><td ${TD}>${frD(h.dep)}</td><td ${TD}>${esc(h.ch)}</td><td ${TD}>${esc(h.nom)}</td><td ${TD}>${h.nb||''}</td><td ${TD}>${esc(h.tel)}</td><td ${TD}>${esc(h.note||'')}</td><td ${TD}>${HETAT[h.etat||'']}</td></tr>`).join('')}</table></div>`:'';
+  const hot=hs.length?`<div class="pg"><h1 style="font-size:18px">Hôtel — clients</h1><table style="border-collapse:collapse;width:100%;font-size:11px"><tr><th ${TD}>Arrivée</th><th ${TD}>Départ</th><th ${TD}>Chambre</th><th ${TD}>Nom</th><th ${TD}>Pers.</th><th ${TD}>Téléphone</th><th ${TD}>Remarque</th><th ${TD}>État</th></tr>${hs.map(h=>`<tr><td ${TD}>${frD(h.arr)}</td><td ${TD}>${isRes(h)?'résident':frD(h.dep)}</td><td ${TD}>${esc(h.ch)}</td><td ${TD}>${esc(h.nom)}</td><td ${TD}>${h.nb||''}</td><td ${TD}>${esc(h.tel)}</td><td ${TD}>${esc(h.note||'')}</td><td ${TD}>${HETAT[h.etat||'']}</td></tr>`).join('')}</table></div>`:'';
   const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n').replace(/@media print\s*\{/g,'@media all{');
   return`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Sauvegarde ${esc(CFG.nom)} — ${frD(T)}</title><style>${css}
     body{background:#fff;padding:10px}#printArea{display:block!important}.pg{margin-bottom:30px;border-bottom:3px dashed #ccc;padding-bottom:20px}</style></head>
@@ -992,41 +992,58 @@ function menOf(){const L=[];for(const mo in MEN)for(const r of MEN[mo]||[])L.pus
 function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.ch)===k);
   const occ=S.find(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti'),depToday=S.find(h=>h.dep===d),arr=S.find(h=>h.arr===d);
   let lastDep='';for(const h of S){const out=h.etat==='parti'&&h.dep>d?d:h.dep;if(out<=d&&out>lastDep&&out>=addD(d,-14))lastDep=out}
-  const men=lastDep?menOf().filter(r=>chKey(r.ch)===k&&r.date>=lastDep).sort((a,b)=>b.ts-a.ts)[0]:null;
-  const sale=!!lastDep&&!men&&!(occ&&occ.arr>lastDep);
-  return{occ,depToday,arr,sale,men,lastDep}}
+  const M=menOf().filter(r=>chKey(r.ch)===k),done=M.filter(r=>!r.prevu).sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts),lastDone=done[0]||null;
+  const men=lastDep?done.find(r=>r.date>=lastDep)||null:null;
+  const why=[];
+  if(lastDep&&!men&&!(occ&&occ.arr>lastDep))why.push('départ');
+  const room=(CFG.rooms||[]).find(r=>chKey(r.n)===k);
+  if(room&&room.hebdo&&!(lastDone&&lastDone.date>addD(d,-7)))why.push('ménage de la semaine');
+  const prev=M.filter(r=>r.prevu&&r.date<=d&&r.date>=addD(d,-14)&&!done.some(x=>x.date>=r.date)).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  if(prev)why.push('ménage prévu le '+frD(prev.date).slice(0,5));
+  const next=M.filter(r=>r.prevu&&r.date>d).sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
+  const hebdoNext=room&&room.hebdo&&lastDone?addD(lastDone.date,7):null;
+  return{occ,depToday,arr,sale:why.length>0,why,men:lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext}}
 function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
   const bg=st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
-  const who=st.occ?`${esc(st.occ.nom)}<br>jusqu'au ${frD(st.occ.dep).slice(0,5)}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'';
+  const who=(st.sale?`<div style="font-weight:700">${st.why.join(' · ')}</div>`:'')+(st.occ?`${esc(st.occ.nom)}<br>${isRes(st.occ)?'🏠 résident':'jusqu\'au '+frD(st.occ.dep).slice(0,5)}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'')+
+    (st.next?`<div>📅 ménage prévu le ${frD(st.next.date).slice(0,5)}</div>`:'')+(st.hebdo&&!st.sale?`<div style="opacity:.85">🔁 hebdo${st.hebdoNext?' — prochain '+frD(st.hebdoNext).slice(0,5):''}</div>`:'');
   const nxt=st.arr&&!st.occ?`<div style="margin-top:3px;font-size:12px">🛎 arrive : ${esc(st.arr.nom)}${st.arr.heure?' '+esc(st.arr.heure):''}</div>`:'';
   return`<div data-room="${esc(r.n)}" style="background:${bg};color:#fff;border-radius:12px;padding:10px;cursor:pointer;min-height:112px;${st.sale?'box-shadow:0 0 0 3px #fecaca':''}">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:24px">${esc(r.n)}</b><span style="font-size:12px;opacity:.9">${esc(r.t)}</span></div>
     <div style="font-weight:800;margin-top:2px">${lab}</div><div style="font-size:12px;opacity:.95">${who}</div>${nxt}
-    ${st.men&&!st.occ?`<div style="font-size:11px;opacity:.9;margin-top:3px">✔ ménage fait ${hhmm(st.men.ts)}${st.men.by?' — '+esc(st.men.by):''}</div>`:''}</div>`}).join('')}
+    ${st.men&&!st.sale?`<div style="font-size:11px;opacity:.9;margin-top:3px">✔ ménage fait ${st.men.date===d?hhmm(st.men.ts):frD(st.men.date).slice(0,5)}${st.men.by?' — '+esc(st.men.by):''}</div>`:''}</div>`}).join('')}
 function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>x.n===n)||{n,t:''};
-  if(st.sale){info(`<h2>🧹 Chambre ${esc(n)} — ${esc(r.t)}</h2><p style="font-size:17px">Le ménage de la chambre <b>${esc(n)}</b> est-il terminé ?</p><p class="meta">Départ ${st.depToday?'de '+esc(st.depToday.nom)+' ':''}le ${frD(st.lastDep)}.</p>
-      <label>Fait par (facultatif)<input id="mnBy" placeholder="prénom" autocomplete="off" value="${esc(localStorage.getItem('pn_mnBy')||'')}"></label>
-      <div class="row" style="margin-top:12px"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="mnOk" style="min-width:200px">✔ Ménage fait</button></div>`,
-      ()=>{$('#mnOk').onclick=()=>{const by=$('#mnBy').value.trim();localStorage.setItem('pn_mnBy',by);const now=Date.now(),T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7);
-        (MEN[mo]=MEN[mo]||[]).push({id:'mn'+now.toString(36),ch:n,date:dd,ts:now,by});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('✔ Chambre '+n+' prête')}});return}
-  if(st.men&&!st.occ){info(`<h2>Chambre ${esc(n)} — ${esc(r.t)}</h2><p>Ménage noté fait à ${hhmm(st.men.ts)}${st.men.by?' par '+esc(st.men.by):''}.</p><div class="row"><button class="btn danger" id="mnUndo">Annuler le ménage (remettre en rouge)</button><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`,
-      ()=>{$('#mnUndo').onclick=()=>{const mo=st.men.date.slice(0,7);MEN[mo]=(MEN[mo]||[]).filter(x=>x.id!==st.men.id);if(MEN[mo].length)put('mn:'+mo,MEN[mo]);else{delete MEN[mo];del('mn:'+mo)}closeInfo();refresh()}});return}
-  if(st.occ)return editHotel(st.occ.id);
-  const h={arr:d,dep:addD(d,1),ch:n};editHotel(null,h)}
+  info(`<h2>🛏 Chambre ${esc(n)} — ${esc(r.t)}</h2>
+    ${st.sale?`<p style="color:#dc2626;font-weight:700;font-size:16px">🧹 À nettoyer : ${st.why.join(' · ')}</p>`:''}
+    ${st.occ?`<p>Occupée par <b>${esc(st.occ.nom)}</b> — ${isRes(st.occ)?'🏠 résident':'départ le '+frD(st.occ.dep)}</p>`:'<p>Libre.</p>'}
+    ${st.men?`<p class="meta">Dernier ménage : ${frD(st.men.date)} à ${hhmm(st.men.ts)}${st.men.by?' par '+esc(st.men.by):''}</p>`:''}
+    <label>Fait par (facultatif)<input id="mnBy" placeholder="prénom" autocomplete="off" value="${esc(localStorage.getItem('pn_mnBy')||'')}"></label>
+    <button class="btn ok" id="mnOk" style="width:100%;margin-top:8px;font-size:17px">✔ Ménage fait</button>
+    <div class="row" style="margin-top:10px"><label class="grow">📅 Prévoir un ménage le<input type="date" id="mnDate" value="${addD(todayS(),1)}"></label><button class="btn sec" id="mnPlan" style="align-self:flex-end">Prévoir</button></div>
+    <label class="row" style="gap:8px;margin-top:8px"><input type="checkbox" id="mnHeb" ${st.hebdo?'checked':''} style="width:auto"> 🔁 Rappel de ménage toutes les semaines pour cette chambre</label>
+    <div class="row" style="margin-top:12px">${st.men?'<button class="btn ghost" id="mnUndo">Annuler le dernier ménage</button>':''}<span class="grow"></span>${st.occ?'<button class="btn sec" id="mnCli">Voir le client</button>':'<button class="btn sec" id="mnNew">➕ Nouveau client</button>'}<button class="btn ghost" id="iClose">Fermer</button></div>`,
+  ()=>{$('#mnOk').onclick=()=>{const by=$('#mnBy').value.trim();localStorage.setItem('pn_mnBy',by);const now=Date.now(),T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7);
+      (MEN[mo]=MEN[mo]||[]).push({id:'mn'+now.toString(36),ch:n,date:dd,ts:now,by});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('✔ Chambre '+n+' : ménage fait')};
+    $('#mnPlan').onclick=()=>{const dd=$('#mnDate').value;if(!dd)return;const mo=dd.slice(0,7),now=Date.now();(MEN[mo]=MEN[mo]||[]).push({id:'mp'+now.toString(36),ch:n,date:dd,ts:now,prevu:1});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('📅 Ménage de la chambre '+n+' prévu le '+frD(dd))};
+    $('#mnHeb').onchange=e=>{const R=(CFG.rooms||[]).find(x=>x.n===n);if(R){if(e.target.checked)R.hebdo=1;else delete R.hebdo;put('cfg',CFG);refresh()}};
+    if($('#mnUndo'))$('#mnUndo').onclick=()=>{const m=st.men,mo=m.date.slice(0,7);MEN[mo]=(MEN[mo]||[]).filter(x=>x.id!==m.id);if(MEN[mo].length)put('mn:'+mo,MEN[mo]);else{delete MEN[mo];del('mn:'+mo)}closeInfo();refresh()};
+    if($('#mnCli'))$('#mnCli').onclick=()=>{closeInfo();editHotel(st.occ.id)};
+    if($('#mnNew'))$('#mnNew').onclick=()=>{closeInfo();editHotel(null,{arr:d,dep:addD(d,1),ch:n})}})}
 function roomsToClean(){return(CFG.rooms||[]).filter(r=>roomState(r.n,todayS()).sale)}
 
 /* ===================== HÔTEL ===================== */
 let htDay=todayS();
 function htAll(){const L=[];for(const mo in HTL)for(const h of HTL[mo]||[])L.push(h);return L}
 function saveHt(mo){const L=HTL[mo];if(L&&L.length)put('ht:'+mo,L);else{delete HTL[mo];del('ht:'+mo)}}
-const nuits=h=>Math.max(0,Math.round((parse(h.dep)-parse(h.arr))/864e5));
+const RESID='9999-12-31',isRes=h=>h.dep===RESID,depTxt=h=>isRes(h)?'résident (sans date de départ)':JOURS[wd(h.dep)].slice(0,3)+' '+frD(h.dep);
+const nuits=h=>isRes(h)?Math.max(0,Math.round((parse(todayS())-parse(h.arr))/864e5)):Math.max(0,Math.round((parse(h.dep)-parse(h.arr))/864e5));
 const HETAT={'':'','arrive':'✔ arrivé','parti':'🧳 parti','annule':'✖ annulé'};
 const actif=h=>h.etat!=='annule';
 function htRow(h,mode){const n=nuits(h),done=h.etat==='parti'||h.etat==='annule',col=h.etat==='arrive'?'#16a34a':done?'#9ca3af':'#7c3aed';
   return`<div class="row" data-ht="${h.id}" style="border:1px solid var(--line);border-left:5px solid ${col};border-radius:10px;padding:10px 12px;margin:8px 0;cursor:pointer;${done&&mode!=='dep'?'opacity:.6':''}">
     <div style="min-width:86px;text-align:center"><div class="meta" style="margin:0">Chambre</div><div style="font-size:22px;font-weight:800">${esc(h.ch||'?')}</div></div>
     <div class="grow"><div style="font-size:17px;font-weight:700">${esc(h.nom)} <span class="meta" style="font-weight:600">· ${h.nb||'?'} pers.</span> ${h.etat?`<span class="meta">${HETAT[h.etat]}</span>`:''}</div>
-      <div class="meta" style="margin:2px 0">Arrivée <b>${JOURS[wd(h.arr)].slice(0,3)} ${frD(h.arr)}</b>${h.heure?' vers '+esc(h.heure):''} → départ <b>${JOURS[wd(h.dep)].slice(0,3)} ${frD(h.dep)}</b> · ${n} nuit${n>1?'s':''}</div>
+      <div class="meta" style="margin:2px 0">Arrivée <b>${JOURS[wd(h.arr)].slice(0,3)} ${frD(h.arr)}</b>${h.heure?' vers '+esc(h.heure):''} → départ <b>${depTxt(h)}</b> · ${isRes(h)?'depuis '+n+' nuit'+(n>1?'s':''):n+' nuit'+(n>1?'s':'')}</div>
       <div>${telLink(h.tel)}${h.note?` <span class="meta">— ${esc(h.note)}</span>`:''}</div></div></div>`}
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
@@ -1045,15 +1062,16 @@ function findHt(id){for(const mo in HTL){const h=(HTL[mo]||[]).find(x=>x.id===id
 function htConflit(v,id){return htAll().filter(h=>actif(h)&&h.id!==id&&h.etat!=='parti'&&String(h.ch).trim().toLowerCase()===String(v.ch).trim().toLowerCase()&&h.arr<v.dep&&v.arr<h.dep)}
 function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr:htDay,dep:addD(htDay,1),heure:'',ch:'',nom:'',tel:'',nb:2,note:'',etat:''},pre||{});
   info(`<h2>${f?'🏨 Client':'➕ Nouveau client'}</h2>
-    <div class="row"><label class="grow">Arrivée<input type="date" id="hArr" value="${esc(h.arr)}"></label><label class="grow">Départ<input type="date" id="hDep" value="${esc(h.dep)}"></label><label style="width:110px">Heure d'arrivée<input type="time" id="hHeure" value="${esc(h.heure||'')}"></label></div>
+    <div class="row"><label class="grow">Arrivée<input type="date" id="hArr" value="${esc(h.arr)}"></label><label class="grow">Départ<input type="date" id="hDep" value="${isRes(h)?'':esc(h.dep)}" ${isRes(h)?'disabled':''}></label><label style="width:110px">Heure d'arrivée<input type="time" id="hHeure" value="${esc(h.heure||'')}"></label></div>
     <div class="row"><label style="width:210px">Chambre<input id="hCh" list="hChL" value="${esc(h.ch)}" placeholder="n°" autocomplete="off"><datalist id="hChL">${(CFG.rooms||[]).map(r=>`<option value="${esc(r.n)}">${esc(r.n)} — ${esc(r.t)}</option>`).join('')}</datalist></label><label style="width:110px">Personnes<input type="number" id="hNb" min="1" value="${esc(h.nb)}"></label><label class="grow">Nom du client<input id="hNom" value="${esc(h.nom)}" placeholder="ex : M. et Mme Martin" autocomplete="off"></label></div>
+    <label class="row" style="gap:8px"><input type="checkbox" id="hRes" ${isRes(h)?'checked':''} style="width:auto"> 🏠 Résident : vit dans la chambre, pas de date de départ</label>
     <label>Téléphone<input id="hTel" type="tel" value="${esc(h.tel)}" placeholder="06 12 34 56 78" autocomplete="off"></label>
     <label>Remarque<input id="hNote" value="${esc(h.note||'')}" placeholder="ex : lit bébé, petit-déjeuner, arrivée tardive…"></label>
     <p class="meta" id="hNuits"></p>
     ${f?`<label>État<select id="hEtat">${Object.entries({'':'À venir','arrive':'✔ Arrivé','parti':'🧳 Parti','annule':'✖ Annulé'}).map(([k,v])=>`<option value="${k}" ${h.etat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}
     <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
-  ()=>{const upd=()=>{const a=$('#hArr').value,b=$('#hDep').value;$('#hNuits').textContent=a&&b&&b>a?nuits({arr:a,dep:b})+' nuit(s)':'⚠ La date de départ doit être après l\'arrivée'};['#hArr','#hDep'].forEach(q=>$(q).onchange=upd);upd();
-    $('#hOk').onclick=()=>{const v={arr:$('#hArr').value,dep:$('#hDep').value,heure:$('#hHeure').value,ch:$('#hCh').value.trim(),nb:+$('#hNb').value||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),note:$('#hNote').value.trim()};
+  ()=>{const upd=()=>{const r=$('#hRes').checked;$('#hDep').disabled=r;const a=$('#hArr').value,b=$('#hDep').value;$('#hNuits').textContent=r?'Résident : la chambre reste occupée sans date de fin.':a&&b&&b>a?nuits({arr:a,dep:b})+' nuit(s)':'⚠ La date de départ doit être après l\'arrivée'};['#hArr','#hDep','#hRes'].forEach(q=>$(q).onchange=upd);upd();
+    $('#hOk').onclick=()=>{const v={arr:$('#hArr').value,dep:$('#hRes').checked?RESID:$('#hDep').value,heure:$('#hHeure').value,ch:$('#hCh').value.trim(),nb:+$('#hNb').value||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),note:$('#hNote').value.trim()};
       if(!v.arr||!v.dep||!v.nom||!v.ch)return toast('Arrivée, départ, chambre et nom obligatoires');if(v.dep<=v.arr)return toast('La date de départ doit être après l\'arrivée');
       const c=htConflit(v,f?h.id:null);if(c.length&&!confirm('⚠ La chambre '+v.ch+' est déjà prise par '+c.map(x=>x.nom+' ('+frD(x.arr)+' → '+frD(x.dep)+')').join(', ')+'. Enregistrer quand même ?'))return;
       const mo=v.arr.slice(0,7);
@@ -1065,7 +1083,7 @@ $('#htNew').onclick=()=>editHotel(null);
 $('#htPrev').onclick=()=>{htDay=addD(htDay,-1);renderHotel()};$('#htNext').onclick=()=>{htDay=addD(htDay,1);renderHotel()};
 $('#htToday').onclick=()=>{htDay=todayS();renderHotel()};$('#htDate').onchange=e=>{if(e.target.value){htDay=e.target.value;renderHotel()}};
 $('#htPrint').onclick=()=>{const d=htDay,A=htAll().filter(actif),T='style="border:1px solid #888;padding:5px 7px;text-align:left"';
-  const tab=(t,L)=>`<h2 style="font-size:15px;margin:14px 0 4px">${t} (${L.length})</h2>`+(L.length?`<table style="border-collapse:collapse;width:100%;font-size:12px"><tr><th ${T}>Chambre</th><th ${T}>Nom</th><th ${T}>Pers.</th><th ${T}>Arrivée</th><th ${T}>Départ</th><th ${T}>Nuits</th><th ${T}>Téléphone</th><th ${T}>Remarque</th><th ${T}>État</th></tr>${L.map(h=>`<tr><td ${T}><b>${esc(h.ch)}</b></td><td ${T}>${esc(h.nom)}</td><td ${T}>${h.nb||''}</td><td ${T}>${frD(h.arr)}${h.heure?' '+esc(h.heure):''}</td><td ${T}>${frD(h.dep)}</td><td ${T}>${nuits(h)}</td><td ${T}>${esc(h.tel)}</td><td ${T}>${esc(h.note||'')}</td><td ${T}>${HETAT[h.etat||'']}</td></tr>`).join('')}</table>`:'<p>—</p>');
+  const tab=(t,L)=>`<h2 style="font-size:15px;margin:14px 0 4px">${t} (${L.length})</h2>`+(L.length?`<table style="border-collapse:collapse;width:100%;font-size:12px"><tr><th ${T}>Chambre</th><th ${T}>Nom</th><th ${T}>Pers.</th><th ${T}>Arrivée</th><th ${T}>Départ</th><th ${T}>Nuits</th><th ${T}>Téléphone</th><th ${T}>Remarque</th><th ${T}>État</th></tr>${L.map(h=>`<tr><td ${T}><b>${esc(h.ch)}</b></td><td ${T}>${esc(h.nom)}</td><td ${T}>${h.nb||''}</td><td ${T}>${frD(h.arr)}${h.heure?' '+esc(h.heure):''}</td><td ${T}>${isRes(h)?'résident':frD(h.dep)}</td><td ${T}>${nuits(h)}</td><td ${T}>${esc(h.tel)}</td><td ${T}>${esc(h.note||'')}</td><td ${T}>${HETAT[h.etat||'']}</td></tr>`).join('')}</table>`:'<p>—</p>');
   const byCh=(a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true});
   $('#printArea').innerHTML=`<style>@page{size:A4 landscape;margin:8mm}</style><div class="pg"><h1 style="font-size:19px;margin:0">Hôtel — ${longD(d)}</h1><p>${esc(CFG.nom)}</p>
     ${tab('Arrivées',A.filter(h=>h.arr===d).sort(byCh))}${tab('Départs',A.filter(h=>h.dep===d).sort(byCh))}${tab('Clients présents cette nuit',A.filter(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti').sort(byCh))}</div>`;
@@ -1851,7 +1869,7 @@ function renderUpd(){$('#upVer').textContent='Version installée : n° '+(APPV||
   $('#syTxt').textContent=cloudOn()?('✔ Activée sur cet appareil ('+DEVNAME()+')'):'Pas encore activée sur cet appareil'}
 
 /* mise à niveau de la configuration (aussi appliquée à celle reçue par la synchro) */
-function migrateCfg(){let ch=0;if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Simple'],['3','Familiale + cuisine'],['4','Double'],['5','Double'],['6','Simple'],['7','Familiale sans cuisine'],['8','Double'],['9','Simple']].map(([n,t])=>({n,t}));ch=1}if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
+function migrateCfg(){let ch=0;if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Simple'],['3','Familiale + cuisine'],['4','Double'],['5','Double'],['6','Simple'],['7','Familiale sans cuisine'],['8','Double'],['9','Simple']].map(([n,t])=>({n,t}));ch=1}if(CFG.rooms&&!CFG.hebdoInit){CFG.hebdoInit=1;for(const r of CFG.rooms)if(['7','8','9'].includes(r.n))r.hebdo=1;ch=1}if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
   if(!CFG.users||!CFG.users.length){CFG.users=DEFUSERS.map(([nom,role],i)=>({id:'u'+i,nom,role}));delete CFG.pin;delete CFG.emps;ch=1}
   if(!CFG.pauseInit){CFG.users.forEach(u=>{if(u.pause==null)u.pause=0});
     CFG.pauseInit=1;ch=1}
@@ -1871,6 +1889,7 @@ function migrateCfg(){let ch=0;if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Si
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
   for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
+  if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);
   $('#sync2').onclick=syncBoth;$('#syBtn').onclick=()=>openSyncModal();$('#syncDot').onclick=()=>openSyncModal();
   $('#upCheck').onclick=()=>checkUpdate(true);$('#upAuto').onchange=e=>localStorage.setItem('pn_autoupd',e.target.checked?'1':'0');
