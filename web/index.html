@@ -349,7 +349,7 @@ h2{font-size:19px;margin:0}
       <label style="width:190px">Date<input type="date" id="cmDate"></label>
       <div class="grow"><b>Statut :</b> <label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt1" style="width:auto"> À commander</label><label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt2" style="width:auto"> Validé patron</label><label class="row" style="display:inline-flex;gap:6px"><input type="checkbox" id="cmSt3" style="width:auto"> Transmis à la direction</label></div>
     </div>
-    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
+    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="btn ghost" id="cmEdit">✏️ Modifier la liste</button><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
   </div>
   <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
   <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
@@ -1098,7 +1098,7 @@ function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>
 function roomsToClean(){return(CFG.rooms||[]).filter(r=>roomState(r.n,todayS()).sale)}
 
 /* ===================== COMMANDES CUISINE / SALLE ===================== */
-let cmZone='cuisine',cmDay=todayS(),cmT=null;
+let cmZone='cuisine',cmDay=todayS(),cmT=null,cmEd=false;
 const cmKey=()=>cmZone+'-'+cmDay;
 const cmTyping=()=>{const a=document.activeElement;return a&&VIEW==='cmd'&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&a.closest('#v-cmd')};
 function cmGet(){return CMD[cmKey()]||{date:cmDay,zone:cmZone,items:{},extra:'',st:{}}}
@@ -1108,12 +1108,23 @@ function renderCmd(){document.querySelectorAll('#cmZones button').forEach(b=>b.c
   const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[];$('#cmDate').value=cmDay;
   $('#cmSt1').checked=!!(o.st||{}).a;$('#cmSt2').checked=!!(o.st||{}).v;$('#cmSt3').checked=!!(o.st||{}).t;$('#cmExtra').value=o.extra||'';cmSumUpd(o);
   $('#cmCats').innerHTML=cats.map(c=>`<div class="card" style="margin:0;padding:0;overflow:hidden"><div style="background:${c.col};color:#fff;font-weight:800;padding:7px 10px;text-transform:uppercase;font-size:13px">${esc(c.nom)}</div>
-    <div style="padding:4px 10px">${c.items.map(it=>{const x=(o.items||{})[it.id]||{};return`<div class="row" style="gap:8px;padding:3px 0;border-bottom:1px dotted var(--line)"><input type="checkbox" data-ci="${it.id}" ${x.c?'checked':''} style="width:22px;height:22px"><span class="grow" style="${x.c?'font-weight:700':''}">${esc(it.nom)}</span><input data-cq="${it.id}" value="${esc(x.q||'')}" placeholder="Quantité" style="width:110px;padding:5px 7px"></div>`}).join('')}
-    <button class="btn ghost sm" data-cadd="${c.id}" style="margin:6px 0">➕ Ajouter un article</button></div></div>`).join('');
+    <div style="padding:4px 10px">${cmEd?`<div class="row" style="gap:6px;margin:6px 0"><button class="btn ghost sm" data-crn="${c.id}">✏️ Renommer la rubrique</button><button class="btn ghost sm" data-cdl="${c.id}" style="color:#dc2626">🗑 Supprimer la rubrique</button></div>`:''}
+    ${c.items.map((it,j)=>{const x=(o.items||{})[it.id]||{};return cmEd?`<div class="row" style="gap:6px;padding:3px 0;border-bottom:1px dotted var(--line)"><span class="grow">${esc(it.nom)}</span><button class="btn ghost sm" data-iup="${c.id}|${j}" ${j?'':'disabled'}>▲</button><button class="btn ghost sm" data-irn="${c.id}|${it.id}">✏️</button><button class="btn ghost sm" data-idl="${c.id}|${it.id}" style="color:#dc2626">🗑</button></div>`
+      :`<div class="row" style="gap:8px;padding:3px 0;border-bottom:1px dotted var(--line)"><input type="checkbox" data-ci="${it.id}" ${x.c?'checked':''} style="width:22px;height:22px"><span class="grow" style="${x.c?'font-weight:700':''}">${esc(it.nom)}</span><input data-cq="${it.id}" value="${esc(x.q||'')}" placeholder="Quantité" style="width:110px;padding:5px 7px"></div>`}).join('')}
+    <button class="btn ghost sm" data-cadd="${c.id}" style="margin:6px 0">➕ Ajouter un article</button></div></div>`).join('')+(cmEd?`<div class="card" style="margin:0;display:flex;align-items:center;justify-content:center"><button class="btn ok" id="cmNewCat">➕ Nouvelle rubrique</button></div>`:'');
+  const CAT=id=>CFG.cmdCat[cmZone].find(x=>x.id===id),sv=()=>{put('cfg',CFG);renderCmd()};
+  document.querySelectorAll('[data-crn]').forEach(el=>el.onclick=()=>{const c=CAT(el.dataset.crn),v=prompt('Nouveau nom de la rubrique :',c.nom);if(v&&v.trim()){c.nom=v.trim();sv()}});
+  document.querySelectorAll('[data-cdl]').forEach(el=>el.onclick=()=>{const c=CAT(el.dataset.cdl);if(confirm('Supprimer la rubrique « '+c.nom+' » et ses '+c.items.length+' article(s) ?')){CFG.cmdCat[cmZone]=CFG.cmdCat[cmZone].filter(x=>x!==c);sv()}});
+  document.querySelectorAll('[data-irn]').forEach(el=>el.onclick=()=>{const[ci,ii]=el.dataset.irn.split('|'),it=CAT(ci).items.find(x=>x.id===ii),v=prompt('Nouveau nom de l\'article :',it.nom);if(v&&v.trim()){it.nom=v.trim();sv()}});
+  document.querySelectorAll('[data-idl]').forEach(el=>el.onclick=()=>{const[ci,ii]=el.dataset.idl.split('|'),c=CAT(ci),it=c.items.find(x=>x.id===ii);if(confirm('Supprimer « '+it.nom+' » de la liste ?')){c.items=c.items.filter(x=>x.id!==ii);sv()}});
+  document.querySelectorAll('[data-iup]').forEach(el=>el.onclick=()=>{const[ci,j]=el.dataset.iup.split('|'),c=CAT(ci),k=+j;if(k>0){[c.items[k-1],c.items[k]]=[c.items[k],c.items[k-1]];sv()}});
+  if($('#cmNewCat'))$('#cmNewCat').onclick=()=>{const v=prompt('Nom de la nouvelle rubrique :');if(!v||!v.trim())return;const cols=['#0e7490','#a16207','#7f1d1d','#15803d','#4c1d95','#c2410c','#334155'];const L=CFG.cmdCat[cmZone];L.push({id:cmZone[0]+'n'+Date.now().toString(36),nom:v.trim(),col:cols[L.length%cols.length],items:[]});sv()};
+  $('#cmEdit').textContent=cmEd?'✔ Terminer les modifications':'✏️ Modifier la liste';$('#cmEdit').className='btn '+(cmEd?'ok':'ghost');
   document.querySelectorAll('[data-ci]').forEach(el=>el.onchange=()=>{const o=cmGet();o.items=o.items||{};const x=o.items[el.dataset.ci]=o.items[el.dataset.ci]||{};x.c=el.checked;el.nextElementSibling.style.fontWeight=el.checked?'700':'';cmSave(o)});
   document.querySelectorAll('[data-cq]').forEach(el=>el.oninput=()=>{const o=cmGet();o.items=o.items||{};const x=o.items[el.dataset.cq]=o.items[el.dataset.cq]||{};x.q=el.value;if(el.value.trim()&&!x.c){x.c=true;const cb=document.querySelector(`[data-ci="${el.dataset.cq}"]`);cb.checked=true;cb.nextElementSibling.style.fontWeight='700'}cmSave(o)});
   document.querySelectorAll('[data-cadd]').forEach(el=>el.onclick=()=>{const v=prompt('Nom du nouvel article :');if(!v||!v.trim())return;const c=CFG.cmdCat[cmZone].find(x=>x.id===el.dataset.cadd);c.items.push({id:c.id+'_n'+Date.now().toString(36),nom:v.trim()});put('cfg',CFG);renderCmd()})}
 document.querySelectorAll('#cmZones button').forEach(b=>b.onclick=()=>{cmZone=b.dataset.cz;renderCmd()});
+$('#cmEdit').onclick=()=>{cmEd=!cmEd;renderCmd()};
 $('#cmDate').onchange=e=>{if(e.target.value){cmDay=e.target.value;renderCmd()}};
 [['#cmSt1','a'],['#cmSt2','v'],['#cmSt3','t']].forEach(([q,k])=>$(q).onchange=e=>{const o=cmGet();o.st=o.st||{};o.st[k]=e.target.checked;cmSave(o)});
 $('#cmExtra').oninput=e=>{const o=cmGet();o.extra=e.target.value;cmSave(o)};
@@ -2001,14 +2012,12 @@ const CMDCAT={cuisine:[
  ['Épices, aromates & fonds','#c2410c',['Origan séché','Cumin','Poivre noir purée / grains','Ail semoule / moulu','Paprika doux','Herbes de Provence','Laurier','Thym','Noix de muscade','Fond de légume','Fond de volaille','Fond de bœuf']],
  ['Pâtisserie, desserts & fruits secs','#86198f',['Sucre glace','Purée fruits rouges','San Vincenzo (Biscuits Savoiardi / Boudoirs)','Cacao poudre noir','Pistaches','Abricots séchés','Crème de marrons','Noix (Walnuts)','Pignons de pin']]],
  salle:[
- ['Boissons sans alcool','#0e7490',['Eau plate','Eau gazeuse','Coca-Cola','Coca-Cola Zéro','Thé froid','Jus d\'orange','Jus de pomme','Sirops']],
- ['Bières','#a16207',['Bière pression (fût)','Bière bouteille','Bière sans alcool']],
- ['Vins','#7f1d1d',['Vin blanc','Vin rouge','Vin rosé','Vin mousseux / Prosecco']],
- ['Apéritifs & spiritueux','#4c1d95',['Apéritif','Spiritueux','Liqueurs']],
- ['Café & thé','#78350f',['Café en grains','Café décaféiné','Thé / infusions','Lait','Sucre / sucrettes']],
- ['Consommables salle','#334155',['Serviettes papier','Sets de table','Bougies','Pailles','Cure-dents','Rouleaux caisse']],
- ['Produits d\'entretien','#15803d',['Liquide vaisselle','Produit lave-vaisselle','Désinfectant','Sacs poubelle','Papier toilette','Savon mains']]]};
-function migrateCfg(){let ch=0;if(!CFG.cmdCat){CFG.cmdCat={};for(const z in CMDCAT)CFG.cmdCat[z]=CMDCAT[z].map(([n,c,L],i)=>({id:z[0]+i,nom:n,col:c,items:L.map((x,j)=>({id:z[0]+i+'_'+j,nom:x}))}));ch=1}if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Simple'],['3','Familiale + cuisine'],['4','Double'],['5','Double'],['6','Simple'],['7','Familiale sans cuisine'],['8','Double'],['9','Simple']].map(([n,t])=>({n,t}));ch=1}if(CFG.taxe==null||(CFG.taxe===1&&!CFG.taxeV2)){CFG.taxe=4.5;CFG.taxeV2=1;ch=1}if(CFG.rooms&&!CFG.hebdoInit){CFG.hebdoInit=1;for(const r of CFG.rooms)if(['7','8','9'].includes(r.n))r.hebdo=1;ch=1}if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
+ ['Boissons sans alcool','#0e7490',['Coca Zéro','Sprite','Limonade (litre)','Rivella rouge','Thé froid pêche','Thé froid citron','Eau plate 0,4','Eau plate 0,8','Eau gazeuse 0,4','Eau gazeuse 0,8','Fanta','San Bitter']],
+ ['Bières & cidre','#a16207',['Magners','Bière sans alcool','San Miguel']],
+ ['Vins','#7f1d1d',['Chasselas — Jacques Meunier','Merlot Gamay — Jacques Meunier','Gamay rosé — Jacques Meunier']],
+ ['Café & bar','#78350f',['Lait','Citron','Orange','Café','Sucre','Crème à café','Biscuits à café','Biscuits pour glace']],
+ ['Chambres & sanitaires','#334155',['Papier toilette','Papier mouchoir','Savon pour les chambres']]]};
+function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=CMDCAT.salle.map(([n,c,L],i)=>({id:'s'+i,nom:n,col:c,items:L.map((x,j)=>({id:'s'+i+'_'+j,nom:x}))}));ch=1}CFG.cmdSalle2=1;if(!CFG.cmdCat){CFG.cmdCat={};for(const z in CMDCAT)CFG.cmdCat[z]=CMDCAT[z].map(([n,c,L],i)=>({id:z[0]+i,nom:n,col:c,items:L.map((x,j)=>({id:z[0]+i+'_'+j,nom:x}))}));ch=1}if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Simple'],['3','Familiale + cuisine'],['4','Double'],['5','Double'],['6','Simple'],['7','Familiale sans cuisine'],['8','Double'],['9','Simple']].map(([n,t])=>({n,t}));ch=1}if(CFG.taxe==null||(CFG.taxe===1&&!CFG.taxeV2)){CFG.taxe=4.5;CFG.taxeV2=1;ch=1}if(CFG.rooms&&!CFG.hebdoInit){CFG.hebdoInit=1;for(const r of CFG.rooms)if(['7','8','9'].includes(r.n))r.hebdo=1;ch=1}if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
   if(!CFG.users||!CFG.users.length){CFG.users=DEFUSERS.map(([nom,role],i)=>({id:'u'+i,nom,role}));delete CFG.pin;delete CFG.emps;ch=1}
   if(!CFG.pauseInit){CFG.users.forEach(u=>{if(u.pause==null)u.pause=0});
     CFG.pauseInit=1;ch=1}
