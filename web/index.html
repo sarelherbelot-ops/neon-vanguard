@@ -1244,7 +1244,7 @@ function lateInfo(d,e){const S=planSegs(e.uid,d);if(!S.length)return null;const 
   if(e.out){const om=(e.out-base)/60000;const so=S.reduce((x,y)=>Math.abs(y[1]-om)<Math.abs(x[1]-om)?y:x);r.early=Math.floor(so[1]-om)}
   return r}
 /* heures comptées : on commence à l'heure prévue (pas avant), ou à l'heure réelle si retard */
-function countedIn(d,e){const li=lateInfo(d,e);return li?Math.max(e.in,li.startTs):e.in}
+function countedIn(d,e){const li=lateInfo(d,e);return li&&!e.avOk?Math.max(e.in,li.startTs):e.in}
 /* pause obligatoire déduite une fois par jour (sur le 1er service terminé du jour) */
 /* pause : 15 min dès 5 h, 1 h au-delà de 8 h — seulement pour un service continu (pas pour un horaire coupé) */
 const PMODES={regle:'Pause : 15 min dès 5 h, 1 h au-delà de 8 h',aucune:'Pas de pause déduite'};
@@ -1257,7 +1257,7 @@ function pTxt(d,e){const t=Math.round(pauseFor(d,e)/60000);return t+' min'+(surP
 function pauseFor(d,e){if(!e.out)return 0;const tot=Math.max(0,e.out-countedIn(d,e));return Math.min(pauseRule(d,e)+(surPlace(e)?15*60000:0),tot)}
 function countedDur(d,e){return e.out?Math.max(0,e.out-countedIn(d,e)-pauseFor(d,e)):0}
 function lateCell(d,e){const li=lateInfo(d,e);if(!li)return '<span class="meta">pas prévu</span>';
-  let h=li.late>0?`<span class="late">+${mins(li.late)} RETARD</span>`:`<span class="ontime">à l'heure</span>`+(li.avance>0?`<br><span class="meta">arrivé ${mins(li.avance)} avant — compté à ${fmtM(li.seg[0])}</span>`:'');
+  let h=li.late>0?`<span class="late">+${mins(li.late)} RETARD</span>`:`<span class="ontime">à l'heure</span>`+(li.avance>0?(e.avOk?`<br><span class="meta" style="color:#2563eb">⏩ avance de ${mins(li.avance)} comptée (demandée)</span>`:`<br><span class="meta">arrivé ${mins(li.avance)} avant — compté à ${fmtM(li.seg[0])}</span>`):'');
   if(li.early>0)h+=`<br><span class="late" style="font-weight:500">parti ${mins(li.early)} avant</span>`;return h}
 function cardPlan(u,o){const d=todayS(),S=planSegs(u.id,d);if(!S.length)return '<br><span class="meta">Pas prévu aujourd\'hui</span>';
   let h=`<br><span class="meta">Prévu : ${planTxt(u.id,d)}</span>`;
@@ -1456,10 +1456,11 @@ async function showPunch(d,id){const e=(PTS[d]||[]).find(x=>x.id===id);if(!e)ret
     $('#iEdit').onclick=async()=>{closeInfo();const a=await askAuth('Corriger un pointage',['admin']);if(!a)return;
       info(`<h2>Corriger — ${esc(e.nom)}</h2><label>Arrivée<input type="datetime-local" id="eIn" value="${dtl(e.in)}"></label>
         <label>Départ<input type="datetime-local" id="eOut" value="${e.out?dtl(e.out):''}"></label>
+        ${(()=>{const li=lateInfo(d,e);return li&&e.in<li.startTs?`<label class="row" style="gap:8px;margin-top:8px"><input type="checkbox" id="eAv" ${e.avOk?'checked':''} style="width:auto"> ⏩ Avance demandée par Sarel : compter à partir de l'arrivée (${hhmm(e.in)} au lieu de ${hhmm(li.startTs)})</label>`:''})()}
         <label>Repas<select id="eRep"><option value="">Non</option><option value="place" ${e.repas&&e.repasType!=='emporter'?'selected':''}>Sur place (+15 min de pause)</option><option value="emporter" ${e.repas&&e.repasType==='emporter'?'selected':''}>À emporter</option></select></label>
         <div class="row" style="margin-top:12px"><button class="btn danger" id="eDel">Supprimer</button><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="eOk">Enregistrer</button></div>`,
       ()=>{$('#eOk').onclick=()=>{const i=new Date($('#eIn').value).getTime(),o=$('#eOut').value?new Date($('#eOut').value).getTime():null;
-          if(!i||(o&&o<=i))return toast('Heures incohérentes');e.in=i;if(o)e.out=o;else delete e.out;{const r=$('#eRep').value;e.repas=!!r;if(r)e.repasType=r;else delete e.repasType}e.edit=a.nom+' le '+frD(todayS());savePts(d);closeInfo();renderPoint();toast('Pointage corrigé')};
+          if(!i||(o&&o<=i))return toast('Heures incohérentes');e.in=i;if(o)e.out=o;else delete e.out;{const r=$('#eRep').value;e.repas=!!r;if(r)e.repasType=r;else delete e.repasType}if($('#eAv')){if($('#eAv').checked)e.avOk=1;else delete e.avOk}e.edit=a.nom+' le '+frD(todayS());savePts(d);closeInfo();renderPoint();toast('Pointage corrigé')};
         $('#eDel').onclick=()=>{if(!confirm('Supprimer ce pointage ?'))return;PTS[d]=PTS[d].filter(x=>x.id!==e.id);if(e.photo)photoDel(e.photo);if(e.photoIn)photoDel(e.photoIn);savePts(d);closeInfo();renderPoint();toast('Pointage supprimé')}})}})}
 function savePhoto(name,dataUrl){const b64=dataUrl.split(',')[1];
   if(native()&&Android.saveBase64){Android.saveBase64(name,b64,'image/jpeg');return}
@@ -1469,7 +1470,7 @@ $('#phPdf').onclick=()=>{const R=phRows();if(!R.length)return toast('Rien à imp
   const T='style="border:1px solid #999;padding:1px 4px;text-align:left;white-space:nowrap"',TH='style="border:1px solid #999;padding:2px 4px;text-align:left;white-space:nowrap;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact"';
   $('#printArea').innerHTML='<style>@page{size:A4;margin:8mm}</style>'+Object.values(by).map(g=>{let tot=0,nl=0,ml=0,nr=0,ne=0;
     const rows=g.rows.map(({d,e})=>{const li=lateInfo(d,e),c=countedDur(d,e);tot+=c;if(e.repas){nr++;if(e.repasType==='emporter')ne++}if(li&&li.late>0){nl++;ml+=li.late}
-      return `<tr><td ${T}>${JOURS[wd(d)].slice(0,3)} ${frD(d).slice(0,5)}</td><td ${T}>${planTxt(e.uid,d)||'—'}</td><td ${T}>${hhmm(e.in)}</td><td ${T}>${li?(li.late>0?'<b>+'+mins(li.late)+'</b>':'à l\'heure'):'—'}</td><td ${T}>${e.out?hhmm(e.out):'—'}</td><td ${T}>${pauseFor(d,e)?Math.round(pauseFor(d,e)/60000)+' min'+(surPlace(e)?' (repas)':''):''}</td><td ${T}><b>${e.out?dur(c):''}</b></td><td ${T}>${rpTxt(e)}</td></tr>`}).join('');
+      return `<tr><td ${T}>${JOURS[wd(d)].slice(0,3)} ${frD(d).slice(0,5)}</td><td ${T}>${planTxt(e.uid,d)||'—'}</td><td ${T}>${hhmm(e.in)}</td><td ${T}>${li?(li.late>0?'<b>+'+mins(li.late)+'</b>':(e.avOk&&li.avance>0?'avance '+mins(li.avance)+' comptée':'à l\'heure')):'—'}</td><td ${T}>${e.out?hhmm(e.out):'—'}</td><td ${T}>${pauseFor(d,e)?Math.round(pauseFor(d,e)/60000)+' min'+(surPlace(e)?' (repas)':''):''}</td><td ${T}><b>${e.out?dur(c):''}</b></td><td ${T}>${rpTxt(e)}</td></tr>`}).join('');
     return `<div class="pg" style="font-size:12px"><h1 style="font-size:16px;margin:0 0 2px">Feuille d'heures — ${esc(g.nom)}</h1>
       <p style="margin:0 0 6px">${esc(CFG.nom)} · du ${frD(a)} au ${frD(b)}</p>
       <table style="border-collapse:collapse;width:100%;font-size:${g.rows.length>40?8.5:g.rows.length>30?9.5:10.5}px;line-height:1.25"><tr><th ${TH}>Date</th><th ${TH}>Prévu</th><th ${TH}>Arrivée</th><th ${TH}>Retard</th><th ${TH}>Départ</th><th ${TH}>Pause</th><th ${TH}>Heures comptées</th><th ${TH}>Repas</th></tr>${rows}
