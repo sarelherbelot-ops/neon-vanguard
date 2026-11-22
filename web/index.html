@@ -358,7 +358,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
 </section>
 <section id="v-chat" class="hidden">
   <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px;padding:0;overflow:hidden">
-    <div class="row" style="padding:10px 14px;border-bottom:1px solid var(--line)"><b class="grow">💬 Messages restaurant ↔ Sarel</b><span class="meta" id="chMe"></span><button class="btn ghost sm hidden" id="chBg">🔔 Notifications</button></div>
+    <div class="row" style="padding:10px 14px;border-bottom:1px solid var(--line)"><b class="grow" id="chTitle">💬 Messages restaurant ↔ responsable</b><span class="meta" id="chMe"></span><button class="btn ghost sm hidden" id="chBg">🔔 Notifications</button></div>
     <div id="chBgWarn" class="hidden" style="background:#fef3c7;border-bottom:1px solid #f59e0b;padding:8px 14px;font-size:14px"></div>
     <div id="chList" style="flex:1;overflow-y:auto;padding:12px 14px;background:#f8fafc"></div>
     <div class="row" style="padding:10px;border-top:1px solid var(--line);gap:8px;align-items:flex-end">
@@ -1186,13 +1186,13 @@ $('#chBg').onclick=bgSetup;
 function msgAll(){const L=[];for(const mo in MSG)for(const m of MSG[mo]||[])L.push(m);return L.sort((a,b)=>a.ts-b.ts)}
 const chSeen=()=>+(localStorage.getItem('pn_chSeen')||0);
 function chMyName(){if(MAIN()){const a=(CFG.users||[]).find(u=>u.role==='admin');return a?a.nom:'Responsable'}return localStorage.getItem('pn_chFrom')||''}
-function renderChat(){bgWarn();const L=msgAll().filter(m=>m.ts>Date.now()-60*864e5),box=$('#chList'),me=DEV;
+function renderChat(){bgWarn();{const a=(CFG.users||[]).find(u=>u.role==='admin');$('#chTitle').textContent='💬 Messages restaurant ↔ '+(a?a.nom:'responsable')}const L=msgAll().filter(m=>m.ts>Date.now()-60*864e5),box=$('#chList'),me=DEV;
   const sel=$('#chFrom'),names=[...new Set((CFG.users||[]).map(u=>u.nom))];
   if(MAIN()){sel.innerHTML=`<option>${esc(chMyName())}</option>`;sel.disabled=true;$('#chMe').textContent='Téléphone principal'}
   else{const cur=chMyName();sel.innerHTML='<option value="">Qui écrit ?</option>'+names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('');sel.disabled=false;$('#chMe').textContent=''}
   let last='';box.innerHTML=L.length?L.map(m=>{const mine=m.dev===me,d=ymd(new Date(m.ts)),sep=d!==last?`<div style="text-align:center;margin:10px 0 4px" class="meta">${longD(d)}</div>`:'';last=d;
     return sep+`<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:4px 0"><div style="max-width:75%;background:${mine?'#dcfce7':'#fff'};border:1px solid ${mine?'#86efac':'var(--line)'};border-radius:14px;padding:7px 11px;font-size:16px"><div style="font-size:12px;font-weight:700;color:${mine?'#15803d':'#2563eb'}">${esc(m.from||'?')}</div><div style="white-space:pre-wrap">${esc(m.txt)}</div><div class="meta" style="text-align:right;font-size:11px;margin:2px 0 0">${hhmm(m.ts)}</div></div></div>`}).join('')
-    :'<p class="meta" style="text-align:center;margin-top:40px">Aucun message. Écris ta question en bas : elle arrive sur le téléphone de Sarel en quelques secondes.</p>';
+    :'<p class="meta" style="text-align:center;margin-top:40px">Aucun message. Écris ta question en bas : elle arrive sur le téléphone du responsable en quelques secondes.</p>';
   box.scrollTop=box.scrollHeight;localStorage.setItem('pn_chSeen',Date.now());chBadge()}
 function chBadge(){const n=msgAll().filter(m=>m.dev!==DEV&&m.ts>chSeen()).length,b=document.querySelector('nav button[data-v=chat]');if(!b)return;
   let x=b.querySelector('.obadge');if(!n||VIEW==='chat'){if(x)x.remove();return}if(!x){x=document.createElement('span');x.className='obadge';x.style.cssText='background:#dc2626;color:#fff;border-radius:9px;padding:0 6px;margin-left:4px;font-size:12px;font-weight:700';b.appendChild(x)}x.textContent=n}
@@ -1785,7 +1785,7 @@ async function showPunch(d,id){const e=(PTS[d]||[]).find(x=>x.id===id);if(!e)ret
     $('#iEdit').onclick=async()=>{closeInfo();const a=await askAuth('Corriger un pointage',['admin']);if(!a)return;
       info(`<h2>Corriger — ${esc(e.nom)}</h2><label>Arrivée<input type="datetime-local" id="eIn" value="${dtl(e.in)}"></label>
         <label>Départ<input type="datetime-local" id="eOut" value="${e.out?dtl(e.out):''}"></label>
-        ${(()=>{const li=lateInfo(d,e);return li&&e.in<li.startTs?`<label class="row" style="gap:8px;margin-top:8px"><input type="checkbox" id="eAv" ${e.avOk?'checked':''} style="width:auto"> ⏩ Avance demandée par Sarel : compter à partir de l'arrivée (${hhmm(e.in)} au lieu de ${hhmm(li.startTs)})</label>`:''})()}
+        ${(()=>{const li=lateInfo(d,e);return li&&e.in<li.startTs?`<label class="row" style="gap:8px;margin-top:8px"><input type="checkbox" id="eAv" ${e.avOk?'checked':''} style="width:auto"> ⏩ Avance demandée par le responsable : compter à partir de l'arrivée (${hhmm(e.in)} au lieu de ${hhmm(li.startTs)})</label>`:''})()}
         <label>Repas<select id="eRep"><option value="">Non</option><option value="place" ${e.repas&&e.repasType!=='emporter'?'selected':''}>Sur place (+15 min de pause)</option><option value="emporter" ${e.repas&&e.repasType==='emporter'?'selected':''}>À emporter</option></select></label>
         <div class="row" style="margin-top:12px"><button class="btn danger" id="eDel">Supprimer</button><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="eOk">Enregistrer</button></div>`,
       ()=>{$('#eOk').onclick=()=>{const i=new Date($('#eIn').value).getTime(),o=$('#eOut').value?new Date($('#eOut').value).getTime():null;
@@ -2060,7 +2060,7 @@ function openSyncModal(fromStart){if(cloudOn()&&RESTRICT()){info(`<h2>☁️ Syn
     <label class="row" style="gap:8px"><input type="checkbox" id="cgFollow" ${FOLLOW()?'checked':''} style="width:auto"> Cet appareil suit le téléphone (à cocher sur la tablette)</label>
     <button class="btn ok" id="cgMain" style="margin-top:6px">⬇ Reprendre maintenant ce qui est sur le téléphone</button></div>`:`
     <label>Compte<input id="cgUser" value="${esc((CFG.users||[]).find(u=>u.role==='admin')?.nom||'')}" autocomplete="off" placeholder="ton prénom"></label>
-    <label>Compte du restaurant <span class="meta">(seulement si tu n'es pas le responsable, ex. : sarel)</span><input id="cgAcc" autocomplete="off" placeholder="laisser vide pour le responsable"></label>
+    <label>Compte du restaurant <span class="meta">(seulement si tu n'es pas le responsable)</span><input id="cgAcc" autocomplete="off" placeholder="laisser vide pour le responsable"></label>
     <label>Mot de passe<input id="cgPwd" type="password" autocomplete="off"></label>
     <label>Nom de cet appareil<input id="cgDev" value="${esc(localStorage.getItem('pn_devname')||(fromStart?'Téléphone':'Tablette'))}"></label>
     <p class="meta" id="syncStatus"></p>`}
