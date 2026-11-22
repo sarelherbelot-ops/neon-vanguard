@@ -376,7 +376,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
   </div>
   <div id="paramBox" class="hidden">
     <div class="card"><h2>🌐 Accès à distance (iPhone, autre appareil)</h2><p class="meta">Donne à un employé son propre accès en ligne : il voit et remplit tout depuis son téléphone, avec son mot de passe, sans accès aux Réglages.</p><div id="webAcc"></div></div>
-    <div class="card"><h2>📧 Récapitulatif de la semaine par e-mail</h2><p class="meta">Chaque lundi, l'appli prépare le récapitulatif de la semaine passée (heures, repas, retards, hygiène, réservations, hôtel, ménages) et propose de l'envoyer en un appui, en PDF.</p>
+    <div class="card"><h2>📧 Récapitulatif de la semaine par e-mail</h2><p class="meta">Le récapitulatif d'une semaine (heures, repas, retards, hygiène, réservations, hôtel, ménages) en PDF : choisis la semaine et appuie sur « Envoyer » quand tu veux. L'appli ne le demande jamais d'elle-même.</p>
       <div class="row"><label class="grow">Adresse e-mail<input type="email" id="rcMail" placeholder="ton.adresse@exemple.fr" autocomplete="off"></label><button class="btn sec" id="rcSave" style="align-self:flex-end">Enregistrer</button></div>
       <div class="row" style="margin-top:8px"><label class="grow">Semaine<input type="date" id="rcWeek"></label><button class="btn sec" id="rcSee" style="align-self:flex-end">👁 Voir / imprimer</button><button class="btn ok" id="rcNow" style="align-self:flex-end">📧 Envoyer</button></div></div>
     <div class="card"><h2>💾 Sauvegarde automatique chaque soir</h2><p class="meta" id="bkTxt"></p>
@@ -1407,7 +1407,7 @@ window.onNativeSaved=(ok,where)=>toast(ok?'Enregistré dans '+where:'Erreur d\'e
 
 /* ===================== REGLAGES ===================== */
 $('#pinOk').onclick=async()=>{if(!await askAuth('Accès administrateur',['admin']))return;$('#lockBox').classList.add('hidden');$('#paramBox').classList.remove('hidden');renderParams();renderBk();renderWebAcc();$('#rcMail').value=CFG.recapMail||'';$('#rcWeek').value=addD(monday(todayS()),-7);$('#oList').innerHTML=oubliHTML()};
-$('#rcSave').onclick=()=>{const v=$('#rcMail').value.trim();if(v&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return toast('Adresse e-mail invalide');CFG.recapMail=v;put('cfg',CFG);toast(v?'Récap envoyé chaque lundi à '+v:'Récap désactivé')};
+$('#rcSave').onclick=()=>{const v=$('#rcMail').value.trim();if(v&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return toast('Adresse e-mail invalide');CFG.recapMail=v;put('cfg',CFG);toast(v?'Adresse enregistrée : '+v:'Adresse effacée')};
 $('#rcSee').onclick=()=>{const m=monday($('#rcWeek').value||todayS());$('#printArea').innerHTML='<style>@page{size:A4;margin:8mm}</style>'+recapHTML(m);outDoc('Récap semaine '+isoWeek(m),0)};
 $('#rcNow').onclick=()=>{if(!CFG.recapMail&&!$('#rcMail').value.trim())return toast('Indique d\'abord ton adresse e-mail');if(!CFG.recapMail){CFG.recapMail=$('#rcMail').value.trim();put('cfg',CFG)}sendRecap(monday($('#rcWeek').value||todayS()))};
 $('#bkNow').onclick=()=>autoBackup(true);
@@ -2135,7 +2135,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   if(!localStorage.getItem('pn_chNotif')){chNotified=Date.now();localStorage.setItem('pn_chNotif',chNotified)}
   setTimeout(bgApply,2500);
-  applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);setTimeout(recapCheck,4000);setInterval(recapCheck,600000);
+  applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);
   $('#sync2').onclick=syncBoth;$('#syBtn').onclick=()=>openSyncModal();$('#syncDot').onclick=()=>openSyncModal();
   $('#upCheck').onclick=()=>checkUpdate(true);$('#upAuto').onchange=e=>localStorage.setItem('pn_autoupd',e.target.checked?'1':'0');
   try{APPV=parseInt(await (await fetch('version.txt',{cache:'no-store'})).text())||0}catch(e){}
