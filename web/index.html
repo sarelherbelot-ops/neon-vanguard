@@ -1927,10 +1927,21 @@ async function pushKey(k){const path=pathOf(k);
         const loc=localValue(k);if(loc!=null&&o.v!=null){const r=resolve(k,loc,o);applyRemote(k,r.v);if(r.rw){MT[k]=o.t||0;saveMT();setCloud(k,o.v);OUT.delete(k);saveOut();return}}continue}
       throw e}}}
 
+/* les accès (comptes en ligne) sont gardés sur chaque appareil : après un redémarrage du serveur, ils sont remis en ligne */
+let cleT=0;
+async function cleHeal(){const a=ACC();if(!a||!a.cle)return;const r=await rl('/cle');const sc=r.cle||{users:{}};let need=false;
+  const users=Object.assign({},a.cle.users||{},sc.users||{}),auth=Object.assign({},a.authTable||{},a.cle.auth||{},sc.auth||{});
+  for(const id in (a.cle.users||{}))if(!(sc.users||{})[id])need=true;for(const id in auth)if(!(sc.auth||{})[id])need=true;
+  const rv=new Set([...(sc.revoked||[]),...(a.cle.revoked||[])]);for(const id of rv){delete users[id];delete auth[id]}
+  need=need&&[...Object.keys(users)].some(id=>!(sc.users||{})[id]);
+  const cle=Object.assign({},sc,{users,auth,revoked:[...rv]});
+  if(need)await rl('/cle',{method:'PUT',body:{cle,auth}});
+  a.cle=cle;a.authTable=auth;localStorage.setItem('pn_acc',JSON.stringify(a))}
 async function pullAll(){let ch;
   try{ch=await rl('/changes?since='+(GH.seq||0))}catch(e){if(e.status===404&&e.j&&e.j.error==='no_account'){await reinit();ch=await rl('/changes?since=0')}else throw e}
-  if(ch.seq<(GH.seq||0)||(ch.epoch&&GH.epoch&&ch.epoch!==GH.epoch&&GH.seq)){GH.seq=0;GH.revs={};await markAllOut(true);ch=await rl('/changes?since=0')}
+  if(ch.seq<(GH.seq||0)||(ch.epoch&&GH.epoch&&ch.epoch!==GH.epoch&&GH.seq)){GH.seq=0;GH.revs={};await markAllOut(true);ch=await rl('/changes?since=0');cleT=0}
   if(ch.epoch)GH.epoch=ch.epoch;
+  if(Date.now()-cleT>600000){cleT=Date.now();try{await cleHeal()}catch(e){}}
   let any=false;
   for(const it of ch.items){if(it.p.startsWith('ph/')){GH.revs[it.p]=it.del?0:it.rev;continue}
     const k=keyOf(it.p);GH.revs[it.p]=it.del?0:it.rev;
@@ -1987,9 +1998,9 @@ async function updateWrap(nom,pw){if(!cloudOn())return;try{const a=ACC();const r
   catch(e){toast('Mot de passe en ligne non mis à jour : '+(e.message||e))}}
 
 /* ---- accès en ligne pour un employé (ex. le chef sur iPhone) ---- */
-async function grantWeb(u,pw){const a=ACC();const r=await rl('/cle');const cle=r.cle;cle.auth=Object.assign({},a.authTable||{},cle.auth||{});const t={};await wrapUser(u.nom,pw,cle,t);
+async function grantWeb(u,pw){const a=ACC();const r=await rl('/cle');const cle=r.cle;cle.revoked=(cle.revoked||[]).filter(x=>x!==u.nom.trim().toLowerCase());cle.auth=Object.assign({},a.authTable||{},cle.auth||{});const t={};await wrapUser(u.nom,pw,cle,t);
   await rl('/cle',{method:'PUT',body:{cle,auth:t}});a.cle=cle;a.authTable=Object.assign({},a.authTable||{},t);localStorage.setItem('pn_acc',JSON.stringify(a));u.web=1;put('cfg',CFG)}
-async function revokeWeb(u){const a=ACC(),id=u.nom.trim().toLowerCase();const r=await rl('/cle');const cle=r.cle;delete cle.users[id];if(cle.auth)delete cle.auth[id];
+async function revokeWeb(u){const a=ACC(),id=u.nom.trim().toLowerCase();const r=await rl('/cle');const cle=r.cle;delete cle.users[id];if(cle.auth)delete cle.auth[id];cle.revoked=[...new Set([...(cle.revoked||[]),id])];if(a.cle&&a.cle.users)delete a.cle.users[id];
   const t={[id]:{salt:b64e(rnd(16)),h:b64e(rnd(32))}};await rl('/cle',{method:'PUT',body:{cle,auth:t}});a.cle=cle;if(a.authTable)delete a.authTable[id];localStorage.setItem('pn_acc',JSON.stringify(a));delete u.web;put('cfg',CFG)}
 function webAccHTML(){if(!cloudOn())return'<p class="meta">Active d\'abord la sauvegarde en ligne sur cet appareil.</p>';const acc=ACC().user;
   return (CFG.users||[]).filter(u=>u.role!=='admin').map(u=>`<div class="row" style="padding:5px 0;border-bottom:1px dotted var(--line)"><span class="grow"><b>${esc(u.nom)}</b> ${u.web?'<span style="color:#16a34a">✔ accès en ligne</span>':'<span class="meta">pas d\'accès</span>'}</span>${u.web?`<button class="btn ghost sm" data-wrv="${u.id}" style="color:#dc2626">Retirer</button>`:`<button class="btn sec sm" data-wgr="${u.id}">Donner l'accès</button>`}</div>`).join('')+
