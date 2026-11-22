@@ -374,6 +374,7 @@ h2{font-size:19px;margin:0}
     <div class="row" style="margin-top:8px"><button class="btn" id="pinOk">🔒 Se connecter</button></div>
   </div>
   <div id="paramBox" class="hidden">
+    <div class="card"><h2>🌐 Accès à distance (iPhone, autre appareil)</h2><p class="meta">Donne à un employé son propre accès en ligne : il voit et remplit tout depuis son téléphone, avec son mot de passe, sans accès aux Réglages.</p><div id="webAcc"></div></div>
     <div class="card"><h2>📧 Récapitulatif de la semaine par e-mail</h2><p class="meta">Chaque lundi, l'appli prépare le récapitulatif de la semaine passée (heures, repas, retards, hygiène, réservations, hôtel, ménages) et propose de l'envoyer en un appui, en PDF.</p>
       <div class="row"><label class="grow">Adresse e-mail<input type="email" id="rcMail" placeholder="ton.adresse@exemple.fr" autocomplete="off"></label><button class="btn sec" id="rcSave" style="align-self:flex-end">Enregistrer</button></div>
       <div class="row" style="margin-top:8px"><label class="grow">Semaine<input type="date" id="rcWeek"></label><button class="btn sec" id="rcSee" style="align-self:flex-end">👁 Voir / imprimer</button><button class="btn ok" id="rcNow" style="align-self:flex-end">📧 Envoyer</button></div></div>
@@ -1399,7 +1400,7 @@ function saveFile(name,content,mime){if(native()){Android.saveFile(name,content,
 window.onNativeSaved=(ok,where)=>toast(ok?'Enregistré dans '+where:'Erreur d\'enregistrement');
 
 /* ===================== REGLAGES ===================== */
-$('#pinOk').onclick=async()=>{if(!await askAuth('Accès administrateur',['admin']))return;$('#lockBox').classList.add('hidden');$('#paramBox').classList.remove('hidden');renderParams();renderBk();$('#rcMail').value=CFG.recapMail||'';$('#rcWeek').value=addD(monday(todayS()),-7);$('#oList').innerHTML=oubliHTML()};
+$('#pinOk').onclick=async()=>{if(!await askAuth('Accès administrateur',['admin']))return;$('#lockBox').classList.add('hidden');$('#paramBox').classList.remove('hidden');renderParams();renderBk();renderWebAcc();$('#rcMail').value=CFG.recapMail||'';$('#rcWeek').value=addD(monday(todayS()),-7);$('#oList').innerHTML=oubliHTML()};
 $('#rcSave').onclick=()=>{const v=$('#rcMail').value.trim();if(v&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return toast('Adresse e-mail invalide');CFG.recapMail=v;put('cfg',CFG);toast(v?'Récap envoyé chaque lundi à '+v:'Récap désactivé')};
 $('#rcSee').onclick=()=>{const m=monday($('#rcWeek').value||todayS());$('#printArea').innerHTML='<style>@page{size:A4;margin:8mm}</style>'+recapHTML(m);outDoc('Récap semaine '+isoWeek(m),0)};
 $('#rcNow').onclick=()=>{if(!CFG.recapMail&&!$('#rcMail').value.trim())return toast('Indique d\'abord ton adresse e-mail');if(!CFG.recapMail){CFG.recapMail=$('#rcMail').value.trim();put('cfg',CFG)}sendRecap(monday($('#rcWeek').value||todayS()))};
@@ -1957,9 +1958,9 @@ function startSync(){clearInterval(syncTimer);DK=localStorage.getItem('pn_dk');
 
 /* ---- compte ---- */
 async function wrapUser(nom,pw,cle,table){const id=nom.trim().toLowerCase(),s1=rnd(16),s2=rnd(16),ak=await authKey(pw,s2);
-  cle.users[id]={salt:s1,...await encWith(await kek(pw,s1),b64d(DK))};table[id]={salt:s2,h:await sha256hex(ak)};return ak}
-async function cloudLogin(nom,pw,adminOk){const id=nom.trim().toLowerCase();let salt;
-  const ns=await nsFor(id);
+  cle.users[id]={salt:s1,...await encWith(await kek(pw,s1),b64d(DK))};table[id]={salt:s2,h:await sha256hex(ak)};cle.auth=Object.assign(cle.auth||{},{[id]:table[id]});return ak}
+async function cloudLogin(nom,pw,adminOk,compte){const id=nom.trim().toLowerCase();let salt;
+  const ns=await nsFor((compte||'').trim()||id);
   try{salt=(await rl('/salt?u='+encodeURIComponent(id),{acc:{},ns})).salt}
   catch(e){
     if(e.status===404&&e.j&&e.j.error==='no_account'){
@@ -1972,12 +1973,28 @@ async function cloudLogin(nom,pw,adminOk){const id=nom.trim().toLowerCase();let 
   const ak=await authKey(pw,salt);let r;
   try{r=await rl('/cle',{acc:{user:id,auth:ak},ns})}catch(e){if(e.status===401)throw new Error('Mot de passe incorrect');throw new Error('Serveur injoignable, réessaie')}
   const w=r.cle.users[id];let raw;try{raw=await decWith(await kek(pw,w.salt),w)}catch(e){throw new Error('Mot de passe incorrect')}
-  DK=b64e(raw);const table={};table[id]={salt,h:await sha256hex(ak)};
+  DK=b64e(raw);const table=Object.assign({},r.cle.auth||{});table[id]={salt,h:await sha256hex(ak)};
   localStorage.setItem('pn_acc',JSON.stringify({user:id,auth:ak,cle:r.cle,authTable:table,ns}));localStorage.setItem('pn_dk',DK);
   GH={seq:0,revs:{}};saveGH();CLOUD.__gh=GH;await markAllOut(false);return'joined'}
 async function updateWrap(nom,pw){if(!cloudOn())return;try{const a=ACC();const r=await rl('/cle');const cle=r.cle;const t={};const ak=await wrapUser(nom,pw,cle,t);
     await rl('/cle',{method:'PUT',body:{cle,auth:t}});a.cle=cle;a.authTable={...(a.authTable||{}),...t};if(nom.trim().toLowerCase()===a.user)a.auth=ak;localStorage.setItem('pn_acc',JSON.stringify(a))}
   catch(e){toast('Mot de passe en ligne non mis à jour : '+(e.message||e))}}
+
+/* ---- accès en ligne pour un employé (ex. le chef sur iPhone) ---- */
+async function grantWeb(u,pw){const a=ACC();const r=await rl('/cle');const cle=r.cle;cle.auth=Object.assign({},a.authTable||{},cle.auth||{});const t={};await wrapUser(u.nom,pw,cle,t);
+  await rl('/cle',{method:'PUT',body:{cle,auth:t}});a.cle=cle;a.authTable=Object.assign({},a.authTable||{},t);localStorage.setItem('pn_acc',JSON.stringify(a));u.web=1;put('cfg',CFG)}
+async function revokeWeb(u){const a=ACC(),id=u.nom.trim().toLowerCase();const r=await rl('/cle');const cle=r.cle;delete cle.users[id];if(cle.auth)delete cle.auth[id];
+  const t={[id]:{salt:b64e(rnd(16)),h:b64e(rnd(32))}};await rl('/cle',{method:'PUT',body:{cle,auth:t}});a.cle=cle;if(a.authTable)delete a.authTable[id];localStorage.setItem('pn_acc',JSON.stringify(a));delete u.web;put('cfg',CFG)}
+function webAccHTML(){if(!cloudOn())return'<p class="meta">Active d\'abord la sauvegarde en ligne sur cet appareil.</p>';const acc=ACC().user;
+  return (CFG.users||[]).filter(u=>u.role!=='admin').map(u=>`<div class="row" style="padding:5px 0;border-bottom:1px dotted var(--line)"><span class="grow"><b>${esc(u.nom)}</b> ${u.web?'<span style="color:#16a34a">✔ accès en ligne</span>':'<span class="meta">pas d\'accès</span>'}</span>${u.web?`<button class="btn ghost sm" data-wrv="${u.id}" style="color:#dc2626">Retirer</button>`:`<button class="btn sec sm" data-wgr="${u.id}">Donner l'accès</button>`}</div>`).join('')+
+    `<p class="meta" style="margin-top:6px">Sur l'autre appareil : « Se connecter à un compte existant », Compte = son prénom, Compte du restaurant = <b>${esc(acc)}</b>, et son mot de passe. Il voit tout, mais n'entre pas dans les Réglages.</p>`}
+function bindWebAcc(){document.querySelectorAll('[data-wgr]').forEach(b=>b.onclick=()=>{const u=CFG.users.find(x=>x.id===b.dataset.wgr);
+    info(`<h2>🌐 Accès en ligne pour ${esc(u.nom)}</h2><p>Choisis son mot de passe (au moins 6 caractères). Il servira aussi à pointer et signer.</p><label>Mot de passe<input id="wPw" type="password" autocomplete="off"></label><label>Confirmer<input id="wPw2" type="password" autocomplete="off"></label>
+      <div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="wOk">Donner l'accès</button></div>`,
+    ()=>{$('#wOk').onclick=async()=>{const p1=$('#wPw').value,p2=$('#wPw2').value;if(p1.length<6)return toast('6 caractères minimum');if(p1!==p2)return toast('Les deux mots de passe sont différents');
+      $('#wOk').disabled=true;try{await setPwd(u,p1);put('cfg',CFG);await grantWeb(u,p1);closeInfo();toast('✔ '+u.nom+' a maintenant un accès en ligne');renderWebAcc()}catch(e){$('#wOk').disabled=false;toast('⚠ '+(e.message||e))}}})});
+  document.querySelectorAll('[data-wrv]').forEach(b=>b.onclick=async()=>{const u=CFG.users.find(x=>x.id===b.dataset.wrv);if(!confirm('Retirer l\'accès en ligne de '+u.nom+' ? Son appareil ne recevra plus rien.'))return;try{await revokeWeb(u);toast('Accès retiré');renderWebAcc()}catch(e){toast('⚠ '+(e.message||e))}})}
+function renderWebAcc(){const el=$('#webAcc');if(el){el.innerHTML=webAccHTML();bindWebAcc()}}
 
 /* ---- tout reprendre de l'appareil principal (téléphone) ---- */
 async function followMain(){if(!cloudOn())return toast('Connecte d\'abord la sauvegarde en ligne');
@@ -2025,7 +2042,8 @@ function openSyncModal(fromStart){
     <label class="row" style="gap:8px"><input type="checkbox" id="cgMainDev" ${MAIN()?'checked':''} style="width:auto"> Cet appareil est le principal (à cocher sur le téléphone)</label>
     <label class="row" style="gap:8px"><input type="checkbox" id="cgFollow" ${FOLLOW()?'checked':''} style="width:auto"> Cet appareil suit le téléphone (à cocher sur la tablette)</label>
     <button class="btn ok" id="cgMain" style="margin-top:6px">⬇ Reprendre maintenant ce qui est sur le téléphone</button></div>`:`
-    <label>Compte<input id="cgUser" value="${esc((CFG.users||[]).find(u=>u.role==='admin')?.nom||'')}" autocomplete="off"></label>
+    <label>Compte<input id="cgUser" value="${esc((CFG.users||[]).find(u=>u.role==='admin')?.nom||'')}" autocomplete="off" placeholder="ton prénom"></label>
+    <label>Compte du restaurant <span class="meta">(seulement si tu n'es pas le responsable, ex. : sarel)</span><input id="cgAcc" autocomplete="off" placeholder="laisser vide pour le responsable"></label>
     <label>Mot de passe<input id="cgPwd" type="password" autocomplete="off"></label>
     <label>Nom de cet appareil<input id="cgDev" value="${esc(localStorage.getItem('pn_devname')||(fromStart?'Téléphone':'Tablette'))}"></label>
     <p class="meta" id="syncStatus"></p>`}
@@ -2034,7 +2052,7 @@ function openSyncModal(fromStart){
       localStorage.setItem('pn_devname',$('#cgDev').value.trim()||'Appareil');$('#syncStatus').textContent='Connexion… (jusqu\'à 1 minute la première fois)';ok.disabled=true;
       const lu=(CFG.users||[]).find(u=>u.nom.trim().toLowerCase()===nom.toLowerCase()&&u.hash);
       let localOk=false;if(lu){localOk=await checkPwd(lu,pw);if(!localOk&&!fromStart){ok.disabled=false;$('#syncStatus').textContent='Mot de passe incorrect';return}}
-      try{const r=await cloudLogin(nom,pw,localOk&&lu.role==='admin');closeInfo();toast(r==='created'?'Sauvegarde en ligne activée ✔ — envoi des données…':'Connecté ✔ — récupération des données…');startSync()}
+      try{const r=await cloudLogin(nom,pw,localOk&&lu.role==='admin',($('#cgAcc')||{}).value||'');closeInfo();toast(r==='created'?'Sauvegarde en ligne activée ✔ — envoi des données…':'Connecté ✔ — récupération des données…');startSync()}
       catch(e){ok.disabled=false;$('#syncStatus').textContent=e.message||String(e);toast(e.message||'Erreur')}};
     const off=$('#cgOff');if(off)off.onclick=async()=>{closeInfo();if(!await askAuth('Déconnecter la sauvegarde en ligne',['admin']))return;
       localStorage.removeItem('pn_dk');localStorage.removeItem('pn_acc');clearInterval(syncTimer);DK=null;setSync('off');toast('Déconnecté')};
