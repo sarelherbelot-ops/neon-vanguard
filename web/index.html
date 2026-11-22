@@ -575,7 +575,9 @@ function oubliHTML(){const L=oublis(90);if(!L.length)return'<p class="meta">Aucu
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2300)}
 const native=()=>typeof Android!=='undefined';
 /* ===================== COMPTES & MOTS DE PASSE ===================== */
-const ROLES={admin:'Administrateur',chef:'Chef',emp:'Employé'};
+const ROLES={admin:'Administrateur',chef:'Chef',emp:'Employé',boss:'Boss'};
+/* le boss : mêmes droits que le chef, mais pas de pointeuse ni de planning */
+const staff=()=>CFG.users.filter(u=>u.role!=='boss');
 const DEFUSERS=[['Administrateur','admin']];
 async function sha(txt){if(crypto&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(txt));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
   let h=5381;for(const c of txt)h=((h<<5)+h+c.charCodeAt(0))|0;return 'x'+h}
@@ -583,7 +585,7 @@ const newSalt=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 async function setPwd(u,pw){u.salt=newSalt();u.hash=await sha(u.salt+':'+pw)}
 async function checkPwd(u,pw){return !!u.hash&&(await sha(u.salt+':'+pw))===u.hash}
 const userById=id=>CFG.users.find(u=>u.id===id);
-const can=(u,roles)=>roles.includes(u.role)||u.role==='admin';
+const can=(u,roles)=>roles.includes(u.role)||u.role==='admin'||(u.role==='boss'&&roles.includes('chef'));
 /* demande compte + mot de passe ; roles = rôles autorisés (l'admin l'est toujours) */
 function askAuth(titre,roles,sub){return new Promise(res=>{
   const L=CFG.users.filter(u=>can(u,roles||['admin']));
@@ -1404,7 +1406,7 @@ function outDoc(title,land){if(OUTQ){OUTQ.push([title,land]);return}
     ()=>{$('#oPrint').onclick=()=>{closeInfo();setTimeout(()=>Android.print(title),250)};$('#oShare').onclick=()=>{closeInfo();toast('Préparation du PDF…');setTimeout(()=>Android.sharePdf(title,land?1:0),250)}})},200)}
 /* planning de la semaine */
 function printPlan(m){const p=PLAN[m]||{},T='style="border:1px solid #777;padding:6px 5px;text-align:center"',TH='style="border:1px solid #777;padding:6px 5px;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact"';
-  const us=CFG.users.filter(u=>Object.keys(p[u.id]||{}).length||!u.hide);
+  const us=staff().filter(u=>Object.keys(p[u.id]||{}).length||!u.hide);
   const rows=us.map(u=>{let tot=0;const c=[1,2,3,4,5,6,7].map(i=>{const v=(p[u.id]||{})[i]||'';const sh=v?parseShift(v):null;if(sh)for(const x of sh)tot+=x[1]-x[0];return`<td ${T}>${esc(v)||'<span style="color:#aaa">repos</span>'}</td>`}).join('');
     return`<tr><td ${T} style="border:1px solid #777;padding:6px 8px;text-align:left;font-weight:700">${esc(u.nom)}</td>${c}<td ${T}><b>${tot?dur(tot):''}</b></td></tr>`}).join('');
   return`<div class="pg"><h1 style="font-size:18px;margin:0 0 4px">Planning — semaine ${isoWeek(m)}</h1><p style="margin:0 0 10px">${esc(CFG.nom)} · du ${frD(m)} au ${frD(addD(m,6))}</p>
@@ -1539,14 +1541,14 @@ function savePts(d){if(PTS[d]&&PTS[d].length)put('pt:'+d,PTS[d]);else{delete PTS
 function tick(){const n=new Date();$('#pClock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());$('#pDate').textContent=longD(todayS())}
 setInterval(()=>{if(VIEW==='point')tick()},1000);
 function renderPoint(){setTimeout(oubliBadge,0);tick();
-  $('#pGrid').innerHTML=CFG.users.map(u=>{const o=openShift(u.id);
+  $('#pGrid').innerHTML=staff().map(u=>{const o=openShift(u.id);
     return `<button class="pbtn ${o?'in':''}" data-u="${u.id}"><b>${esc(u.nom)}</b>
       <span class="meta">${o?'Présent depuis '+hhmm(o.e.in)+(o.d!==todayS()?' ('+frD(o.d)+')':''):'Absent'}${poste(u)==='salle'?' · 🍽 Salle':poste(u)==='chef'?' · 👨‍🍳 Chef':' · 👨‍🍳 Cuisine'}</span>
       ${cardPlan(u,o)}<br>
       <span class="act">${o?'Pointer le départ':'Pointer l\'arrivée'}</span></button>`}).join('');
   $('#pGrid').querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>punch(b.dataset.u));
   if(!$('#phFrom').value){$('#phFrom').value=monday(todayS());$('#phTo').value=addD(monday(todayS()),6)}
-  $('#phUser').innerHTML='<option value="">Tous</option>'+CFG.users.map(u=>`<option value="${u.id}" ${$('#phUser').value===u.id?'selected':''}>${esc(u.nom)}</option>`).join('');
+  $('#phUser').innerHTML='<option value="">Tous</option>'+staff().map(u=>`<option value="${u.id}" ${$('#phUser').value===u.id?'selected':''}>${esc(u.nom)}</option>`).join('');
   renderPlan();renderPH()}
 async function punch(uid){const u=userById(uid),o=openShift(uid);
   const who=await new Promise(res=>{ // demande le mot de passe du compte choisi uniquement
@@ -1650,7 +1652,7 @@ function renderPlan(){const m=plWeek,p=PLAN[m]||{},T=todayS();
   $('#plHelp').textContent=plEdit?'Format : 9h-15h  ou  9h30-14h30 / 18h30-23h. Case vide = repos.':'Horaires prévus de chacun. Le retard est calculé automatiquement à l\'arrivée.';
   let h='<tr><th></th>'+[1,2,3,4,5,6,7].map(i=>`<th>${JOURS[i].slice(0,3)} ${frD(addD(m,i-1)).slice(0,5)}</th>`).join('')+'</tr>';
   const OB={};for(const x of oublis(30))OB[x.e.uid]=(OB[x.e.uid]||0)+1;
-  for(const u of CFG.users){h+=`<tr><td class="n">${esc(u.nom)}${OB[u.id]?` <span title="fermetures sans les tâches (30 jours)" style="background:#dc2626;color:#fff;border-radius:9px;padding:0 6px;font-size:11px">⚠ ${OB[u.id]}</span>`:''}</td>`;
+  for(const u of staff()){h+=`<tr><td class="n">${esc(u.nom)}${OB[u.id]?` <span title="fermetures sans les tâches (30 jours)" style="background:#dc2626;color:#fff;border-radius:9px;padding:0 6px;font-size:11px">⚠ ${OB[u.id]}</span>`:''}</td>`;
     for(let i=1;i<=7;i++){const d=addD(m,i-1),v=(p[u.id]||{})[i]||'',bad=v&&parseShift(v)===null;
       h+=`<td class="${d===T?'today':''}">${plEdit?`<input data-u="${u.id}" data-j="${i}" value="${esc(v)}" placeholder="repos" style="${bad?'border-color:var(--red)':''}">`:(v?(bad?`<span class="late">${esc(v)} ?</span>`:planTxt(u.id,d)):'<span class="meta">—</span>')}</td>`}
     h+='</tr>'}
@@ -1663,7 +1665,7 @@ function renderPlan(){const m=plWeek,p=PLAN[m]||{},T=todayS();
   $('#plPapers').querySelectorAll('img[data-ph]').forEach(async im=>{im.src=await photoGet(im.dataset.ph)||''});
   $('#plPapers').querySelectorAll('.paper').forEach(el=>el.onclick=()=>{curWeek=m;showPaper(+el.dataset.i)})}
 /* heures planifiées par personne et par semaine — visible seulement par l'administrateur */
-function plHours(m){const p=PLAN[m]||{};return CFG.users.map(u=>{let brut=0,net=0,jours=0,fait=0;
+function plHours(m){const p=PLAN[m]||{};return staff().map(u=>{let brut=0,net=0,jours=0,fait=0;
   for(let i=1;i<=7;i++){const d=addD(m,i-1),S=parseShift((p[u.id]||{})[i]||'')||[];if(S.length){jours++;const t=S.reduce((a,[x,y])=>a+(y-x),0);brut+=t;
       net+=t-(S.length===1&&(u.pmode||'aucune')==='regle'?(t>480?60:t>=300?15:0):0)}
     for(const e of PTS[d]||[])if(e.uid===u.id)fait+=countedDur(d,e)/60000}
