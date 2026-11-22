@@ -998,7 +998,7 @@ function recapData(m){const a=m,b=addD(m,6),days=[];for(let i=0;i<7;i++)days.pus
   const rc=[];for(const mo of new Set(days.map(d=>d.slice(0,7))))for(const e of RCP[mo]||[])if(e.date>=a&&e.date<=b)rc.push(e);
   const rs=[];for(const d of days)rs.push(...resaOf(d));
   const H=htAll().filter(h=>actif(h)&&h.arr<=b&&h.dep>a).map(h=>{const s1=h.arr>a?h.arr:a,e1=h.dep<addD(b,1)?h.dep:addD(b,1),n=Math.max(0,Math.round((parse(e1)-parse(s1))/864e5));return{h,n,P:htPrix(h,n),T:htPrix(h)}});
-  const men=menOf().filter(r=>!r.prevu&&r.date>=a&&r.date<=b);
+  const men=menOf().filter(r=>!r.prevu&&!r.verif&&r.date>=a&&r.date<=b);
   return{a,b,days,per,hyg,rc,rs,H,men}}
 function recapHTML(m){const R=recapData(m),T='style="border:1px solid #999;padding:3px 6px;text-align:left"',TH='style="border:1px solid #999;padding:3px 6px;text-align:left;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact"';
   const tab=(h,rows)=>`<table style="border-collapse:collapse;width:100%;font-size:11px;margin:4px 0 10px"><tr>${h.map(x=>`<th ${TH}>${x}</th>`).join('')}</tr>${rows.join('')}</table>`;
@@ -1015,7 +1015,7 @@ function recapHTML(m){const R=recapData(m),T='style="border:1px solid #999;paddi
   <p>📦 Réceptions : <b>${R.rc.length}</b>${rcKo.length?` · <b style="color:#dc2626">${rcKo.length} non conforme(s)</b> : ${rcKo.map(e=>esc(e.four)+' '+frD(e.date).slice(0,5)).join(', ')}`:' · toutes conformes'}</p>
   <h2 style="font-size:14px;margin:8px 0 2px">📞 Réservations restaurant</h2><p><b>${rsA.length}</b> réservation(s) · <b>${rsA.reduce((t,r)=>t+(+r.nb||0),0)}</b> couverts${rsNo?` · ${rsNo} pas venu(s)`:''}${rsAn?` · ${rsAn} annulée(s)`:''}</p>
   <h2 style="font-size:14px;margin:8px 0 2px">🏨 Hôtel — ${hN} nuitée(s) · ${eur(hCA)} (dont taxe de séjour ${eur(hTx)})</h2>${R.H.length?tab(['Ch.','Client','Nuits cette semaine','Montant semaine','Total séjour','Reste à payer'],R.H.map(x=>`<tr><td ${T}>${esc(x.h.ch)}</td><td ${T}>${esc(x.h.nom)}${isRes(x.h)?' (résident)':''}</td><td ${T}>${x.n}</td><td ${T}>${+x.h.prix?eur(x.P.tot):'—'}</td><td ${T}>${+x.h.prix?eur(x.T.tot):'—'}</td><td ${T}>${+x.h.prix?(x.T.reste>0?'<b style="color:#dc2626">'+eur(x.T.reste)+'</b>':'payé'):'—'}</td></tr>`)):'<p>Aucun client.</p>'}
-  <p>Reste à encaisser (séjours de la semaine) : <b>${eur(hRe)}</b> · Ménages faits : <b>${R.men.length}</b>${vides.length?` · <b style="color:#dc2626">chambres à faire aujourd'hui : ${vides.join(', ')}</b>`:''}</p>
+  <p>Reste à encaisser (séjours de la semaine) : <b>${eur(hRe)}</b> · Ménages faits : <b>${R.men.length}</b> (vérifiés : <b>${R.men.filter(m=>verOf(m)).length}</b>)${vides.length?` · <b style="color:#dc2626">chambres à faire aujourd'hui : ${vides.join(', ')}</b>`:''}</p>
   <p style="font-size:8px;color:#666;margin-top:10px">Généré le ${frD(todayS())} à ${hhmm(Date.now())}</p></div>`}
 function recapText(m){const R=recapData(m),tot=Object.values(R.per).reduce((t,o)=>t+o.h,0),H=R.H.reduce((t,x)=>t+x.P.tot,0);
   return`Récapitulatif de la semaine ${isoWeek(m)} (${frD(R.a)} au ${frD(R.b)})\n\n• Personnel : ${dur(tot)} au total\n`+Object.entries(R.per).map(([n,o])=>`   - ${n} : ${dur(o.h)}, ${o.rs+o.re} repas, ${o.lt} retard(s)${o.ob?', '+o.ob+' fermeture(s) sans les tâches':''}`).join('\n')+
@@ -1073,10 +1073,11 @@ function menOf(){const L=[];for(const mo in MEN)for(const r of MEN[mo]||[])L.pus
 function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.ch)===k);
   const occ=S.find(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti'),depToday=S.find(h=>h.dep===d),arr=S.find(h=>h.arr===d);
   let lastDep='';for(const h of S){const out=h.etat==='parti'&&h.dep>d?d:h.dep;if(out<=d&&out>lastDep&&out>=addD(d,-14))lastDep=out}
-  const M=menOf().filter(r=>chKey(r.ch)===k),done=M.filter(r=>!r.prevu).sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts),lastDone=done[0]||null;
+  const M=menOf().filter(r=>chKey(r.ch)===k),done=M.filter(r=>!r.prevu&&!r.verif).sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts),lastDone=done[0]||null;
   const men=lastDep?done.find(r=>r.date>=lastDep)||null:null;
   const why=[];
   if(lastDep&&!men&&!(occ&&occ.arr>lastDep))why.push('départ');
+  {const vL=lastDone?verOf(lastDone):null;if(vL&&!vL.ok)why.push('❌ à refaire (refusée par '+vL.by+')')}
   const room=(CFG.rooms||[]).find(r=>chKey(r.n)===k);
   if(room&&room.hebdo&&!(lastDone&&lastDone.date>addD(d,-7)))why.push('ménage de la semaine');
   const P=M.filter(r=>r.prevu&&r.date<=d&&r.date>=addD(d,-14)&&!done.some(x=>x.date>=r.date&&x.ts>=r.ts-60000)).sort((a,b)=>a.date.localeCompare(b.date));
@@ -1086,7 +1087,12 @@ function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.c
   if(light)why.unshift('✨ à rafraîchir');
   const next=M.filter(r=>r.prevu&&r.date>d).sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   const hebdoNext=room&&room.hebdo&&lastDone?addD(lastDone.date,7):null;
-  return{occ,depToday,arr,sale:why.length>0,why,light,men:lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext}}
+  const menR=lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men;
+  return{occ,depToday,arr,sale:why.length>0,why,light,men:menR,ver:menR?verOf(menR):null,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext,hist:done.slice(0,6)}}
+/* vérification d'un ménage : entrée séparée {verif:1,of:id du ménage,by,uid,ok} */
+function verOf(m){if(!m)return null;return menOf().filter(r=>r.verif&&r.of===m.id).sort((a,b)=>b.ts-a.ts)[0]||null}
+const locD=t=>{const x=new Date(t);return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')};
+const verTxt=v=>v?(v.ok?'🔍 vérifiée par '+esc(v.by)+' le '+locD(v.ts)+' à '+hhmm(v.ts):'❌ refusée par '+esc(v.by)+' le '+locD(v.ts)+' à '+hhmm(v.ts)):'⏳ pas encore vérifiée';
 function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
   const bg=st.light?'#ea580c':st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.light?'✨ À RAFRAÎCHIR':st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
   const who=(st.sale?`<div style="font-weight:700">${st.why.join(' · ')}</div>`:'')+(st.occ?`${esc(st.occ.nom)}<br>${isRes(st.occ)?'🏠 résident':'jusqu\'au '+frD(st.occ.dep).slice(0,5)}${absentNow(st.occ,d)?'<br>🚶 absent, revient le '+frD(st.occ.absAu).slice(0,5):''}${st.occ.mensuel?'<br>'+(loyerState(st.occ,d).ok?'💶 mois payé ✔':'<b>💶 mois pas payé ⚠</b>'):''}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'')+
@@ -1095,21 +1101,28 @@ function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
   return`<div data-room="${esc(r.n)}" style="background:${bg};color:#fff;border-radius:12px;padding:10px;cursor:pointer;min-height:112px;${st.sale?'box-shadow:0 0 0 3px '+(st.light?'#fed7aa':'#fecaca'):''}">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:24px">${esc(r.n)}</b><span style="font-size:12px;opacity:.9">${esc(r.t)}</span></div>
     <div style="font-weight:800;margin-top:2px">${lab}</div><div style="font-size:12px;opacity:.95">${who}</div>${nxt}
-    ${st.men&&!st.sale?`<div style="font-size:11px;opacity:.9;margin-top:3px">✔ ménage fait ${st.men.date===d?hhmm(st.men.ts):frD(st.men.date).slice(0,5)}${st.men.by?' — '+esc(st.men.by):''}</div>`:''}</div>`}).join('')}
+    ${st.men&&!st.sale?`<div style="font-size:11px;opacity:.9;margin-top:3px">✔ ménage fait ${st.men.date===d?hhmm(st.men.ts):frD(st.men.date).slice(0,5)}${st.men.by?' — '+esc(st.men.by):''}<br>${st.ver&&st.ver.ok?'🔍 vérifiée — '+esc(st.ver.by):'<b>⏳ à vérifier</b>'}</div>`:''}</div>`}).join('')}
 function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>x.n===n)||{n,t:''};
   info(`<h2>🛏 Chambre ${esc(n)} — ${esc(r.t)}</h2>
     ${st.sale?`<p style="color:#dc2626;font-weight:700;font-size:16px">🧹 À nettoyer : ${st.why.join(' · ')}</p>`:''}
     ${st.occ?`<p>Occupée par <b>${esc(st.occ.nom)}</b> — ${isRes(st.occ)?'🏠 résident':'départ le '+frD(st.occ.dep)}</p>`:'<p>Libre.</p>'}
-    ${st.men?`<p class="meta">Dernier ménage : ${frD(st.men.date)} à ${hhmm(st.men.ts)}${st.men.by?' par '+esc(st.men.by):''}</p>`:''}
+    ${st.men?`<p class="meta">Dernier ménage : ${frD(st.men.date)} à ${hhmm(st.men.ts)}${st.men.by?' par '+esc(st.men.by):''}</p>
+    <p style="font-weight:700;color:${st.ver&&st.ver.ok?'#16a34a':'#b45309'}">${verTxt(st.ver)}</p>
+    ${!st.sale&&!(st.ver&&st.ver.ok)?`<div class="row" style="gap:8px;margin:6px 0 10px"><button class="btn ok" id="mnVer" style="flex:2;font-size:16px">🔍 Chambre vérifiée</button><button class="btn" id="mnKo" style="flex:1;background:#dc2626;color:#fff">❌ À refaire</button></div>`:''}`:''}
     <label>Fait par (facultatif)<input id="mnBy" placeholder="prénom" autocomplete="off" value="${esc(localStorage.getItem('pn_mnBy')||'')}"></label>
     <button class="btn ok" id="mnOk" style="width:100%;margin-top:8px;font-size:17px">✔ Ménage fait</button>
     <div class="row" style="margin-top:8px;gap:8px"><button class="btn" id="mnSale" style="flex:1;background:#dc2626;color:#fff;font-size:16px">🧹 À nettoyer</button><button class="btn" id="mnRaf" style="flex:1;background:#ea580c;color:#fff;font-size:16px">✨ À rafraîchir</button></div>
     <div class="row" style="margin-top:10px"><label class="grow">📅 Prévoir le<input type="date" id="mnDate" value="${addD(todayS(),1)}"></label><label style="width:170px">Type<select id="mnKind"><option value="">Ménage complet</option><option value="rafraichir">Rafraîchir</option></select></label><button class="btn sec" id="mnPlan" style="align-self:flex-end">Prévoir</button></div>
+    ${st.hist.length?`<details style="margin-top:8px"><summary>📋 Derniers ménages (qui a fait, qui a vérifié)</summary><table style="width:100%;font-size:13px;border-collapse:collapse">${st.hist.map(m=>{const v=verOf(m);return`<tr style="border-bottom:1px solid var(--line)"><td>${frD(m.date).slice(0,5)} ${hhmm(m.ts)}</td><td>${esc(m.by||'—')}</td><td>${v?(v.ok?'🔍 '+esc(v.by):'❌ '+esc(v.by)):'⏳'}</td></tr>`}).join('')}</table></details>`:''}
     <label class="row" style="gap:8px;margin-top:8px"><input type="checkbox" id="mnHeb" ${st.hebdo?'checked':''} style="width:auto"> 🔁 Rappel de ménage toutes les semaines pour cette chambre</label>
     <div class="row" style="margin-top:12px">${st.men?'<button class="btn ghost" id="mnUndo">Annuler le dernier ménage</button>':''}<span class="grow"></span>${st.occ?'<button class="btn sec" id="mnCli">Voir le client</button>':'<button class="btn sec" id="mnNew">➕ Nouveau client</button>'}<button class="btn ghost" id="iClose">Fermer</button></div>`,
   ()=>{$('#mnOk').onclick=()=>{const by=$('#mnBy').value.trim();localStorage.setItem('pn_mnBy',by);const now=Date.now(),T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7);
       (MEN[mo]=MEN[mo]||[]).push({id:'mn'+now.toString(36),ch:n,date:dd,ts:now,by});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('✔ Chambre '+n+' : ménage fait')};
     const flag=(kind)=>{const T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7),now=Date.now();(MEN[mo]=MEN[mo]||[]).push({id:'mp'+now.toString(36),ch:n,date:dd,ts:now,prevu:1,kind});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast(kind==='rafraichir'?'✨ Chambre '+n+' à rafraîchir':'🧹 Chambre '+n+' à nettoyer')};
+    const verif=async ok=>{const m=st.men;closeInfo();const u=await askAuth(ok?'🔍 Vérification chambre '+n:'❌ Chambre '+n+' à refaire',['admin','chef','emp'],'Qui a vérifié ? Le mot de passe confirme que c\'est bien vous.');if(!u)return;
+      const now=Date.now(),mo=m.date.slice(0,7);(MEN[mo]=MEN[mo]||[]).push({id:'mv'+now.toString(36),ch:n,date:m.date,ts:now,verif:1,of:m.id,ok:ok?1:0,by:u.nom,uid:u.id});put('mn:'+mo,MEN[mo]);
+      refresh();if(!ok)return toast('❌ Chambre '+n+' à refaire');toast('🔍 Chambre '+n+' vérifiée par '+u.nom)};
+    if($('#mnVer'))$('#mnVer').onclick=()=>verif(true);if($('#mnKo'))$('#mnKo').onclick=()=>verif(false);
     $('#mnSale').onclick=()=>flag('nettoyer');$('#mnRaf').onclick=()=>flag('rafraichir');
     $('#mnPlan').onclick=()=>{const dd=$('#mnDate').value;if(!dd)return;const mo=dd.slice(0,7),now=Date.now(),kind=$('#mnKind').value||undefined;(MEN[mo]=MEN[mo]||[]).push({id:'mp'+now.toString(36),ch:n,date:dd,ts:now,prevu:1,kind});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('📅 Ménage de la chambre '+n+' prévu le '+frD(dd))};
     $('#mnHeb').onchange=e=>{const R=(CFG.rooms||[]).find(x=>x.n===n);if(R){if(e.target.checked)R.hebdo=1;else delete R.hebdo;put('cfg',CFG);refresh()}};
@@ -1351,11 +1364,12 @@ $('#rsPrint').onclick=()=>{const d=rsDay,L=resaOf(d),T='style="border:1px solid 
   outDoc('Réservations '+frD(d),0)};
 /* rappels : bandeau du jour, fenêtre une fois par jour, rappel 30 min avant */
 function resaBanner(){const b=$('#resaBar');if(!b)return;const T=todayS(),L=resaOf(T).filter(r=>!r.etat),A=htAll().filter(h=>h.arr===T&&!h.etat),D=htAll().filter(h=>h.dep===T&&h.etat!=='parti'&&h.etat!=='annule');
-  const Z=roomsToClean(),LY=htAll().filter(h=>actif(h)&&h.mensuel&&h.arr<=T&&h.dep>T&&h.etat!=='parti'&&!loyerState(h,T).ok);
-  if(!L.length&&!A.length&&!D.length&&!Z.length&&!LY.length){b.classList.add('hidden');return}b.classList.remove('hidden');
+  const Z=roomsToClean(),VZ=(CFG.rooms||[]).filter(r=>{const st=roomState(r.n,T);return !st.sale&&st.men&&st.men.date===T&&!(st.ver&&st.ver.ok)}),LY=htAll().filter(h=>actif(h)&&h.mensuel&&h.arr<=T&&h.dep>T&&h.etat!=='parti'&&!loyerState(h,T).ok);
+  if(!L.length&&!A.length&&!D.length&&!Z.length&&!VZ.length&&!LY.length){b.classList.add('hidden');return}b.classList.remove('hidden');
   b.innerHTML=(L.length?`<span data-go="resa">📞 <b>Réservations aujourd'hui (${L.length}) :</b> `+L.map(r=>`<b>${esc(r.heure)}</b> ${esc(r.nom)} (${r.nb||'?'} pers.)`).join(' · ')+'</span>':'')+
     (A.length||D.length?`<div data-go="hotel" style="${L.length?'margin-top:4px':''}">🏨 <b>Hôtel :</b> ${A.length?`${A.length} arrivée(s) — `+A.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}${A.length&&D.length?' · ':''}${D.length?`${D.length} départ(s) — `+D.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}</div>`:'')+
     (Z.length?`<div data-go="hotel" style="margin-top:4px;color:#dc2626;font-weight:700">🧹 Chambres à nettoyer : ${Z.map(r=>esc(r.n)).join(', ')}</div>`:'')+
+    (VZ.length?`<div data-go="hotel" style="margin-top:4px;color:#b45309;font-weight:700">🔍 Chambres à vérifier : ${VZ.map(r=>esc(r.n)).join(', ')}</div>`:'')+
     (LY.length?`<div data-go="hotel" style="margin-top:4px;color:#b45309;font-weight:700">💶 Loyer de ${moisTxt(T.slice(0,7))} pas encore payé : ${LY.map(h=>'ch. '+esc(h.ch)+' '+esc(h.nom)).join(', ')}</div>`:'');
   b.querySelectorAll('[data-go]').forEach(el=>el.onclick=ev=>{ev.stopPropagation();if(el.dataset.go==='hotel'){htDay=T;show('hotel')}else{rsDay=T;show('resa')}});b.onclick=null}
 function resaPopup(force){const T=todayS(),L=resaOf(T).filter(r=>r.etat!=='annule');if(!L.length||(!force&&localStorage.getItem('pn_resaPop')===T))return;
