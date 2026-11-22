@@ -170,6 +170,7 @@ h2{font-size:19px;margin:0}
     <button data-v="resa">📞 Réservations</button>
     <button data-v="hotel">🏨 Hôtel</button>
     <button data-v="cmd">🛒 Commandes</button>
+    <button data-v="chat">💬 Messages</button>
     <button data-v="params">⚙️ Réglages</button>
   </nav>
 </header>
@@ -353,6 +354,17 @@ h2{font-size:19px;margin:0}
   </div>
   <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
   <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
+</section>
+<section id="v-chat" class="hidden">
+  <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px;padding:0;overflow:hidden">
+    <div class="row" style="padding:10px 14px;border-bottom:1px solid var(--line)"><b class="grow">💬 Messages restaurant ↔ Sarel</b><span class="meta" id="chMe"></span></div>
+    <div id="chList" style="flex:1;overflow-y:auto;padding:12px 14px;background:#f8fafc"></div>
+    <div class="row" style="padding:10px;border-top:1px solid var(--line);gap:8px;align-items:flex-end">
+      <select id="chFrom" style="width:150px"></select>
+      <textarea id="chTxt" rows="2" class="grow" placeholder="Écris ton message ou ta question…" style="resize:none"></textarea>
+      <button class="btn ok" id="chSend" style="min-width:100px;font-size:17px">Envoyer ➤</button>
+    </div>
+  </div>
 </section>
 <section id="v-params" class="hidden">
   <div class="card" id="lockBox">
@@ -593,7 +605,8 @@ const dayObj=s=>DAYS[s]||(DAYS[s]={tasks:{}});
 function isClosed(s){const o=DAYS[s];if(o&&o.closed!==undefined)return o.closed;return !CFG.open.includes(wd(s))}
 function due(s){if(isClosed(s))return [];const w=wd(s);return CFG.tasks.filter(t=>t.type==='Q'||t.jour===w)}
 const ZONES={salle:'🍽 Nettoyage salle',cuisine:'👨‍🍳 Nettoyage cuisine',temp:'🌡 Températures',recep:'📦 Réception'};
-let RCP={},RSV={},HTL={},MEN={},CMD={}; // CMD['cuisine-2026-11-22'] = {date,zone,items:{id:{c,q}},extra,st,ts}
+let RCP={},RSV={},HTL={},MEN={},CMD={},MSG={}; // MSG['2026-11'] = [{id,ts,from,dev,txt}]
+ // CMD['cuisine-2026-11-22'] = {date,zone,items:{id:{c,q}},extra,st,ts}
  // MEN['2026-12'] = [{id,ch,date,ts,by}] ménage des chambres fait
  // HTL['2026-12'] = séjours dont l'arrivée est dans ce mois
  // RSV['2026-12'] = [{id,date,heure,nom,tel,nb,note,etat,ts}]
@@ -672,8 +685,8 @@ let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFull
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
 function show(v){VIEW=v;if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  ['jour','point','semaine','cal','resa','hotel','cmd','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
-  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();
+  ['jour','point','semaine','cal','resa','hotel','cmd','chat','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
 
@@ -868,7 +881,7 @@ function printRecep(list){const months=[...new Set(list.map(m=>m.slice(0,7)))];
 function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after()}
 function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
-function refresh(){resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmdTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
+function refresh(){chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmdTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -1010,7 +1023,7 @@ function recapCheck(){const last=addD(monday(todayS()),-7);if(!CFG.recapMail||lo
     ()=>{$('#rcSend').onclick=()=>{closeInfo();sendRecap(last)};$('#rcLater').onclick=()=>closeInfo()})}
 
 /* ===================== SAUVEGARDE AUTOMATIQUE (chaque soir) ===================== */
-function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD})}
+function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG})}
 async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:addD(T,-30);
   const body=await dossierHTML(a,T,['salle','cuisine','temp','recep','plan','heures']);
   const rs=[];for(const mo of Object.keys(RSV).sort())for(const r of (RSV[mo]||[]).slice().sort((x,y)=>(x.date+x.heure).localeCompare(y.date+y.heure)))rs.push(r);
@@ -1141,6 +1154,31 @@ $('#cmPrint').onclick=()=>{const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[],ck=
     <div style="columns:2;column-gap:14px">${cats.map(col).join('')}</div>
     <div style="margin-top:6px;font-size:11px"><b>ARTICLES SUPPLÉMENTAIRES / NOTES PATRON :</b><div style="white-space:pre-line;border:1px solid #999;min-height:40px;padding:4px;margin-top:3px">${esc(o.extra||'')}</div></div></div>`;
   outDoc('Commande '+cmZone+' '+frD(cmDay),0)};
+
+/* ===================== MESSAGES (tablette ↔ téléphone) ===================== */
+function msgAll(){const L=[];for(const mo in MSG)for(const m of MSG[mo]||[])L.push(m);return L.sort((a,b)=>a.ts-b.ts)}
+const chSeen=()=>+(localStorage.getItem('pn_chSeen')||0);
+function chMyName(){if(MAIN()){const a=(CFG.users||[]).find(u=>u.role==='admin');return a?a.nom:'Responsable'}return localStorage.getItem('pn_chFrom')||''}
+function renderChat(){const L=msgAll().filter(m=>m.ts>Date.now()-60*864e5),box=$('#chList'),me=DEV;
+  const sel=$('#chFrom'),names=[...new Set((CFG.users||[]).map(u=>u.nom))];
+  if(MAIN()){sel.innerHTML=`<option>${esc(chMyName())}</option>`;sel.disabled=true;$('#chMe').textContent='Téléphone principal'}
+  else{const cur=chMyName();sel.innerHTML='<option value="">Qui écrit ?</option>'+names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('');sel.disabled=false;$('#chMe').textContent=''}
+  let last='';box.innerHTML=L.length?L.map(m=>{const mine=m.dev===me,d=ymd(new Date(m.ts)),sep=d!==last?`<div style="text-align:center;margin:10px 0 4px" class="meta">${longD(d)}</div>`:'';last=d;
+    return sep+`<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:4px 0"><div style="max-width:75%;background:${mine?'#dcfce7':'#fff'};border:1px solid ${mine?'#86efac':'var(--line)'};border-radius:14px;padding:7px 11px;font-size:16px"><div style="font-size:12px;font-weight:700;color:${mine?'#15803d':'#2563eb'}">${esc(m.from||'?')}</div><div style="white-space:pre-wrap">${esc(m.txt)}</div><div class="meta" style="text-align:right;font-size:11px;margin:2px 0 0">${hhmm(m.ts)}</div></div></div>`}).join('')
+    :'<p class="meta" style="text-align:center;margin-top:40px">Aucun message. Écris ta question en bas : elle arrive sur le téléphone de Sarel en quelques secondes.</p>';
+  box.scrollTop=box.scrollHeight;localStorage.setItem('pn_chSeen',Date.now());chBadge()}
+function chBadge(){const n=msgAll().filter(m=>m.dev!==DEV&&m.ts>chSeen()).length,b=document.querySelector('nav button[data-v=chat]');if(!b)return;
+  let x=b.querySelector('.obadge');if(!n||VIEW==='chat'){if(x)x.remove();return}if(!x){x=document.createElement('span');x.className='obadge';x.style.cssText='background:#dc2626;color:#fff;border-radius:9px;padding:0 6px;margin-left:4px;font-size:12px;font-weight:700';b.appendChild(x)}x.textContent=n}
+var chNotified=+(localStorage.getItem('pn_chNotif')||0);
+function chatCheck(){const N=msgAll().filter(m=>m.dev!==DEV&&m.ts>chNotified);
+  if(N.length){chNotified=Math.max(...N.map(m=>m.ts));localStorage.setItem('pn_chNotif',chNotified);const m=N[N.length-1];
+    if(VIEW!=='chat'){toastRed('💬 '+(m.from||'?')+' : '+m.txt.slice(0,80));if(native()&&Android.notify)try{Android.notify('💬 Message de '+(m.from||'?'),m.txt.slice(0,200))}catch(e){}}}
+  if(VIEW==='chat')renderChat();else chBadge()}
+$('#chSend').onclick=()=>{const t=$('#chTxt').value.trim();if(!t)return;const from=MAIN()?chMyName():$('#chFrom').value;if(!from)return toast('Choisis d\'abord qui écrit');
+  if(!MAIN())localStorage.setItem('pn_chFrom',from);const now=Date.now(),mo=ymd(new Date(now)).slice(0,7);
+  (MSG[mo]=MSG[mo]||[]).push({id:'m'+now.toString(36)+Math.random().toString(36).slice(2,5),ts:now,from,dev:DEV,txt:t});put('ms:'+mo,MSG[mo]);$('#chTxt').value='';renderChat();
+  if(!cloudOn())toast('⚠ La sauvegarde en ligne n\'est pas activée : le message ne part pas sur le téléphone')};
+$('#chTxt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#chSend').click()}};
 
 /* ===================== HÔTEL ===================== */
 let htDay=todayS();
@@ -1410,12 +1448,12 @@ $('#pSave').onclick=async()=>{
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
-$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD}),'application/json');
+$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG}),'application/json');
 $('#pRestoreBtn').onclick=()=>$('#pRestore').click();
 $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=async()=>{try{const x=JSON.parse(r.result);if(!x.cfg||!x.days)throw 0;
     if(!confirm(`Remplacer toutes les données par cette sauvegarde (${Object.keys(x.days).length} jours) ?`))return;
-    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
+    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);MSG=x.messages||{};for(const k in MSG)put('ms:'+k,MSG[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
@@ -1789,7 +1827,7 @@ function deepMerge(a,b){if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Arra
 /* qui gagne quand les deux appareils ont modifié la même chose */
 function resolve(k,loc,o){const pre=kPre(k),rt=o.t||0,lt=MT[k]||0;
   if(loc==null)return{v:o.v,rw:1};if(o.v==null)return{v:loc,rw:0};
-  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
+  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
   if(k==='cfg'||pre==='pl'){if(MAIN()&&o.f)return{v:loc,rw:0};if(FOLLOW()||rt>lt)return{v:o.v,rw:1};return{v:loc,rw:0}}
   if(pre==='w'||pre==='co')return rt>lt?{v:deepMerge(loc,o.v),rw:0}:{v:deepMerge(o.v,loc),rw:0};
   return rt>lt?{v:o.v,rw:1}:{v:loc,rw:0}}
@@ -1802,14 +1840,14 @@ function kick(){clearTimeout(kickT);kickT=setTimeout(syncOnce,300)}
 function cloudPut(k,v){if(!cloudOn())return;OUT.add(k);saveOut();kick()}
 function photoQueue(id,delOp){if(!cloudOn())return;OUTPH.add((delOp?'-':'')+id);saveOut();kick()}
 function setCloud(k,v){CLOUD[k]=v;localPut('cl:'+k,v==null?null:v)}
-function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,dv:DV}[pre];return m?m[key]:null}
-function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);return L}
+function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,dv:DV}[pre];return m?m[key]:null}
+function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);for(const k in MSG)L.push('ms:'+k);return L}
 function removedIds(k,v){const c=CLOUD[k];if(!c)return[];
   if(kPre(k)==='d'){const a=(c.tasks)||{},b=(v&&v.tasks)||{};return Object.keys(a).filter(x=>!(x in b))}
-  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
+  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'||kPre(k)==='ms'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
 function mergeVals(k,loc,rem,rm){const pre=kPre(k);rm=new Set(rm||[]);
   if(pre==='d'&&loc&&rem){const t={...(rem.tasks||{}),...(loc.tasks||{})};rm.forEach(i=>delete t[i]);const o={...rem,...loc,tasks:t};if(rem.temps||loc.temps)o.temps={...(rem.temps||{}),...(loc.temps||{})};return o}
-  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
+  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
   return loc??rem}
 /* même personne créée sur deux appareils (ids différents) : on garde une seule fiche et on rattache ses pointages */
 function remapUsers(oldC,nv){if(!oldC||!oldC.users||!nv||!nv.users)return;const byName={},map={};for(const u of nv.users)byName[u.nom.trim().toLowerCase()]=u.id;
@@ -1822,7 +1860,7 @@ function applyRemote(k,v){
   if(k==='cfg'){if(!v)return;remapUsers(CFG,v);CFG=v;if(migrateCfg()){localPut(k,CFG);OUT.add('cfg');saveOut();kick()}else localPut(k,v);applyCfg();refreshSoon();
     if(faResolve&&CFG.users&&CFG.users.some(u=>u.role==='admin'&&u.hash)){$('#mAuth').classList.add('hidden');$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');$('#aJoin').classList.add('hidden');const r=faResolve;faResolve=null;r()}
     return}
-  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,dv:DV}[pre];if(!map)return;
+  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,dv:DV}[pre];if(!map)return;
   if(v==null){delete map[key];localDel(k)}else{map[key]=v;localPut(k,v)}}
 let rfT=null;function refreshSoon(){clearTimeout(rfT);rfT=setTimeout(()=>{if(VIEW!=='params'&&$('#mSign').classList.contains('hidden')&&$('#mCam').classList.contains('hidden'))refresh()},300)}
 
@@ -1932,7 +1970,7 @@ async function followMain(){if(!cloudOn())return toast('Connecte d\'abord la sau
     for(const d in PTS){let c=0;for(const e of PTS[d]||[])if(map[e.emp]){e.emp=map[e.emp];c=1}if(c){MT['pt:'+d]=Date.now();localPut('pt:'+d,PTS[d]);OUT.add('pt:'+d)}}
     applyRemote('cfg',nv);MT.cfg=cfgNew.t||0;setCloud('cfg',cfgNew.v);OUT.delete('cfg');if(JSON.stringify(nv.users)!==JSON.stringify(cfgNew.v.users))OUT.add('cfg');n++}
   for(const[k,o]of vals){const pre=kPre(k),loc=localValue(k);
-    if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'){const m=loc!=null?mergeVals(k,loc,o.v,[]):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
+    if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms'){const m=loc!=null?mergeVals(k,loc,o.v,[]):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
     else if(pre==='w'){const m=loc!=null?deepMerge(loc,o.v):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
     else{applyRemote(k,o.v);setCloud(k,o.v);OUT.delete(k)}
     MT[k]=o.t||0;n++}
@@ -2035,9 +2073,10 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   const all=await idbAll();
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
-  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k]}
+  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k];else if(k.startsWith('ms:'))MSG[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
+  if(!localStorage.getItem('pn_chNotif')){chNotified=Date.now();localStorage.setItem('pn_chNotif',chNotified)}
   applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);setTimeout(recapCheck,4000);setInterval(recapCheck,600000);
   $('#sync2').onclick=syncBoth;$('#syBtn').onclick=()=>openSyncModal();$('#syncDot').onclick=()=>openSyncModal();
   $('#upCheck').onclick=()=>checkUpdate(true);$('#upAuto').onchange=e=>localStorage.setItem('pn_autoupd',e.target.checked?'1':'0');
