@@ -169,6 +169,7 @@ h2{font-size:19px;margin:0}
     <button data-v="cal">📅 Calendrier</button>
     <button data-v="resa">📞 Réservations</button>
     <button data-v="hotel">🏨 Hôtel</button>
+    <button data-v="cmd">🛒 Commandes</button>
     <button data-v="params">⚙️ Réglages</button>
   </nav>
 </header>
@@ -340,6 +341,18 @@ h2{font-size:19px;margin:0}
   <div class="card"><h2>🏨 Clients présents</h2><div id="htIn"></div></div>
   <div class="card"><h2>📅 Arrivées des 7 prochains jours</h2><div id="htNext7"></div></div>
   <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="btn sec" id="htTxBtn">Modifier</button></div></div>
+</section>
+<section id="v-cmd" class="hidden">
+  <div class="card">
+    <div class="ztabs" id="cmZones"><button data-cz="cuisine">🍳 Commande cuisine</button><button data-cz="salle">🍽 Commande salle</button></div>
+    <div class="row">
+      <label style="width:190px">Date<input type="date" id="cmDate"></label>
+      <div class="grow"><b>Statut :</b> <label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt1" style="width:auto"> À commander</label><label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt2" style="width:auto"> Validé patron</label><label class="row" style="display:inline-flex;gap:6px"><input type="checkbox" id="cmSt3" style="width:auto"> Transmis à la direction</label></div>
+    </div>
+    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
+  </div>
+  <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
+  <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
 </section>
 <section id="v-params" class="hidden">
   <div class="card" id="lockBox">
@@ -580,7 +593,8 @@ const dayObj=s=>DAYS[s]||(DAYS[s]={tasks:{}});
 function isClosed(s){const o=DAYS[s];if(o&&o.closed!==undefined)return o.closed;return !CFG.open.includes(wd(s))}
 function due(s){if(isClosed(s))return [];const w=wd(s);return CFG.tasks.filter(t=>t.type==='Q'||t.jour===w)}
 const ZONES={salle:'🍽 Nettoyage salle',cuisine:'👨‍🍳 Nettoyage cuisine',temp:'🌡 Températures',recep:'📦 Réception'};
-let RCP={},RSV={},HTL={},MEN={}; // MEN['2026-12'] = [{id,ch,date,ts,by}] ménage des chambres fait
+let RCP={},RSV={},HTL={},MEN={},CMD={}; // CMD['cuisine-2026-11-22'] = {date,zone,items:{id:{c,q}},extra,st,ts}
+ // MEN['2026-12'] = [{id,ch,date,ts,by}] ménage des chambres fait
  // HTL['2026-12'] = séjours dont l'arrivée est dans ce mois
  // RSV['2026-12'] = [{id,date,heure,nom,tel,nb,note,etat,ts}]
 const tz=t=>t.zone||'salle';
@@ -658,8 +672,8 @@ let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFull
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
 function show(v){VIEW=v;if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  ['jour','point','semaine','cal','resa','hotel','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
-  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();
+  ['jour','point','semaine','cal','resa','hotel','cmd','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
 
@@ -854,7 +868,7 @@ function printRecep(list){const months=[...new Set(list.map(m=>m.slice(0,7)))];
 function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after()}
 function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
-function refresh(){resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
+function refresh(){resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmdTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -996,7 +1010,7 @@ function recapCheck(){const last=addD(monday(todayS()),-7);if(!CFG.recapMail||lo
     ()=>{$('#rcSend').onclick=()=>{closeInfo();sendRecap(last)};$('#rcLater').onclick=()=>closeInfo()})}
 
 /* ===================== SAUVEGARDE AUTOMATIQUE (chaque soir) ===================== */
-function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN})}
+function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD})}
 async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:addD(T,-30);
   const body=await dossierHTML(a,T,['salle','cuisine','temp','recep','plan','heures']);
   const rs=[];for(const mo of Object.keys(RSV).sort())for(const r of (RSV[mo]||[]).slice().sort((x,y)=>(x.date+x.heure).localeCompare(y.date+y.heure)))rs.push(r);
@@ -1082,6 +1096,40 @@ function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>
     if($('#mnCli'))$('#mnCli').onclick=()=>{closeInfo();editHotel(st.occ.id)};
     if($('#mnNew'))$('#mnNew').onclick=()=>{closeInfo();editHotel(null,{arr:d,dep:addD(d,1),ch:n})}})}
 function roomsToClean(){return(CFG.rooms||[]).filter(r=>roomState(r.n,todayS()).sale)}
+
+/* ===================== COMMANDES CUISINE / SALLE ===================== */
+let cmZone='cuisine',cmDay=todayS(),cmT=null;
+const cmKey=()=>cmZone+'-'+cmDay;
+const cmTyping=()=>{const a=document.activeElement;return a&&VIEW==='cmd'&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&a.closest('#v-cmd')};
+function cmGet(){return CMD[cmKey()]||{date:cmDay,zone:cmZone,items:{},extra:'',st:{}}}
+function cmSave(o){o.ts=Date.now();CMD[cmKey()]=o;clearTimeout(cmT);cmT=setTimeout(()=>put('co:'+cmKey(),CMD[cmKey()]),400);cmSumUpd(o)}
+function cmSumUpd(o){const n=Object.values(o.items||{}).filter(x=>x.c).length;$('#cmSum').textContent=n?n+' article(s) coché(s)':'Aucun article coché';}
+function renderCmd(){document.querySelectorAll('#cmZones button').forEach(b=>b.classList.toggle('on',b.dataset.cz===cmZone));
+  const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[];$('#cmDate').value=cmDay;
+  $('#cmSt1').checked=!!(o.st||{}).a;$('#cmSt2').checked=!!(o.st||{}).v;$('#cmSt3').checked=!!(o.st||{}).t;$('#cmExtra').value=o.extra||'';cmSumUpd(o);
+  $('#cmCats').innerHTML=cats.map(c=>`<div class="card" style="margin:0;padding:0;overflow:hidden"><div style="background:${c.col};color:#fff;font-weight:800;padding:7px 10px;text-transform:uppercase;font-size:13px">${esc(c.nom)}</div>
+    <div style="padding:4px 10px">${c.items.map(it=>{const x=(o.items||{})[it.id]||{};return`<div class="row" style="gap:8px;padding:3px 0;border-bottom:1px dotted var(--line)"><input type="checkbox" data-ci="${it.id}" ${x.c?'checked':''} style="width:22px;height:22px"><span class="grow" style="${x.c?'font-weight:700':''}">${esc(it.nom)}</span><input data-cq="${it.id}" value="${esc(x.q||'')}" placeholder="Quantité" style="width:110px;padding:5px 7px"></div>`}).join('')}
+    <button class="btn ghost sm" data-cadd="${c.id}" style="margin:6px 0">➕ Ajouter un article</button></div></div>`).join('');
+  document.querySelectorAll('[data-ci]').forEach(el=>el.onchange=()=>{const o=cmGet();o.items=o.items||{};const x=o.items[el.dataset.ci]=o.items[el.dataset.ci]||{};x.c=el.checked;el.nextElementSibling.style.fontWeight=el.checked?'700':'';cmSave(o)});
+  document.querySelectorAll('[data-cq]').forEach(el=>el.oninput=()=>{const o=cmGet();o.items=o.items||{};const x=o.items[el.dataset.cq]=o.items[el.dataset.cq]||{};x.q=el.value;if(el.value.trim()&&!x.c){x.c=true;const cb=document.querySelector(`[data-ci="${el.dataset.cq}"]`);cb.checked=true;cb.nextElementSibling.style.fontWeight='700'}cmSave(o)});
+  document.querySelectorAll('[data-cadd]').forEach(el=>el.onclick=()=>{const v=prompt('Nom du nouvel article :');if(!v||!v.trim())return;const c=CFG.cmdCat[cmZone].find(x=>x.id===el.dataset.cadd);c.items.push({id:c.id+'_n'+Date.now().toString(36),nom:v.trim()});put('cfg',CFG);renderCmd()})}
+document.querySelectorAll('#cmZones button').forEach(b=>b.onclick=()=>{cmZone=b.dataset.cz;renderCmd()});
+$('#cmDate').onchange=e=>{if(e.target.value){cmDay=e.target.value;renderCmd()}};
+[['#cmSt1','a'],['#cmSt2','v'],['#cmSt3','t']].forEach(([q,k])=>$(q).onchange=e=>{const o=cmGet();o.st=o.st||{};o.st[k]=e.target.checked;cmSave(o)});
+$('#cmExtra').oninput=e=>{const o=cmGet();o.extra=e.target.value;cmSave(o)};
+$('#cmCopy').onclick=()=>{const prev=Object.keys(CMD).filter(k=>k.startsWith(cmZone+'-')&&k<cmKey()).sort().pop();if(!prev)return toast('Pas de commande précédente');
+  if(!confirm('Reprendre les articles de la commande du '+frD(prev.slice(cmZone.length+1))+' ?'))return;const o=cmGet(),P=CMD[prev];o.items=JSON.parse(JSON.stringify(P.items||{}));cmSave(o);renderCmd()};
+$('#cmPrint').onclick=()=>{const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[],ck=v=>v?'☑':'☐';
+  const col=c=>`<div style="break-inside:avoid;margin-bottom:8px"><div style="background:${c.col};color:#fff;font-weight:800;padding:3px 6px;font-size:10px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${esc(c.nom)}</div>
+    <table style="border-collapse:collapse;width:100%;font-size:10px"><tr><th style="text-align:left;padding:1px 4px;font-weight:600">Article</th><th style="text-align:left;width:80px;padding:1px 4px;font-weight:600">Quantité</th></tr>
+    ${c.items.map(it=>{const x=(o.items||{})[it.id]||{};return`<tr><td style="padding:1px 4px;border-bottom:1px dotted #bbb;${x.c?'font-weight:700':''}">${ck(x.c)} ${esc(it.nom)}</td><td style="padding:1px 4px;border-bottom:1px dotted #bbb;font-weight:700">${esc(x.q||'')}</td></tr>`}).join('')}</table></div>`;
+  const st=o.st||{};
+  $('#printArea').innerHTML=`<style>@page{size:A4;margin:9mm}</style><div class="pg"><div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:4px">
+    <div><h1 style="font-size:18px;margin:0">LISTE DE COURSES & COMMANDES ${cmZone==='cuisine'?'CUISINE':'SALLE'}</h1><div>${esc(CFG.nom)}</div></div><div style="font-weight:700">${st.t?'☑':'☐'} Transmis à la Direction</div></div>
+    <div style="display:flex;gap:30px;margin:6px 0 8px;font-size:11px"><b>Date : ${longD(cmDay)}</b><span>Service : ${cmZone==='cuisine'?'Cuisine':'Salle'} & Approvisionnement</span><span>Statut : ${ck(st.a)} À commander ${ck(st.v)} Validé patron</span></div>
+    <div style="columns:2;column-gap:14px">${cats.map(col).join('')}</div>
+    <div style="margin-top:6px;font-size:11px"><b>ARTICLES SUPPLÉMENTAIRES / NOTES PATRON :</b><div style="white-space:pre-line;border:1px solid #999;min-height:40px;padding:4px;margin-top:3px">${esc(o.extra||'')}</div></div></div>`;
+  outDoc('Commande '+cmZone+' '+frD(cmDay),0)};
 
 /* ===================== HÔTEL ===================== */
 let htDay=todayS();
@@ -1351,12 +1399,12 @@ $('#pSave').onclick=async()=>{
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
-$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN}),'application/json');
+$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD}),'application/json');
 $('#pRestoreBtn').onclick=()=>$('#pRestore').click();
 $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=async()=>{try{const x=JSON.parse(r.result);if(!x.cfg||!x.days)throw 0;
     if(!confirm(`Remplacer toutes les données par cette sauvegarde (${Object.keys(x.days).length} jours) ?`))return;
-    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
+    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
@@ -1732,7 +1780,7 @@ function resolve(k,loc,o){const pre=kPre(k),rt=o.t||0,lt=MT[k]||0;
   if(loc==null)return{v:o.v,rw:1};if(o.v==null)return{v:loc,rw:0};
   if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
   if(k==='cfg'||pre==='pl'){if(MAIN()&&o.f)return{v:loc,rw:0};if(FOLLOW()||rt>lt)return{v:o.v,rw:1};return{v:loc,rw:0}}
-  if(pre==='w')return rt>lt?{v:deepMerge(loc,o.v),rw:0}:{v:deepMerge(o.v,loc),rw:0};
+  if(pre==='w'||pre==='co')return rt>lt?{v:deepMerge(loc,o.v),rw:0}:{v:deepMerge(o.v,loc),rw:0};
   return rt>lt?{v:o.v,rw:1}:{v:loc,rw:0}}
 function saveOut(){localStorage.setItem('pn_out',JSON.stringify([...OUT]));localStorage.setItem('pn_outph',JSON.stringify([...OUTPH]))}
 const ACC=()=>lsJ('pn_acc',null); // {user, auth, cle, authTable}
@@ -1743,8 +1791,8 @@ function kick(){clearTimeout(kickT);kickT=setTimeout(syncOnce,300)}
 function cloudPut(k,v){if(!cloudOn())return;OUT.add(k);saveOut();kick()}
 function photoQueue(id,delOp){if(!cloudOn())return;OUTPH.add((delOp?'-':'')+id);saveOut();kick()}
 function setCloud(k,v){CLOUD[k]=v;localPut('cl:'+k,v==null?null:v)}
-function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,dv:DV}[pre];return m?m[key]:null}
-function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);return L}
+function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,dv:DV}[pre];return m?m[key]:null}
+function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);return L}
 function removedIds(k,v){const c=CLOUD[k];if(!c)return[];
   if(kPre(k)==='d'){const a=(c.tasks)||{},b=(v&&v.tasks)||{};return Object.keys(a).filter(x=>!(x in b))}
   if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
@@ -1763,7 +1811,7 @@ function applyRemote(k,v){
   if(k==='cfg'){if(!v)return;remapUsers(CFG,v);CFG=v;if(migrateCfg()){localPut(k,CFG);OUT.add('cfg');saveOut();kick()}else localPut(k,v);applyCfg();refreshSoon();
     if(faResolve&&CFG.users&&CFG.users.some(u=>u.role==='admin'&&u.hash)){$('#mAuth').classList.add('hidden');$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');$('#aJoin').classList.add('hidden');const r=faResolve;faResolve=null;r()}
     return}
-  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,dv:DV}[pre];if(!map)return;
+  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,dv:DV}[pre];if(!map)return;
   if(v==null){delete map[key];localDel(k)}else{map[key]=v;localPut(k,v)}}
 let rfT=null;function refreshSoon(){clearTimeout(rfT);rfT=setTimeout(()=>{if(VIEW!=='params'&&$('#mSign').classList.contains('hidden')&&$('#mCam').classList.contains('hidden'))refresh()},300)}
 
@@ -1943,7 +1991,24 @@ function renderUpd(){$('#upVer').textContent='Version installée : n° '+(APPV||
   $('#syTxt').textContent=cloudOn()?('✔ Activée sur cet appareil ('+DEVNAME()+')'):'Pas encore activée sur cet appareil'}
 
 /* mise à niveau de la configuration (aussi appliquée à celle reçue par la synchro) */
-function migrateCfg(){let ch=0;if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Simple'],['3','Familiale + cuisine'],['4','Double'],['5','Double'],['6','Simple'],['7','Familiale sans cuisine'],['8','Double'],['9','Simple']].map(([n,t])=>({n,t}));ch=1}if(CFG.taxe==null||(CFG.taxe===1&&!CFG.taxeV2)){CFG.taxe=4.5;CFG.taxeV2=1;ch=1}if(CFG.rooms&&!CFG.hebdoInit){CFG.hebdoInit=1;for(const r of CFG.rooms)if(['7','8','9'].includes(r.n))r.hebdo=1;ch=1}if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
+const CMDCAT={cuisine:[
+ ['Légumes, salades & fruits frais','#15803d',['Pommes de terre','Pommes de terre pelées','Frites','Salade','Tomates cerises','Oignons jaunes','Oignons rouges','Céleri branche','Persil','Ciboulette','Ail (gousses fraîches)','Olives','Poires','Pommes','Pousses d\'oignon','Pousses de betterave','Brocoli','Carottes','Poireaux']],
+ ['Boucherie, gibier (chasse) & charcuterie','#ea580c',['Filet de bœuf','Entrecôte de bœuf','Souris d\'agneau','Nuggets','Lardons fumés','Magret fumé','Charcuterie (assortiment)','Filet de cerf','Entrecôte de marcassin','Selle de chevreuil','Saucisse aux choux','Guanciale']],
+ ['Poissonnerie','#1d4ed8',['Poulpe','Filets de perche','Filets de truite','Filets de loup de mer (bar)']],
+ ['Crèmerie & fromages','#4c1d95',['Beurre','Crème','Fromage (assortiment)','Fromage au Chasselas','Fromage Mont-d\'Or']],
+ ['Féculents, pâtes & riz','#1f2937',['Riz Jasmin','Spaghetti','Tagliatelle']],
+ ['Huiles, truffe, conserves & base','#334155',['Huile de friture','Huile d\'olive','Truffe déco','Crème de truffe','Crème balsamique','Conserve tomates pelées','Farine','Sel','Sucre']],
+ ['Épices, aromates & fonds','#c2410c',['Origan séché','Cumin','Poivre noir purée / grains','Ail semoule / moulu','Paprika doux','Herbes de Provence','Laurier','Thym','Noix de muscade','Fond de légume','Fond de volaille','Fond de bœuf']],
+ ['Pâtisserie, desserts & fruits secs','#86198f',['Sucre glace','Purée fruits rouges','San Vincenzo (Biscuits Savoiardi / Boudoirs)','Cacao poudre noir','Pistaches','Abricots séchés','Crème de marrons','Noix (Walnuts)','Pignons de pin']]],
+ salle:[
+ ['Boissons sans alcool','#0e7490',['Eau plate','Eau gazeuse','Coca-Cola','Coca-Cola Zéro','Thé froid','Jus d\'orange','Jus de pomme','Sirops']],
+ ['Bières','#a16207',['Bière pression (fût)','Bière bouteille','Bière sans alcool']],
+ ['Vins','#7f1d1d',['Vin blanc','Vin rouge','Vin rosé','Vin mousseux / Prosecco']],
+ ['Apéritifs & spiritueux','#4c1d95',['Apéritif','Spiritueux','Liqueurs']],
+ ['Café & thé','#78350f',['Café en grains','Café décaféiné','Thé / infusions','Lait','Sucre / sucrettes']],
+ ['Consommables salle','#334155',['Serviettes papier','Sets de table','Bougies','Pailles','Cure-dents','Rouleaux caisse']],
+ ['Produits d\'entretien','#15803d',['Liquide vaisselle','Produit lave-vaisselle','Désinfectant','Sacs poubelle','Papier toilette','Savon mains']]]};
+function migrateCfg(){let ch=0;if(!CFG.cmdCat){CFG.cmdCat={};for(const z in CMDCAT)CFG.cmdCat[z]=CMDCAT[z].map(([n,c,L],i)=>({id:z[0]+i,nom:n,col:c,items:L.map((x,j)=>({id:z[0]+i+'_'+j,nom:x}))}));ch=1}if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Simple'],['3','Familiale + cuisine'],['4','Double'],['5','Double'],['6','Simple'],['7','Familiale sans cuisine'],['8','Double'],['9','Simple']].map(([n,t])=>({n,t}));ch=1}if(CFG.taxe==null||(CFG.taxe===1&&!CFG.taxeV2)){CFG.taxe=4.5;CFG.taxeV2=1;ch=1}if(CFG.rooms&&!CFG.hebdoInit){CFG.hebdoInit=1;for(const r of CFG.rooms)if(['7','8','9'].includes(r.n))r.hebdo=1;ch=1}if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hygiène"){CFG.nom='Restaurant';ch=1}
   if(!CFG.users||!CFG.users.length){CFG.users=DEFUSERS.map(([nom,role],i)=>({id:'u'+i,nom,role}));delete CFG.pin;delete CFG.emps;ch=1}
   if(!CFG.pauseInit){CFG.users.forEach(u=>{if(u.pause==null)u.pause=0});
     CFG.pauseInit=1;ch=1}
@@ -1961,7 +2026,7 @@ function migrateCfg(){let ch=0;if(!CFG.rooms){CFG.rooms=[['1','Double'],['2','Si
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   const all=await idbAll();
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
-  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k]}
+  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);setTimeout(recapCheck,4000);setInterval(recapCheck,600000);
