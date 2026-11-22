@@ -168,6 +168,7 @@ h2{font-size:19px;margin:0}
     <button data-v="semaine">🗓 Semaine</button>
     <button data-v="cal">📅 Calendrier</button>
     <button data-v="resa">📞 Réservations</button>
+    <button data-v="hotel">🏨 Hôtel</button>
     <button data-v="params">⚙️ Réglages</button>
   </nav>
 </header>
@@ -318,6 +319,25 @@ h2{font-size:19px;margin:0}
   </div>
   <div class="card"><div id="rsList"></div></div>
   <div class="card"><h2>📅 Les 7 prochains jours</h2><div id="rsNext7"></div></div>
+</section>
+<section id="v-hotel" class="hidden">
+  <div class="card">
+    <div class="row">
+      <button class="btn ghost icon" id="htPrev">‹</button>
+      <div class="grow" style="text-align:center"><div class="big" id="htTitle"></div><div class="meta" id="htSub"></div></div>
+      <button class="btn ghost icon" id="htNext">›</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost" id="htToday">Aujourd'hui</button><input type="date" id="htDate" style="width:auto">
+      <span class="grow"></span>
+      <button class="btn sec" id="htPrint">🖨 Imprimer / partager</button>
+      <button class="btn ok" id="htNew">➕ Nouveau client</button>
+    </div>
+  </div>
+  <div class="card"><h2>🛎 Arrivées</h2><div id="htArr"></div></div>
+  <div class="card"><h2>🧳 Départs</h2><div id="htDep"></div></div>
+  <div class="card"><h2>🏨 Clients présents</h2><div id="htIn"></div></div>
+  <div class="card"><h2>📅 Arrivées des 7 prochains jours</h2><div id="htNext7"></div></div>
 </section>
 <section id="v-params" class="hidden">
   <div class="card" id="lockBox">
@@ -555,7 +575,8 @@ const dayObj=s=>DAYS[s]||(DAYS[s]={tasks:{}});
 function isClosed(s){const o=DAYS[s];if(o&&o.closed!==undefined)return o.closed;return !CFG.open.includes(wd(s))}
 function due(s){if(isClosed(s))return [];const w=wd(s);return CFG.tasks.filter(t=>t.type==='Q'||t.jour===w)}
 const ZONES={salle:'🍽 Nettoyage salle',cuisine:'👨‍🍳 Nettoyage cuisine',temp:'🌡 Températures',recep:'📦 Réception'};
-let RCP={},RSV={}; // RSV['2026-12'] = [{id,date,heure,nom,tel,nb,note,etat,ts}]
+let RCP={},RSV={},HTL={}; // HTL['2026-12'] = séjours dont l'arrivée est dans ce mois
+ // RSV['2026-12'] = [{id,date,heure,nom,tel,nb,note,etat,ts}]
 const tz=t=>t.zone||'salle';
 function dueZ(s,z){return due(s).filter(t=>tz(t)===z)}
 /* tâches hebdomadaires (à planifier dans la semaine) et mensuelles (profondes) */
@@ -631,8 +652,8 @@ let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFull
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
 function show(v){VIEW=v;if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  ['jour','point','semaine','cal','resa','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
-  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();
+  ['jour','point','semaine','cal','resa','hotel','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
 
@@ -827,7 +848,7 @@ function printRecep(list){const months=[...new Set(list.map(m=>m.slice(0,7)))];
 function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after()}
 function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
-function refresh(){resaBanner();if(VIEW==='resa')renderResa();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
+function refresh(){resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -927,16 +948,18 @@ $('#cCsvM').onclick=()=>{const[a,b]=monthRange();csvRange(a,b,`nettoyage_${calY}
 $('#cCsvY').onclick=()=>csvRange(calY+'-01-01',calY+'-12-31','nettoyage_'+calY);
 
 /* ===================== SAUVEGARDE AUTOMATIQUE (chaque soir) ===================== */
-function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV})}
+function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL})}
 async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:addD(T,-30);
   const body=await dossierHTML(a,T,['salle','cuisine','temp','recep','plan','heures']);
   const rs=[];for(const mo of Object.keys(RSV).sort())for(const r of (RSV[mo]||[]).slice().sort((x,y)=>(x.date+x.heure).localeCompare(y.date+y.heure)))rs.push(r);
   const TD='style="border:1px solid #888;padding:4px 6px"';
   const resa=rs.length?`<div class="pg"><h1 style="font-size:18px">Réservations</h1><table style="border-collapse:collapse;width:100%;font-size:11px"><tr><th ${TD}>Date</th><th ${TD}>Heure</th><th ${TD}>Nom</th><th ${TD}>Pers.</th><th ${TD}>Téléphone</th><th ${TD}>Remarque</th><th ${TD}>État</th></tr>${rs.map(r=>`<tr><td ${TD}>${frD(r.date)}</td><td ${TD}>${esc(r.heure)}</td><td ${TD}>${esc(r.nom)}</td><td ${TD}>${r.nb||''}</td><td ${TD}>${esc(r.tel)}</td><td ${TD}>${esc(r.note||'')}</td><td ${TD}>${ETAT[r.etat||'']}</td></tr>`).join('')}</table></div>`:'';
+  const hs=htAll().sort((x,y)=>(x.arr+x.ch).localeCompare(y.arr+y.ch));
+  const hot=hs.length?`<div class="pg"><h1 style="font-size:18px">Hôtel — clients</h1><table style="border-collapse:collapse;width:100%;font-size:11px"><tr><th ${TD}>Arrivée</th><th ${TD}>Départ</th><th ${TD}>Chambre</th><th ${TD}>Nom</th><th ${TD}>Pers.</th><th ${TD}>Téléphone</th><th ${TD}>Remarque</th><th ${TD}>État</th></tr>${hs.map(h=>`<tr><td ${TD}>${frD(h.arr)}</td><td ${TD}>${frD(h.dep)}</td><td ${TD}>${esc(h.ch)}</td><td ${TD}>${esc(h.nom)}</td><td ${TD}>${h.nb||''}</td><td ${TD}>${esc(h.tel)}</td><td ${TD}>${esc(h.note||'')}</td><td ${TD}>${HETAT[h.etat||'']}</td></tr>`).join('')}</table></div>`:'';
   const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n').replace(/@media print\s*\{/g,'@media all{');
   return`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Sauvegarde ${esc(CFG.nom)} — ${frD(T)}</title><style>${css}
     body{background:#fff;padding:10px}#printArea{display:block!important}.pg{margin-bottom:30px;border-bottom:3px dashed #ccc;padding-bottom:20px}</style></head>
-    <body><div id="printArea"><div class="pg"><h1>Sauvegarde du ${frD(T)} à ${hhmm(Date.now())}</h1><p>${esc(CFG.nom)} — toutes les feuilles du ${frD(a)} au ${frD(T)} : nettoyage salle et cuisine, températures, réception des marchandises, planning, feuilles d'heures, réservations.</p><p>Pour imprimer : Ctrl + P. Pour remettre les données dans l'appli : Réglages → Restaurer, avec le fichier <b>.json</b> du même jour.</p></div>${body}${resa}</div></body></html>`}
+    <body><div id="printArea"><div class="pg"><h1>Sauvegarde du ${frD(T)} à ${hhmm(Date.now())}</h1><p>${esc(CFG.nom)} — toutes les feuilles du ${frD(a)} au ${frD(T)} : nettoyage salle et cuisine, températures, réception des marchandises, planning, feuilles d'heures, réservations, hôtel.</p><p>Pour imprimer : Ctrl + P. Pour remettre les données dans l'appli : Réglages → Restaurer, avec le fichier <b>.json</b> du même jour.</p></div>${body}${resa}${hot}</div></body></html>`}
 let PCDIR=null;
 async function pcDirGet(){if(PCDIR)return PCDIR;if(!idb)return null;return new Promise(res=>{try{const q=idb.transaction(ST).objectStore(ST).get('fsdir');q.onsuccess=()=>{PCDIR=q.result||null;res(PCDIR)};q.onerror=()=>res(null)}catch(e){res(null)}})}
 async function pcWrite(dir,name,content){const f=await dir.getFileHandle(name,{create:true});const w=await f.createWritable();await w.write(content);await w.close()}
@@ -960,6 +983,61 @@ setInterval(()=>{const n=new Date();if(n.getHours()>=23)autoBackup(false)},5*600
 /* au démarrage : rattrape la sauvegarde d'hier si l'appli était fermée à 23h */
 setTimeout(async()=>{if(!native()){const d=await pcDirGet();if(d&&d.queryPermission&&(await d.queryPermission({mode:'readwrite'}))!=='granted')pcBar(true)}},4000);
 setTimeout(()=>{const last=localStorage.getItem('pn_autobk')||'';if(last<addD(todayS(),-1)||new Date().getHours()>=23)autoBackup(false)},20000);
+
+/* ===================== HÔTEL ===================== */
+let htDay=todayS();
+function htAll(){const L=[];for(const mo in HTL)for(const h of HTL[mo]||[])L.push(h);return L}
+function saveHt(mo){const L=HTL[mo];if(L&&L.length)put('ht:'+mo,L);else{delete HTL[mo];del('ht:'+mo)}}
+const nuits=h=>Math.max(0,Math.round((parse(h.dep)-parse(h.arr))/864e5));
+const HETAT={'':'','arrive':'✔ arrivé','parti':'🧳 parti','annule':'✖ annulé'};
+const actif=h=>h.etat!=='annule';
+function htRow(h,mode){const n=nuits(h),done=h.etat==='parti'||h.etat==='annule',col=h.etat==='arrive'?'#16a34a':done?'#9ca3af':'#7c3aed';
+  return`<div class="row" data-ht="${h.id}" style="border:1px solid var(--line);border-left:5px solid ${col};border-radius:10px;padding:10px 12px;margin:8px 0;cursor:pointer;${done&&mode!=='dep'?'opacity:.6':''}">
+    <div style="min-width:86px;text-align:center"><div class="meta" style="margin:0">Chambre</div><div style="font-size:22px;font-weight:800">${esc(h.ch||'?')}</div></div>
+    <div class="grow"><div style="font-size:17px;font-weight:700">${esc(h.nom)} <span class="meta" style="font-weight:600">· ${h.nb||'?'} pers.</span> ${h.etat?`<span class="meta">${HETAT[h.etat]}</span>`:''}</div>
+      <div class="meta" style="margin:2px 0">Arrivée <b>${JOURS[wd(h.arr)].slice(0,3)} ${frD(h.arr)}</b>${h.heure?' vers '+esc(h.heure):''} → départ <b>${JOURS[wd(h.dep)].slice(0,3)} ${frD(h.dep)}</b> · ${n} nuit${n>1?'s':''}</div>
+      <div>${telLink(h.tel)}${h.note?` <span class="meta">— ${esc(h.note)}</span>`:''}</div></div></div>`}
+function renderHotel(){const d=htDay,A=htAll().filter(actif);
+  const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
+  const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
+  const pres=A.filter(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti').sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
+  $('#htDate').value=d;$('#htTitle').textContent=longD(d);
+  $('#htSub').textContent=`${arr.length} arrivée(s) · ${dep.length} départ(s) · ${pres.length} chambre(s) occupée(s) cette nuit`;
+  $('#htArr').innerHTML=arr.length?arr.map(h=>htRow(h,'arr')).join(''):'<p class="meta">Aucune arrivée ce jour-là.</p>';
+  $('#htDep').innerHTML=dep.length?dep.map(h=>htRow(h,'dep')).join(''):'<p class="meta">Aucun départ ce jour-là.</p>';
+  $('#htIn').innerHTML=pres.length?pres.map(h=>htRow(h,'in')).join(''):'<p class="meta">Aucun client cette nuit.</p>';
+  let x='';for(let i=1;i<=7;i++){const j=addD(d,i),l=A.filter(h=>h.arr===j);if(l.length)x+=`<h3 style="margin:10px 0 2px">${longD(j)} — ${l.length} arrivée(s)</h3>`+l.map(h=>htRow(h,'arr')).join('')}
+  $('#htNext7').innerHTML=x||'<p class="meta">Aucune arrivée prévue les 7 prochains jours.</p>';
+  document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));bindTel($('#v-hotel'))}
+function findHt(id){for(const mo in HTL){const h=(HTL[mo]||[]).find(x=>x.id===id);if(h)return{mo,h}}return null}
+function htConflit(v,id){return htAll().filter(h=>actif(h)&&h.id!==id&&h.etat!=='parti'&&String(h.ch).trim().toLowerCase()===String(v.ch).trim().toLowerCase()&&h.arr<v.dep&&v.arr<h.dep)}
+function editHotel(id){const f=id?findHt(id):null,h=f?f.h:{arr:htDay,dep:addD(htDay,1),heure:'',ch:'',nom:'',tel:'',nb:2,note:'',etat:''};
+  info(`<h2>${f?'🏨 Client':'➕ Nouveau client'}</h2>
+    <div class="row"><label class="grow">Arrivée<input type="date" id="hArr" value="${esc(h.arr)}"></label><label class="grow">Départ<input type="date" id="hDep" value="${esc(h.dep)}"></label><label style="width:110px">Heure d'arrivée<input type="time" id="hHeure" value="${esc(h.heure||'')}"></label></div>
+    <div class="row"><label style="width:140px">Chambre<input id="hCh" value="${esc(h.ch)}" placeholder="ex : 12" autocomplete="off"></label><label style="width:110px">Personnes<input type="number" id="hNb" min="1" value="${esc(h.nb)}"></label><label class="grow">Nom du client<input id="hNom" value="${esc(h.nom)}" placeholder="ex : M. et Mme Martin" autocomplete="off"></label></div>
+    <label>Téléphone<input id="hTel" type="tel" value="${esc(h.tel)}" placeholder="06 12 34 56 78" autocomplete="off"></label>
+    <label>Remarque<input id="hNote" value="${esc(h.note||'')}" placeholder="ex : lit bébé, petit-déjeuner, arrivée tardive…"></label>
+    <p class="meta" id="hNuits"></p>
+    ${f?`<label>État<select id="hEtat">${Object.entries({'':'À venir','arrive':'✔ Arrivé','parti':'🧳 Parti','annule':'✖ Annulé'}).map(([k,v])=>`<option value="${k}" ${h.etat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}
+    <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
+  ()=>{const upd=()=>{const a=$('#hArr').value,b=$('#hDep').value;$('#hNuits').textContent=a&&b&&b>a?nuits({arr:a,dep:b})+' nuit(s)':'⚠ La date de départ doit être après l\'arrivée'};['#hArr','#hDep'].forEach(q=>$(q).onchange=upd);upd();
+    $('#hOk').onclick=()=>{const v={arr:$('#hArr').value,dep:$('#hDep').value,heure:$('#hHeure').value,ch:$('#hCh').value.trim(),nb:+$('#hNb').value||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),note:$('#hNote').value.trim()};
+      if(!v.arr||!v.dep||!v.nom||!v.ch)return toast('Arrivée, départ, chambre et nom obligatoires');if(v.dep<=v.arr)return toast('La date de départ doit être après l\'arrivée');
+      const c=htConflit(v,f?h.id:null);if(c.length&&!confirm('⚠ La chambre '+v.ch+' est déjà prise par '+c.map(x=>x.nom+' ('+frD(x.arr)+' → '+frD(x.dep)+')').join(', ')+'. Enregistrer quand même ?'))return;
+      const mo=v.arr.slice(0,7);
+      if(f){Object.assign(h,v,{etat:$('#hEtat').value,mod:Date.now()});if(mo!==f.mo){HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);(HTL[mo]=HTL[mo]||[]).push(h)}saveHt(mo)}
+      else{(HTL[mo]=HTL[mo]||[]).push({id:'ht'+Date.now().toString(36),...v,etat:'',ts:Date.now()});saveHt(mo)}
+      closeInfo();htDay=v.arr;refresh();toast('Client enregistré ✔')};
+    if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
+$('#htNew').onclick=()=>editHotel(null);
+$('#htPrev').onclick=()=>{htDay=addD(htDay,-1);renderHotel()};$('#htNext').onclick=()=>{htDay=addD(htDay,1);renderHotel()};
+$('#htToday').onclick=()=>{htDay=todayS();renderHotel()};$('#htDate').onchange=e=>{if(e.target.value){htDay=e.target.value;renderHotel()}};
+$('#htPrint').onclick=()=>{const d=htDay,A=htAll().filter(actif),T='style="border:1px solid #888;padding:5px 7px;text-align:left"';
+  const tab=(t,L)=>`<h2 style="font-size:15px;margin:14px 0 4px">${t} (${L.length})</h2>`+(L.length?`<table style="border-collapse:collapse;width:100%;font-size:12px"><tr><th ${T}>Chambre</th><th ${T}>Nom</th><th ${T}>Pers.</th><th ${T}>Arrivée</th><th ${T}>Départ</th><th ${T}>Nuits</th><th ${T}>Téléphone</th><th ${T}>Remarque</th><th ${T}>État</th></tr>${L.map(h=>`<tr><td ${T}><b>${esc(h.ch)}</b></td><td ${T}>${esc(h.nom)}</td><td ${T}>${h.nb||''}</td><td ${T}>${frD(h.arr)}${h.heure?' '+esc(h.heure):''}</td><td ${T}>${frD(h.dep)}</td><td ${T}>${nuits(h)}</td><td ${T}>${esc(h.tel)}</td><td ${T}>${esc(h.note||'')}</td><td ${T}>${HETAT[h.etat||'']}</td></tr>`).join('')}</table>`:'<p>—</p>');
+  const byCh=(a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true});
+  $('#printArea').innerHTML=`<style>@page{size:A4 landscape;margin:8mm}</style><div class="pg"><h1 style="font-size:19px;margin:0">Hôtel — ${longD(d)}</h1><p>${esc(CFG.nom)}</p>
+    ${tab('Arrivées',A.filter(h=>h.arr===d).sort(byCh))}${tab('Départs',A.filter(h=>h.dep===d).sort(byCh))}${tab('Clients présents cette nuit',A.filter(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti').sort(byCh))}</div>`;
+  outDoc('Hôtel '+frD(d),1)};
 
 /* ===================== RÉSERVATIONS ===================== */
 let rsDay=todayS();
@@ -1006,10 +1084,11 @@ $('#rsPrint').onclick=()=>{const d=rsDay,L=resaOf(d),T='style="border:1px solid 
     ${L.map(r=>`<tr><td ${T}><b>${esc(r.heure)}</b></td><td ${T}>${esc(r.nom)}</td><td ${T}>${r.nb||''}</td><td ${T}>${esc(r.tel)}</td><td ${T}>${esc(r.note||'')}</td><td ${T}>${ETAT[r.etat||'']}</td></tr>`).join('')}</table></div>`;
   outDoc('Réservations '+frD(d),0)};
 /* rappels : bandeau du jour, fenêtre une fois par jour, rappel 30 min avant */
-function resaBanner(){const b=$('#resaBar');if(!b)return;const L=resaOf(todayS()).filter(r=>!r.etat);
-  if(!L.length){b.classList.add('hidden');return}b.classList.remove('hidden');
-  b.innerHTML=`📞 <b>Réservations aujourd'hui (${L.length}) :</b> `+L.map(r=>`<b>${esc(r.heure)}</b> ${esc(r.nom)} (${r.nb||'?'} pers.)`).join(' · ');
-  b.onclick=()=>{rsDay=todayS();show('resa')}}
+function resaBanner(){const b=$('#resaBar');if(!b)return;const T=todayS(),L=resaOf(T).filter(r=>!r.etat),A=htAll().filter(h=>h.arr===T&&!h.etat),D=htAll().filter(h=>h.dep===T&&h.etat!=='parti'&&h.etat!=='annule');
+  if(!L.length&&!A.length&&!D.length){b.classList.add('hidden');return}b.classList.remove('hidden');
+  b.innerHTML=(L.length?`<span data-go="resa">📞 <b>Réservations aujourd'hui (${L.length}) :</b> `+L.map(r=>`<b>${esc(r.heure)}</b> ${esc(r.nom)} (${r.nb||'?'} pers.)`).join(' · ')+'</span>':'')+
+    (A.length||D.length?`<div data-go="hotel" style="${L.length?'margin-top:4px':''}">🏨 <b>Hôtel :</b> ${A.length?`${A.length} arrivée(s) — `+A.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}${A.length&&D.length?' · ':''}${D.length?`${D.length} départ(s) — `+D.map(h=>`ch. <b>${esc(h.ch)}</b> ${esc(h.nom)}`).join(', '):''}</div>`:'');
+  b.querySelectorAll('[data-go]').forEach(el=>el.onclick=ev=>{ev.stopPropagation();if(el.dataset.go==='hotel'){htDay=T;show('hotel')}else{rsDay=T;show('resa')}});b.onclick=null}
 function resaPopup(force){const T=todayS(),L=resaOf(T).filter(r=>r.etat!=='annule');if(!L.length||(!force&&localStorage.getItem('pn_resaPop')===T))return;
   localStorage.setItem('pn_resaPop',T);
   if(native()&&Android.notify)try{Android.notify('Réservations du jour : '+L.length,L.map(r=>r.heure+' '+r.nom+' ('+(r.nb||'?')+')').join(' · '))}catch(e){}
@@ -1146,12 +1225,12 @@ $('#pSave').onclick=async()=>{
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
-$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV}),'application/json');
+$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL}),'application/json');
 $('#pRestoreBtn').onclick=()=>$('#pRestore').click();
 $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=async()=>{try{const x=JSON.parse(r.result);if(!x.cfg||!x.days)throw 0;
     if(!confirm(`Remplacer toutes les données par cette sauvegarde (${Object.keys(x.days).length} jours) ?`))return;
-    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
+    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
@@ -1525,7 +1604,7 @@ function deepMerge(a,b){if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Arra
 /* qui gagne quand les deux appareils ont modifié la même chose */
 function resolve(k,loc,o){const pre=kPre(k),rt=o.t||0,lt=MT[k]||0;
   if(loc==null)return{v:o.v,rw:1};if(o.v==null)return{v:loc,rw:0};
-  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
+  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
   if(k==='cfg'||pre==='pl'){if(MAIN()&&o.f)return{v:loc,rw:0};if(FOLLOW()||rt>lt)return{v:o.v,rw:1};return{v:loc,rw:0}}
   if(pre==='w')return rt>lt?{v:deepMerge(loc,o.v),rw:0}:{v:deepMerge(o.v,loc),rw:0};
   return rt>lt?{v:o.v,rw:1}:{v:loc,rw:0}}
@@ -1538,14 +1617,14 @@ function kick(){clearTimeout(kickT);kickT=setTimeout(syncOnce,300)}
 function cloudPut(k,v){if(!cloudOn())return;OUT.add(k);saveOut();kick()}
 function photoQueue(id,delOp){if(!cloudOn())return;OUTPH.add((delOp?'-':'')+id);saveOut();kick()}
 function setCloud(k,v){CLOUD[k]=v;localPut('cl:'+k,v==null?null:v)}
-function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,dv:DV}[pre];return m?m[key]:null}
-function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);return L}
+function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,dv:DV}[pre];return m?m[key]:null}
+function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);return L}
 function removedIds(k,v){const c=CLOUD[k];if(!c)return[];
   if(kPre(k)==='d'){const a=(c.tasks)||{},b=(v&&v.tasks)||{};return Object.keys(a).filter(x=>!(x in b))}
-  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
+  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
 function mergeVals(k,loc,rem,rm){const pre=kPre(k);rm=new Set(rm||[]);
   if(pre==='d'&&loc&&rem){const t={...(rem.tasks||{}),...(loc.tasks||{})};rm.forEach(i=>delete t[i]);const o={...rem,...loc,tasks:t};if(rem.temps||loc.temps)o.temps={...(rem.temps||{}),...(loc.temps||{})};return o}
-  if((pre==='pt'||pre==='rc'||pre==='rs')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
+  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
   return loc??rem}
 /* même personne créée sur deux appareils (ids différents) : on garde une seule fiche et on rattache ses pointages */
 function remapUsers(oldC,nv){if(!oldC||!oldC.users||!nv||!nv.users)return;const byName={},map={};for(const u of nv.users)byName[u.nom.trim().toLowerCase()]=u.id;
@@ -1558,7 +1637,7 @@ function applyRemote(k,v){
   if(k==='cfg'){if(!v)return;remapUsers(CFG,v);CFG=v;if(migrateCfg()){localPut(k,CFG);OUT.add('cfg');saveOut();kick()}else localPut(k,v);applyCfg();refreshSoon();
     if(faResolve&&CFG.users&&CFG.users.some(u=>u.role==='admin'&&u.hash)){$('#mAuth').classList.add('hidden');$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');$('#aJoin').classList.add('hidden');const r=faResolve;faResolve=null;r()}
     return}
-  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,dv:DV}[pre];if(!map)return;
+  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,dv:DV}[pre];if(!map)return;
   if(v==null){delete map[key];localDel(k)}else{map[key]=v;localPut(k,v)}}
 let rfT=null;function refreshSoon(){clearTimeout(rfT);rfT=setTimeout(()=>{if(VIEW!=='params'&&$('#mSign').classList.contains('hidden')&&$('#mCam').classList.contains('hidden'))refresh()},300)}
 
@@ -1668,7 +1747,7 @@ async function followMain(){if(!cloudOn())return toast('Connecte d\'abord la sau
     for(const d in PTS){let c=0;for(const e of PTS[d]||[])if(map[e.emp]){e.emp=map[e.emp];c=1}if(c){MT['pt:'+d]=Date.now();localPut('pt:'+d,PTS[d]);OUT.add('pt:'+d)}}
     applyRemote('cfg',nv);MT.cfg=cfgNew.t||0;setCloud('cfg',cfgNew.v);OUT.delete('cfg');if(JSON.stringify(nv.users)!==JSON.stringify(cfgNew.v.users))OUT.add('cfg');n++}
   for(const[k,o]of vals){const pre=kPre(k),loc=localValue(k);
-    if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'){const m=loc!=null?mergeVals(k,loc,o.v,[]):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
+    if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'){const m=loc!=null?mergeVals(k,loc,o.v,[]):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
     else if(pre==='w'){const m=loc!=null?deepMerge(loc,o.v):o.v;applyRemote(k,m);setCloud(k,o.v);if(JSON.stringify(m)!==JSON.stringify(o.v))OUT.add(k);else OUT.delete(k)}
     else{applyRemote(k,o.v);setCloud(k,o.v);OUT.delete(k)}
     MT[k]=o.t||0;n++}
@@ -1756,7 +1835,7 @@ function migrateCfg(){let ch=0;if(!CFG.nom||CFG.nom==="Plan de nettoyage & d'hyg
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   const all=await idbAll();
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
-  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k]}
+  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
   applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);
   $('#sync2').onclick=syncBoth;$('#syBtn').onclick=()=>openSyncModal();$('#syncDot').onclick=()=>openSyncModal();
