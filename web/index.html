@@ -334,7 +334,7 @@ h2{font-size:19px;margin:0}
       <button class="btn ok" id="htNew">➕ Nouveau client</button>
     </div>
   </div>
-  <div class="card"><div class="row"><h2 class="grow">🛏 Les chambres</h2><span class="meta"><span style="background:#dc2626;color:#fff;border-radius:5px;padding:0 6px">à faire</span> <span style="background:#2563eb;color:#fff;border-radius:5px;padding:0 6px">occupée</span> <span style="background:#16a34a;color:#fff;border-radius:5px;padding:0 6px">prête</span></span></div><div id="htRooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px"></div></div>
+  <div class="card"><div class="row"><h2 class="grow">🛏 Les chambres</h2><span class="meta"><span style="background:#dc2626;color:#fff;border-radius:5px;padding:0 6px">à nettoyer</span> <span style="background:#ea580c;color:#fff;border-radius:5px;padding:0 6px">à rafraîchir</span> <span style="background:#2563eb;color:#fff;border-radius:5px;padding:0 6px">occupée</span> <span style="background:#16a34a;color:#fff;border-radius:5px;padding:0 6px">prête</span></span></div><div id="htRooms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px"></div></div>
   <div class="card"><h2>🛎 Arrivées</h2><div id="htArr"></div></div>
   <div class="card"><h2>🧳 Départs</h2><div id="htDep"></div></div>
   <div class="card"><h2>🏨 Clients présents</h2><div id="htIn"></div></div>
@@ -998,17 +998,19 @@ function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.c
   if(lastDep&&!men&&!(occ&&occ.arr>lastDep))why.push('départ');
   const room=(CFG.rooms||[]).find(r=>chKey(r.n)===k);
   if(room&&room.hebdo&&!(lastDone&&lastDone.date>addD(d,-7)))why.push('ménage de la semaine');
-  const prev=M.filter(r=>r.prevu&&r.date<=d&&r.date>=addD(d,-14)&&!done.some(x=>x.date>=r.date)).sort((a,b)=>a.date.localeCompare(b.date))[0];
-  if(prev)why.push('ménage prévu le '+frD(prev.date).slice(0,5));
+  const P=M.filter(r=>r.prevu&&r.date<=d&&r.date>=addD(d,-14)&&!done.some(x=>x.date>=r.date&&x.ts>=r.ts-60000)).sort((a,b)=>a.date.localeCompare(b.date));
+  let refresh=false;
+  for(const prev of P){if(prev.kind==='rafraichir'){refresh=true;continue}why.push(prev.kind==='nettoyer'?'à nettoyer':'ménage prévu le '+frD(prev.date).slice(0,5))}
+  if(refresh&&!why.length)why.push('✨ à rafraîchir');
   const next=M.filter(r=>r.prevu&&r.date>d).sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
   const hebdoNext=room&&room.hebdo&&lastDone?addD(lastDone.date,7):null;
-  return{occ,depToday,arr,sale:why.length>0,why,men:lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext}}
+  return{occ,depToday,arr,sale:why.length>0,why,light:why.length===1&&why[0]==='✨ à rafraîchir',men:lastDone&&(!lastDep||lastDone.date>=lastDep)?lastDone:men,lastDep,next,hebdo:!!(room&&room.hebdo),hebdoNext}}
 function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
-  const bg=st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
+  const bg=st.light?'#ea580c':st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.light?'✨ À RAFRAÎCHIR':st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Prête — arrivée':'Libre, prête';
   const who=(st.sale?`<div style="font-weight:700">${st.why.join(' · ')}</div>`:'')+(st.occ?`${esc(st.occ.nom)}<br>${isRes(st.occ)?'🏠 résident':'jusqu\'au '+frD(st.occ.dep).slice(0,5)}`:st.depToday?`départ : ${esc(st.depToday.nom)}`:'')+
-    (st.next?`<div>📅 ménage prévu le ${frD(st.next.date).slice(0,5)}</div>`:'')+(st.hebdo&&!st.sale?`<div style="opacity:.85">🔁 hebdo${st.hebdoNext?' — prochain '+frD(st.hebdoNext).slice(0,5):''}</div>`:'');
+    (st.next?`<div>📅 ${st.next.kind==='rafraichir'?'rafraîchir':'ménage'} prévu le ${frD(st.next.date).slice(0,5)}</div>`:'')+(st.hebdo&&!st.sale?`<div style="opacity:.85">🔁 hebdo${st.hebdoNext?' — prochain '+frD(st.hebdoNext).slice(0,5):''}</div>`:'');
   const nxt=st.arr&&!st.occ?`<div style="margin-top:3px;font-size:12px">🛎 arrive : ${esc(st.arr.nom)}${st.arr.heure?' '+esc(st.arr.heure):''}</div>`:'';
-  return`<div data-room="${esc(r.n)}" style="background:${bg};color:#fff;border-radius:12px;padding:10px;cursor:pointer;min-height:112px;${st.sale?'box-shadow:0 0 0 3px #fecaca':''}">
+  return`<div data-room="${esc(r.n)}" style="background:${bg};color:#fff;border-radius:12px;padding:10px;cursor:pointer;min-height:112px;${st.sale?'box-shadow:0 0 0 3px '+(st.light?'#fed7aa':'#fecaca'):''}">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:24px">${esc(r.n)}</b><span style="font-size:12px;opacity:.9">${esc(r.t)}</span></div>
     <div style="font-weight:800;margin-top:2px">${lab}</div><div style="font-size:12px;opacity:.95">${who}</div>${nxt}
     ${st.men&&!st.sale?`<div style="font-size:11px;opacity:.9;margin-top:3px">✔ ménage fait ${st.men.date===d?hhmm(st.men.ts):frD(st.men.date).slice(0,5)}${st.men.by?' — '+esc(st.men.by):''}</div>`:''}</div>`}).join('')}
@@ -1019,12 +1021,15 @@ function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>
     ${st.men?`<p class="meta">Dernier ménage : ${frD(st.men.date)} à ${hhmm(st.men.ts)}${st.men.by?' par '+esc(st.men.by):''}</p>`:''}
     <label>Fait par (facultatif)<input id="mnBy" placeholder="prénom" autocomplete="off" value="${esc(localStorage.getItem('pn_mnBy')||'')}"></label>
     <button class="btn ok" id="mnOk" style="width:100%;margin-top:8px;font-size:17px">✔ Ménage fait</button>
-    <div class="row" style="margin-top:10px"><label class="grow">📅 Prévoir un ménage le<input type="date" id="mnDate" value="${addD(todayS(),1)}"></label><button class="btn sec" id="mnPlan" style="align-self:flex-end">Prévoir</button></div>
+    <div class="row" style="margin-top:8px;gap:8px"><button class="btn" id="mnSale" style="flex:1;background:#dc2626;color:#fff;font-size:16px">🧹 À nettoyer</button><button class="btn" id="mnRaf" style="flex:1;background:#ea580c;color:#fff;font-size:16px">✨ À rafraîchir</button></div>
+    <div class="row" style="margin-top:10px"><label class="grow">📅 Prévoir le<input type="date" id="mnDate" value="${addD(todayS(),1)}"></label><label style="width:170px">Type<select id="mnKind"><option value="">Ménage complet</option><option value="rafraichir">Rafraîchir</option></select></label><button class="btn sec" id="mnPlan" style="align-self:flex-end">Prévoir</button></div>
     <label class="row" style="gap:8px;margin-top:8px"><input type="checkbox" id="mnHeb" ${st.hebdo?'checked':''} style="width:auto"> 🔁 Rappel de ménage toutes les semaines pour cette chambre</label>
     <div class="row" style="margin-top:12px">${st.men?'<button class="btn ghost" id="mnUndo">Annuler le dernier ménage</button>':''}<span class="grow"></span>${st.occ?'<button class="btn sec" id="mnCli">Voir le client</button>':'<button class="btn sec" id="mnNew">➕ Nouveau client</button>'}<button class="btn ghost" id="iClose">Fermer</button></div>`,
   ()=>{$('#mnOk').onclick=()=>{const by=$('#mnBy').value.trim();localStorage.setItem('pn_mnBy',by);const now=Date.now(),T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7);
       (MEN[mo]=MEN[mo]||[]).push({id:'mn'+now.toString(36),ch:n,date:dd,ts:now,by});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('✔ Chambre '+n+' : ménage fait')};
-    $('#mnPlan').onclick=()=>{const dd=$('#mnDate').value;if(!dd)return;const mo=dd.slice(0,7),now=Date.now();(MEN[mo]=MEN[mo]||[]).push({id:'mp'+now.toString(36),ch:n,date:dd,ts:now,prevu:1});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('📅 Ménage de la chambre '+n+' prévu le '+frD(dd))};
+    const flag=(kind)=>{const T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7),now=Date.now();(MEN[mo]=MEN[mo]||[]).push({id:'mp'+now.toString(36),ch:n,date:dd,ts:now,prevu:1,kind});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast(kind==='rafraichir'?'✨ Chambre '+n+' à rafraîchir':'🧹 Chambre '+n+' à nettoyer')};
+    $('#mnSale').onclick=()=>flag('nettoyer');$('#mnRaf').onclick=()=>flag('rafraichir');
+    $('#mnPlan').onclick=()=>{const dd=$('#mnDate').value;if(!dd)return;const mo=dd.slice(0,7),now=Date.now(),kind=$('#mnKind').value||undefined;(MEN[mo]=MEN[mo]||[]).push({id:'mp'+now.toString(36),ch:n,date:dd,ts:now,prevu:1,kind});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('📅 Ménage de la chambre '+n+' prévu le '+frD(dd))};
     $('#mnHeb').onchange=e=>{const R=(CFG.rooms||[]).find(x=>x.n===n);if(R){if(e.target.checked)R.hebdo=1;else delete R.hebdo;put('cfg',CFG);refresh()}};
     if($('#mnUndo'))$('#mnUndo').onclick=()=>{const m=st.men,mo=m.date.slice(0,7);MEN[mo]=(MEN[mo]||[]).filter(x=>x.id!==m.id);if(MEN[mo].length)put('mn:'+mo,MEN[mo]);else{delete MEN[mo];del('mn:'+mo)}closeInfo();refresh()};
     if($('#mnCli'))$('#mnCli').onclick=()=>{closeInfo();editHotel(st.occ.id)};
