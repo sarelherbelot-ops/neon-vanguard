@@ -248,7 +248,7 @@ h2{font-size:19px;margin:0}
       <span><i style="background:#e5e7eb"></i>Fermé</span>
     </div>
   </div>
-  <div class="card"><div class="cal" id="cGrid"></div></div>
+  <div class="card"><div class="meta" style="margin-bottom:6px">Tâches faites : <span style="background:#16a34a;color:#fff;border-radius:6px;padding:0 6px;font-weight:700">salle</span> &nbsp; <span style="background:#2563eb;color:#fff;border-radius:6px;padding:0 6px;font-weight:700">cuisine</span></div><div class="cal" id="cGrid"></div></div>
   <div class="card">
     <div class="row">
       <div class="grow meta" id="cStats"></div>
@@ -893,6 +893,9 @@ $('#wCsv').onclick=()=>csvRange(curWeek,addD(curWeek,6),'semaine_'+isoWeek(curWe
 
 /* ===================== CALENDRIER ===================== */
 $('#cMonth').innerHTML=MOIS.map((m,i)=>`<option value="${i}">${m[0].toUpperCase()+m.slice(1)}</option>`).join('');
+function calCnt(s,L){const z=k=>{const l=L.filter(t=>tz(t)===k);return l.length?[l.filter(t=>rec(s,t.id)).length,l.length]:null},a=z('salle'),c=z('cuisine');
+  return(a?`<span style="display:inline-block;background:#16a34a;color:#fff;border-radius:6px;padding:0 5px;font-weight:700;margin-right:3px" title="Salle / restaurant">${a[0]}/${a[1]}</span>`:'')+
+    (c?`<span style="display:inline-block;background:#2563eb;color:#fff;border-radius:6px;padding:0 5px;font-weight:700" title="Cuisine">${c[0]}/${c[1]}</span>`:'')}
 function renderCal(){$('#cMonth').value=calM;$('#cYear').value=calY;
   const first=ymd(new Date(calY,calM,1)),start=monday(first),T=todayS();
   let h='<div class="h">Sem.</div>'+['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(x=>`<div class="h">${x}</div>`).join('');
@@ -903,7 +906,7 @@ function renderCal(){$('#cMonth').value=calM;$('#cYear').value=calY;
     for(let i=0;i<7;i++){const d=parse(s),inM=d.getMonth()===calM,st=status(s),L=due(s),n=L.filter(t=>rec(s,t.id)).length;
       if(inM&&st==='arch')arch++;if(inM&&!['closed','before','todo','arch'].includes(st)&&s<=T){tot++;if(st==='ok')ok++;else if(st==='ko')ko++;else part++}
       h+=`<div class="d ${inM?'':'out'} ${st} ${s===T?'today':''}" data-d="${s}"><div class="n">${d.getDate()}</div>
-        <div class="s">${st==='closed'?'Fermé':st==='before'?'':st==='arch'?'📄 papier':(L.length?n+'/'+L.length:'')}</div></div>`;
+        <div class="s">${st==='closed'?'Fermé':st==='before'?'':st==='arch'?'📄 papier':calCnt(s,L)}</div></div>`;
       s=addD(s,1)}
   }
   $('#cGrid').innerHTML=h;
