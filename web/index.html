@@ -1466,17 +1466,17 @@ function savePhoto(name,dataUrl){const b64=dataUrl.split(',')[1];
   const a=document.createElement('a');a.href=dataUrl;a.download=name;a.click()}
 $('#phPdf').onclick=()=>{const R=phRows();if(!R.length)return toast('Rien à imprimer');
   const a=$('#phFrom').value,b=$('#phTo').value,by={};for(const x of R)(by[x.e.uid]=by[x.e.uid]||{nom:x.e.nom,rows:[]}).rows.push(x);
-  const T='style="border:1px solid #999;padding:4px 6px;text-align:left"',TH='style="border:1px solid #999;padding:4px 6px;text-align:left;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact"';
-  $('#printArea').innerHTML=Object.values(by).map(g=>{let tot=0,nl=0,ml=0,nr=0,ne=0;
+  const T='style="border:1px solid #999;padding:1px 4px;text-align:left;white-space:nowrap"',TH='style="border:1px solid #999;padding:2px 4px;text-align:left;white-space:nowrap;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact"';
+  $('#printArea').innerHTML='<style>@page{size:A4;margin:8mm}</style>'+Object.values(by).map(g=>{let tot=0,nl=0,ml=0,nr=0,ne=0;
     const rows=g.rows.map(({d,e})=>{const li=lateInfo(d,e),c=countedDur(d,e);tot+=c;if(e.repas){nr++;if(e.repasType==='emporter')ne++}if(li&&li.late>0){nl++;ml+=li.late}
-      return `<tr><td ${T}>${JOURS[wd(d)].slice(0,3)} ${frD(d)}</td><td ${T}>${planTxt(e.uid,d)||'—'}</td><td ${T}>${hhmm(e.in)}</td><td ${T}>${li?(li.late>0?'<b>+'+mins(li.late)+'</b>':'à l\'heure'):'—'}</td><td ${T}>${e.out?hhmm(e.out):'—'}</td><td ${T}>${pauseFor(d,e)?pTxt(d,e):''}</td><td ${T}><b>${e.out?dur(c):''}</b></td><td ${T}>${rpTxt(e)}</td></tr>`}).join('');
-    return `<div class="pg" style="font-size:12px"><h1 style="font-size:18px;margin:0 0 4px">Feuille d'heures — ${esc(g.nom)}</h1>
-      <p style="margin:0 0 10px">${esc(CFG.nom)} · du ${frD(a)} au ${frD(b)}</p>
-      <table style="border-collapse:collapse;width:100%"><tr><th ${TH}>Date</th><th ${TH}>Prévu</th><th ${TH}>Arrivée</th><th ${TH}>Retard</th><th ${TH}>Départ</th><th ${TH}>Pause</th><th ${TH}>Heures comptées</th><th ${TH}>Repas</th></tr>${rows}
+      return `<tr><td ${T}>${JOURS[wd(d)].slice(0,3)} ${frD(d).slice(0,5)}</td><td ${T}>${planTxt(e.uid,d)||'—'}</td><td ${T}>${hhmm(e.in)}</td><td ${T}>${li?(li.late>0?'<b>+'+mins(li.late)+'</b>':'à l\'heure'):'—'}</td><td ${T}>${e.out?hhmm(e.out):'—'}</td><td ${T}>${pauseFor(d,e)?Math.round(pauseFor(d,e)/60000)+' min'+(surPlace(e)?' (repas)':''):''}</td><td ${T}><b>${e.out?dur(c):''}</b></td><td ${T}>${rpTxt(e)}</td></tr>`}).join('');
+    return `<div class="pg" style="font-size:12px"><h1 style="font-size:16px;margin:0 0 2px">Feuille d'heures — ${esc(g.nom)}</h1>
+      <p style="margin:0 0 6px">${esc(CFG.nom)} · du ${frD(a)} au ${frD(b)}</p>
+      <table style="border-collapse:collapse;width:100%;font-size:${g.rows.length>40?8.5:g.rows.length>30?9.5:10.5}px;line-height:1.25"><tr><th ${TH}>Date</th><th ${TH}>Prévu</th><th ${TH}>Arrivée</th><th ${TH}>Retard</th><th ${TH}>Départ</th><th ${TH}>Pause</th><th ${TH}>Heures comptées</th><th ${TH}>Repas</th></tr>${rows}
       <tr><td ${T} colspan="6" style="border:1px solid #999;padding:6px;text-align:right"><b>TOTAL</b></td><td ${T}><b>${dur(tot)}</b></td><td ${T}><b>${nr}</b></td></tr></table>
       <p style="font-size:14px"><b>Repas pris : ${nr}</b>${nr?` (${nr-ne} sur place, ${ne} à emporter)`:''}</p><p>Retards : ${nl?nl+' ('+mins(ml)+')':'aucun'}</p>
-      <div style="display:flex;gap:40px;margin-top:30px"><div style="flex:1;border-top:1px solid #000;padding-top:4px">Signature de l'employé</div><div style="flex:1;border-top:1px solid #000;padding-top:4px">Signature du responsable</div></div>
-      <p style="font-size:9px;color:#666;margin-top:16px">Imprimé le ${frD(todayS())}</p></div>`}).join('');
+      <div style="display:flex;gap:40px;margin-top:22px"><div style="flex:1;border-top:1px solid #000;padding-top:4px">Signature de l'employé</div><div style="flex:1;border-top:1px solid #000;padding-top:4px">Signature du responsable</div></div>
+      <p style="font-size:8px;color:#666;margin-top:8px">Imprimé le ${frD(todayS())}</p></div>`}).join('');
   outDoc('Feuilles d\'heures',0)};
 $('#phCsv').onclick=()=>{const R=phRows();if(!R.length)return toast('Rien à exporter');const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
   let csv='\ufeffDate;Jour;Compte;Prévu;Arrivée;Retard (min);Départ;Départ anticipé (min);Heure comptée;Durée comptée (h);Repas;Ticket Flash Info;Rapport caisse\n';
