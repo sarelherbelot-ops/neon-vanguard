@@ -1287,16 +1287,16 @@ function ficheHTML(h){const B='color:#1d4ed8;font-weight:700;font-family:sans-se
   const o=fichePrefill(h);
   const r=h&&(CFG.rooms||[]).find(x=>chKey(x.n)===chKey(h.ch));
   const L=[['Nom',h&&h.nom],['Contact',h&&h.tel],['E-mail',h&&h.mail],['Adresse',h&&h.adr],['Signature',''],['Numéro de chambre',h&&h.ch],['Nombre de personnes',h&&h.nb],['Durée du séjour',o.duree],['Petit déjeuner',o.pdj],['Facture restaurant',o.fresto],['Taxe de séjour',o.taxe],['Animaux',o.anim]];
-  const TD='border:1.3px solid #333;padding:6px 8px;font-weight:700;font-size:12.5pt;height:21px';
+  const TD='border:1.3px solid #333;padding:4px 8px;font-weight:700;font-size:12pt;height:19px';
   const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:3.5mm">${b.split('\n').map(l=>`<p style="margin:0 0 1.5mm;line-height:1.35">${esc(l)}</p>`).join('')}</div>`).join('');
   return`<div style="font-family:Calibri,Carlito,'DejaVu Sans',Arial,sans-serif;font-size:12pt;color:#111">
-  <div style="text-align:center;font-size:21pt;color:#555;margin:0 0 6mm">${esc(CFG.nom||'')}</div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin:0 4mm 2mm;font-size:17pt;font-weight:700"><span>Fiche hôtel</span>${h&&h.booking?`<span style="border:2px solid #003580;color:#003580;font-weight:800;font-size:11pt;padding:1mm 3mm;border-radius:2mm;font-family:sans-serif">PAYÉ PAR BOOKING${+h.bkMontant?' : CHF '+(+h.bkMontant).toFixed(2):''}</span>`:''}<span>Date : ${h?`<span style="${B}">${frD(h.arr)}</span>`:'____________________'}</span></div>
+  <div style="text-align:center;font-size:22pt;font-weight:700;color:#333;margin:0 0 4mm">${esc(CFG.nom||'Hôtel')}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:0 4mm 2mm;font-size:17pt;font-weight:700"><span>Fiche hôtel</span><span>Date : ${h?`<span style="${B}">${frD(h.arr)}</span>`:'____________________'}</span></div>
   <table style="width:100%;border-collapse:collapse">${L.map(([k,x])=>`<tr><td style="${TD}">${k} :${v(x)}</td></tr>`).join('')}</table>
-  <table style="width:100%;border-collapse:collapse;margin-top:7mm"><tr><td style="${TD}">Total :${v(o.total)}</td></tr></table>
-  <h2 style="font-size:16pt;margin:7mm 0 0">Charte Hôtel :</h2>${ch}
+  <table style="width:100%;border-collapse:collapse;margin-top:5mm"><tr><td style="${TD}">Total :${v(o.total)}</td></tr>${h&&h.booking?`<tr><td style="${TD};color:#003580">Payé par Booking :${v(+h.bkMontant?'CHF '+(+h.bkMontant).toFixed(2):'oui')}</td></tr>`:''}</table>
+  <h2 style="font-size:15pt;margin:5mm 0 0">Charte Hôtel :</h2>${ch}
   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:7mm;gap:10mm"><div><p style="margin:0 0 1.5mm">Pour le room-service, adressez-vous au personnel du restaurant.</p><p style="margin:0">Nos sincères salutations, ${esc(CFG.nom||'')}.</p></div><div style="width:65mm;font-weight:700;font-size:13pt;border-bottom:1px solid #333;padding-bottom:13mm;flex:none">Signature</div></div></div>`}
-function printFiche(h){$('#printArea').innerHTML='<style>@page{size:A4;margin:13mm 18mm}</style>'+ficheHTML(h);outDoc(h?'Fiche hôtel '+h.nom:'Fiche hôtel vierge',0)}
+function printFiche(h){$('#printArea').innerHTML='<style>@page{size:A4;margin:10mm 16mm}</style>'+ficheHTML(h);outDoc(h?'Fiche hôtel '+h.nom:'Fiche hôtel vierge',0)}
 $('#htFicheV').onclick=()=>printFiche(null);
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
@@ -1325,8 +1325,7 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
   const old=fichePrefill(h),ln=(lab,idx,val,type)=>`<tr><td style="${TD}"><div style="display:flex;align-items:center;gap:6px"><span style="white-space:nowrap">${lab} :</span><input id="${idx}" ${type?`type="${type}"`:''} value="${esc(val==null?'':String(val))}" autocomplete="off" style="${IN}"></div></td></tr>`;
   const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:8px">${b.split('\n').map(l=>`<div style="margin-bottom:3px">${esc(l)}</div>`).join('')}</div>`).join('');
   info(`<div style="background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-family:Calibri,Carlito,'Segoe UI',sans-serif">
-    <div style="text-align:center;font-size:21px;color:#555;margin-bottom:8px">${esc(CFG.nom||'')}</div>
-    <div style="display:flex;align-items:center;gap:10px;margin:0 6px 8px;flex-wrap:wrap"><label class="row" style="gap:6px;margin:0;font-weight:700;color:#003580"><input type="checkbox" id="hBook" ${h.booking?'checked':''} style="width:auto;margin:0;transform:scale(1.3)"> 🅱️ Payé par Booking</label><span id="hBookM" class="row" style="gap:4px;align-items:center;${h.booking?'':'display:none'}">montant : CHF<input type="number" id="hBkM" min="0" step="0.5" value="${esc(h.bkMontant||'')}" placeholder="0" style="width:100px;margin:0;color:#003580;font-weight:700"></span><span id="hBookBan" style="background:#003580;color:#fff;font-weight:800;border-radius:6px;padding:4px 10px;letter-spacing:.03em;${h.booking?'':'display:none'}">PAYÉ PAR BOOKING<span id="hBkTxt">${+h.bkMontant?' : CHF '+(+h.bkMontant).toFixed(2):''}</span></span></div>
+    <div style="position:sticky;top:-14px;z-index:2;background:#fff;text-align:center;font-size:22px;font-weight:700;color:#333;padding:6px 0 8px;margin:-6px 0 4px;border-bottom:1px solid #eee">${esc(CFG.nom||'Hôtel')}</div>
     <div style="display:flex;align-items:center;gap:8px;margin:0 6px 4px"><b style="font-size:19px">Fiche hôtel</b><button class="btn ok" id="hPrint" title="Enregistrer et imprimer" style="padding:4px 10px;font-size:18px">🖨</button><span class="grow"></span><b style="font-size:17px">Date :</b><input type="date" id="hArr" value="${esc(h.arr)}" style="${IN};flex:none;width:170px"></div>
     <table style="width:100%;border-collapse:collapse">
     ${ln('Nom','hNom',h.nom)}${ln('Contact','hTel',h.tel,'tel')}${ln('E-mail','hMail',h.mail||'','email')}${ln('Adresse','hAdr',h.adr||'')}
@@ -1334,7 +1333,7 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
     ${ln('Numéro de chambre','hCh',h.ch)}${ln('Nombre de personnes','hNb',f||pre?h.nb:'')}${ln('Durée du séjour','hDuree',old.duree)}
     ${ln('Petit déjeuner','hPdjT',old.pdj)}${ln('Facture restaurant','hFrT',old.fresto)}${ln('Taxe de séjour','hTaxT',old.taxe)}${ln('Animaux','hAnimT',old.anim)}
     </table>
-    <table style="width:100%;border-collapse:collapse;margin-top:14px">${ln('Total','hTotT',old.total)}</table>
+    <table style="width:100%;border-collapse:collapse;margin-top:14px">${ln('Total','hTotT',old.total)}<tr><td style="${TD};color:#003580"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label class="row" style="gap:6px;margin:0;color:#003580;font-weight:700;font-size:15px"><input type="checkbox" id="hBook" ${h.booking?'checked':''} style="width:auto;margin:0;transform:scale(1.3)"> Payé par Booking</label><span id="hBookM" class="row" style="gap:4px;align-items:center;${h.booking?'':'display:none'}">: CHF<input type="number" id="hBkM" min="0" step="0.5" value="${esc(h.bkMontant||'')}" placeholder="montant" style="${IN};flex:none;width:110px;color:#003580"></span></div></td></tr></table>
     <div style="font-size:13px;color:#333;margin-top:12px"><b style="font-size:17px;color:#111">Charte Hôtel :</b>${ch}
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px;gap:14px"><div><div>Pour le room-service, adressez-vous au personnel du restaurant.</div><div>Nos sincères salutations, ${esc(CFG.nom||'')}.</div></div><b style="font-size:15px;border-bottom:1px solid #333;padding-bottom:26px;width:160px;flex:none">Signature</b></div></div>
     </div>
@@ -1361,7 +1360,7 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
       if(f){Object.assign(h,v,{etat:$('#hEtat').value,mod:Date.now()});if(mo!==f.mo){HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);(HTL[mo]=HTL[mo]||[]).push(h)}saveHt(mo)}
       else{out={id:'ht'+Date.now().toString(36),...v,etat:'',ts:Date.now()};(HTL[mo]=HTL[mo]||[]).push(out);saveHt(mo)}
       closeInfo();refresh();toast(v.arr>todayS()?'Client enregistré ✔ — arrive le '+frD(v.arr)+', la chambre reste libre d\'ici là':'Client enregistré ✔');return out};
-    $('#hBook').onchange=e=>{$('#hBookBan').style.display=$('#hBookM').style.display=e.target.checked?'':'none'};$('#hBkM').oninput=()=>{const m=+$('#hBkM').value;$('#hBkTxt').textContent=m?' : CHF '+m.toFixed(2):''};
+    $('#hBook').onchange=e=>{$('#hBookM').style.display=e.target.checked?'':'none'};
     $('#hOk').onclick=()=>save();$('#hPrint').onclick=()=>{const r=save();if(r)printFiche(r)};
     if(f&&$('#hPay'))$('#hPay').onclick=()=>{closeInfo();payMonth(h)};
     if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
