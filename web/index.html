@@ -280,6 +280,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
       <span class="grow"></span>
       <button class="adm-only btn sec sm" id="plImport">📥 Importer</button>
       <button class="btn sec sm" id="plPrint">🖨 Imprimer / partager</button>
+      <button class="btn sec sm adm-only" id="plHours">⏱ Heures par personne</button>
 
     </div>
     <p class="meta" id="plHelp">Horaires prévus de chacun. Le retard est calculé automatiquement à l'arrivée.</p>
@@ -1652,6 +1653,24 @@ function renderPlan(){const m=plWeek,p=PLAN[m]||{},T=todayS();
   $('#plPapers').innerHTML=H.map(({x,i})=>`<div class="paper" data-i="${i}"><img data-ph="${x.photo}"><div><b>Feuille d'horaires</b><br><span class="meta">${esc(x.by)} · ${frD(ymd(new Date(x.ts)))}</span></div></div>`).join('');
   $('#plPapers').querySelectorAll('img[data-ph]').forEach(async im=>{im.src=await photoGet(im.dataset.ph)||''});
   $('#plPapers').querySelectorAll('.paper').forEach(el=>el.onclick=()=>{curWeek=m;showPaper(+el.dataset.i)})}
+/* heures planifiées par personne et par semaine — visible seulement par l'administrateur */
+function plHours(m){const p=PLAN[m]||{};return CFG.users.map(u=>{let brut=0,net=0,jours=0,fait=0;
+  for(let i=1;i<=7;i++){const d=addD(m,i-1),S=parseShift((p[u.id]||{})[i]||'')||[];if(S.length){jours++;const t=S.reduce((a,[x,y])=>a+(y-x),0);brut+=t;
+      net+=t-(S.length===1&&(u.pmode||'aucune')==='regle'?(t>480?60:t>=300?15:0):0)}
+    for(const e of PTS[d]||[])if(e.uid===u.id)fait+=countedDur(d,e)/60000}
+  return{u,brut,net,jours,fait:Math.round(fait)}}).filter(x=>x.jours||x.fait)}
+const hTxt=m=>Math.floor(m/60)+'h'+pad(Math.round(m%60));
+function showHours(m){const L=plHours(m),tot=k=>L.reduce((a,x)=>a+x[k],0),past=m<=todayS(),TD='style="padding:6px 8px;border-bottom:1px solid var(--line);text-align:right"';
+  info(`<h2>⏱ Heures planifiées — semaine ${isoWeek(m)}</h2><p class="meta">du ${frD(m)} au ${frD(addD(m,6))}</p>
+    <div class="row" style="gap:8px;margin:6px 0"><button class="btn ghost sm" id="hwP">◀ Semaine d'avant</button><span class="grow"></span><button class="btn ghost sm" id="hwN">Semaine d'après ▶</button></div>
+    ${L.length?`<table style="width:100%;border-collapse:collapse;font-size:15px"><tr style="background:#f1f5f9"><th style="text-align:left;padding:6px 8px">Personne</th><th ${TD}>Jours</th><th ${TD}>Prévues</th><th ${TD}>Après pauses</th>${past?`<th ${TD}>Pointées</th>`:''}</tr>
+    ${L.map(x=>`<tr><td style="padding:6px 8px;border-bottom:1px solid var(--line)"><b>${esc(x.u.nom)}</b></td><td ${TD}>${x.jours}</td><td ${TD}><b>${hTxt(x.brut)}</b></td><td ${TD}>${hTxt(x.net)}</td>${past?`<td ${TD}>${x.fait?hTxt(x.fait):'—'}</td>`:''}</tr>`).join('')}
+    <tr style="background:#f1f5f9;font-weight:700"><td style="padding:6px 8px">Total</td><td ${TD}>${tot('jours')}</td><td ${TD}>${hTxt(tot('brut'))}</td><td ${TD}>${hTxt(tot('net'))}</td>${past?`<td ${TD}>${hTxt(tot('fait'))}</td>`:''}</tr></table>
+    <p class="meta" style="margin-top:6px">« Après pauses » : pause déduite selon la règle de chaque compte (15 min dès 5 h, 1 h au-delà de 8 h, sauf horaire coupé). Les 15 min de repas ne sont pas comptées ici car on ne les connaît qu'au départ.${past?' « Pointées » : heures réellement comptées à la pointeuse.':''}</p>`
+    :'<p class="meta">Aucun horaire prévu cette semaine.</p>'}
+    <div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ghost" id="iClose">Fermer</button></div>`,
+  ()=>{$('#hwP').onclick=()=>showHours(addD(m,-7));$('#hwN').onclick=()=>showHours(addD(m,7))})}
+$('#plHours').onclick=async()=>{if(RESTRICT())return;if(!MAIN()&&!await askAuth('Heures par personne',['admin'],'Réservé à l\'administrateur'))return;showHours(plWeek)};
 $('#plPrev').onclick=()=>{plWeek=addD(plWeek,-7);renderPlan()};
 $('#plNext').onclick=()=>{plWeek=addD(plWeek,7);renderPlan()};
 $('#plEditBtn').onclick=async()=>{if(plEdit){plEdit=false;return renderPoint()}
