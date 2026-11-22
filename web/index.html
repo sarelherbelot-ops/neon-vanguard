@@ -123,6 +123,7 @@ h2{font-size:19px;margin:0}
 .sheet td.tv{min-width:52px;text-align:center;cursor:pointer;font-weight:700}
 .sheet tr.today td{outline:2px solid var(--navy);outline-offset:-2px}
 .sheet td.tv.ko{background:var(--red2);color:var(--red);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body.restricted .adm-only,body.restricted nav button[data-v=params],body.restricted #updBar{display:none!important}
 @media print{.sheet{font-size:9px}.sheet td.ck{height:20px;width:22px;font-size:11px}.sheet td.sg{height:22px;width:80px}.sheet td.sg svg{width:76px;height:20px}.sheet td,.sheet th{padding:2px 3px}}
 /* planning */
 .pltab{width:100%;border-collapse:collapse;font-size:14px}
@@ -161,7 +162,7 @@ h2{font-size:19px;margin:0}
 </head>
 <body>
 <header>
-  <h1 id="titre">Plan de nettoyage & d'hygiène</h1><span id="verTag" style="font-size:12px;opacity:.7"></span><span id="syncDot" style="font-size:14px;cursor:pointer" title=""></span><button class="btn sec sm hidden" id="sync2" style="margin-left:8px">🔄 Synchroniser les 2 appareils</button>
+  <h1 id="titre">Plan de nettoyage & d'hygiène</h1><span id="verTag" style="font-size:12px;opacity:.7"></span><span id="syncDot" style="font-size:14px;cursor:pointer" title=""></span><button class="btn sec sm hidden" id="sync2" style="margin-left:8px">🔄 Synchroniser tous les appareils</button>
   <nav>
     <button data-v="jour" class="on">📋 Aujourd'hui</button>
     <button data-v="point">⏱ Pointeuse</button>
@@ -274,10 +275,10 @@ h2{font-size:19px;margin:0}
       <button class="btn ghost sm" id="plNext">›</button>
     </div>
     <div class="row" style="margin-top:8px">
-      <button class="btn sec sm" id="plEditBtn">✏️ Modifier le planning</button>
-      <button class="btn ghost sm hidden" id="plCopy">Copier la semaine précédente</button>
+      <button class="adm-only btn sec sm" id="plEditBtn">✏️ Modifier le planning</button>
+      <button class="adm-only btn ghost sm hidden" id="plCopy">Copier la semaine précédente</button>
       <span class="grow"></span>
-      <button class="btn sec sm" id="plImport">📥 Importer</button>
+      <button class="adm-only btn sec sm" id="plImport">📥 Importer</button>
       <button class="btn sec sm" id="plPrint">🖨 Imprimer / partager</button>
 
     </div>
@@ -295,7 +296,7 @@ h2{font-size:19px;margin:0}
       <label class="grow">Du<input type="date" id="phFrom"></label>
       <label class="grow">Au<input type="date" id="phTo"></label>
       <label class="grow">Compte<select id="phUser"></select></label>
-      <button class="btn sec" id="phImport" style="margin-top:18px">📥 Importer</button>
+      <button class="adm-only btn sec" id="phImport" style="margin-top:18px">📥 Importer</button>
       <button class="btn sec" id="phPdf" style="margin-top:18px">🖨 Imprimer / PDF</button>
       <button class="btn sec" id="phCsv" style="margin-top:18px">⬇ Excel</button>
     </div>
@@ -341,7 +342,7 @@ h2{font-size:19px;margin:0}
   <div class="card"><h2>🧳 Départs</h2><div id="htDep"></div></div>
   <div class="card"><h2>🏨 Clients présents</h2><div id="htIn"></div></div>
   <div class="card"><h2>📅 Arrivées des 7 prochains jours</h2><div id="htNext7"></div></div>
-  <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="btn sec" id="htTxBtn">Modifier</button></div></div>
+  <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="adm-only btn sec" id="htTxBtn">Modifier</button></div></div>
 </section>
 <section id="v-cmd" class="hidden">
   <div class="card">
@@ -350,7 +351,7 @@ h2{font-size:19px;margin:0}
       <label style="width:190px">Date<input type="date" id="cmDate"></label>
       <div class="grow"><b>Statut :</b> <label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt1" style="width:auto"> À commander</label><label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt2" style="width:auto"> Validé patron</label><label class="row" style="display:inline-flex;gap:6px"><input type="checkbox" id="cmSt3" style="width:auto"> Transmis à la direction</label></div>
     </div>
-    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="btn ghost" id="cmEdit">✏️ Modifier la liste</button><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
+    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="adm-only btn ghost" id="cmEdit">✏️ Modifier la liste</button><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
   </div>
   <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
   <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
@@ -490,6 +491,9 @@ h2{font-size:19px;margin:0}
 
 <!-- Modale connexion -->
 <div id="mAuth" class="modal hidden"><div class="card" style="max-width:460px">
+  <div id="aJoinBox" class="hidden" style="background:#ecfdf5;border:2px solid #16a34a;border-radius:12px;padding:12px;margin-bottom:12px">
+    <b style="font-size:17px">👤 Employé, ou appareil en plus (téléphone, PC, iPhone…)</b><p class="meta" style="margin:4px 0 8px">Ton responsable t'a donné un mot de passe : connecte-toi au compte du restaurant.</p>
+    <button class="btn ok" id="aJoin2" style="width:100%;font-size:17px">☁️ Se connecter au compte du restaurant</button></div>
   <h2 id="aTitle">Connexion</h2>
   <p class="meta" id="aSub"></p>
   <label id="aNameL" class="hidden">Ton nom (administrateur)<input id="aName" autocomplete="off"></label>
@@ -592,14 +596,14 @@ function askAuth(titre,roles,sub){return new Promise(res=>{
     if(!await checkPwd(u,$('#aPwd').value))return toast('Mot de passe incorrect');done(u)};
 })}
 /* création du mot de passe administrateur au premier lancement */
-function firstAdmin(){return new Promise(res=>{const a=CFG.users.find(u=>u.role==='admin');faResolve=res;$('#aJoin').classList.remove('hidden');$('#aJoin').onclick=()=>{$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');openSyncModal(true)};
-  $('#aTitle').textContent='Bienvenue — créer le compte administrateur';
+function firstAdmin(){return new Promise(res=>{const a=CFG.users.find(u=>u.role==='admin');faResolve=res;$('#aJoinBox').classList.remove('hidden');$('#aJoin2').onclick=()=>$('#aJoin').onclick();$('#aJoin').onclick=()=>{$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');openSyncModal(true)};
+  $('#aTitle').textContent='Ou : nouveau restaurant — créer le compte administrateur';
   $('#aSub').textContent='Ce compte donne accès aux réglages : employés, tâches, frigos… Tout se remplit ensuite dans Réglages.';
   $('#aUser').innerHTML=`<option value="${a.id}">${esc(a.nom)} — Administrateur</option>`;
   $('#aPwd').value=$('#aPwd2').value='';$('#aPwd2Lbl').classList.remove('hidden');$('#aCancel').classList.add('hidden');$('#aNameL').classList.remove('hidden');$('#aName').value=a.nom==='Administrateur'?'':a.nom;$('#aUser').parentElement.classList.add('hidden');$('#mAuth').classList.remove('hidden');
   $('#aOk').onclick=async()=>{const p1=$('#aPwd').value,p2=$('#aPwd2').value;
     const nm=$('#aName').value.trim();if(!nm)return toast('Écris ton nom');if(p1.length<4)return toast('4 caractères minimum');if(p1!==p2)return toast('Les deux mots de passe sont différents');a.nom=nm;$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');
-    await setPwd(a,p1);put('cfg',CFG);faResolve=null;$('#aJoin').classList.add('hidden');$('#mAuth').classList.add('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');
+    await setPwd(a,p1);put('cfg',CFG);faResolve=null;$('#aJoin').classList.add('hidden');$('#aJoinBox').classList.add('hidden');$('#mAuth').classList.add('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');
     toast('Mot de passe créé ✔ — crée ceux des employés dans Réglages');res()}})}
 
 /* ===================== LOGIQUE ===================== */
@@ -685,9 +689,9 @@ window.addEventListener('resize',()=>{if(!$('#mSign').classList.contains('hidden
 /* ===================== NAVIGATION ===================== */
 let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFullYear(),calM=new Date().getMonth();
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
-function show(v){VIEW=v;if(v!=='point')plEdit=false;
+function show(v){if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  ['jour','point','semaine','cal','resa','hotel','cmd','chat','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+    ['jour','point','semaine','cal','resa','hotel','cmd','chat','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
   if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
@@ -883,7 +887,9 @@ function printRecep(list){const months=[...new Set(list.map(m=>m.slice(0,7)))];
 function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after()}
 function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
-function refresh(){chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmdTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
+function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false;const u=(CFG.users||[]).find(x=>x.nom.trim().toLowerCase()===a.user);return!(u&&u.role==='admin')}
+function applyRestrict(){const r=RESTRICT();document.body.classList.toggle('restricted',r);if(r&&VIEW==='params')show('jour')}
+function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -1134,7 +1140,7 @@ function renderCmd(){document.querySelectorAll('#cmZones button').forEach(b=>b.c
   document.querySelectorAll('[data-idl]').forEach(el=>el.onclick=()=>{const[ci,ii]=el.dataset.idl.split('|'),c=CAT(ci),it=c.items.find(x=>x.id===ii);if(confirm('Supprimer « '+it.nom+' » de la liste ?')){c.items=c.items.filter(x=>x.id!==ii);sv()}});
   document.querySelectorAll('[data-iup]').forEach(el=>el.onclick=()=>{const[ci,j]=el.dataset.iup.split('|'),c=CAT(ci),k=+j;if(k>0){[c.items[k-1],c.items[k]]=[c.items[k],c.items[k-1]];sv()}});
   if($('#cmNewCat'))$('#cmNewCat').onclick=()=>{const v=prompt('Nom de la nouvelle rubrique :');if(!v||!v.trim())return;const cols=['#0e7490','#a16207','#7f1d1d','#15803d','#4c1d95','#c2410c','#334155'];const L=CFG.cmdCat[cmZone];L.push({id:cmZone[0]+'n'+Date.now().toString(36),nom:v.trim(),col:cols[L.length%cols.length],items:[]});sv()};
-  $('#cmEdit').textContent=cmEd?'✔ Terminer les modifications':'✏️ Modifier la liste';$('#cmEdit').className='btn '+(cmEd?'ok':'ghost');
+  $('#cmEdit').textContent=cmEd?'✔ Terminer les modifications':'✏️ Modifier la liste';$('#cmEdit').className='adm-only btn '+(cmEd?'ok':'ghost');
   document.querySelectorAll('[data-ci]').forEach(el=>el.onchange=()=>{const o=cmGet();o.items=o.items||{};const x=o.items[el.dataset.ci]=o.items[el.dataset.ci]||{};x.c=el.checked;el.nextElementSibling.style.fontWeight=el.checked?'700':'';cmSave(o)});
   document.querySelectorAll('[data-cq]').forEach(el=>el.oninput=()=>{const o=cmGet();o.items=o.items||{};const x=o.items[el.dataset.cq]=o.items[el.dataset.cq]||{};x.q=el.value;if(el.value.trim()&&!x.c){x.c=true;const cb=document.querySelector(`[data-ci="${el.dataset.cq}"]`);cb.checked=true;cb.nextElementSibling.style.fontWeight='700'}cmSave(o)});
   document.querySelectorAll('[data-cadd]').forEach(el=>el.onclick=()=>{const v=prompt('Nom du nouvel article :');if(!v||!v.trim())return;const c=CFG.cmdCat[cmZone].find(x=>x.id===el.dataset.cadd);c.items.push({id:c.id+'_n'+Date.now().toString(36),nom:v.trim()});put('cfg',CFG);renderCmd()})}
@@ -1478,7 +1484,7 @@ $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new F
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
-function applyCfg(){setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
+function applyCfg(){setTimeout(applyRestrict,0);setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
 
 /* ===================== POINTEUSE ===================== */
 let PTS={}; // PTS[date] = [{id,uid,nom,in,out,photo}]
@@ -1964,7 +1970,7 @@ async function cloudLogin(nom,pw,adminOk,compte){const id=nom.trim().toLowerCase
   try{salt=(await rl('/salt?u='+encodeURIComponent(id),{acc:{},ns})).salt}
   catch(e){
     if(e.status===404&&e.j&&e.j.error==='no_account'){
-      if(!adminOk)throw new Error('Aucun compte en ligne pour l\'instant : active d\'abord la sauvegarde sur le premier appareil (Réglages, avec le compte administrateur)');
+      if(!adminOk||((compte||'').trim()&&(compte||'').trim().toLowerCase()!==id))throw new Error('Aucun compte en ligne pour l\'instant : active d\'abord la sauvegarde sur le premier appareil (Réglages, avec le compte administrateur)');
       DK=rnd(32);const cle={v:1,users:{}},table={};const ak=await wrapUser(nom,pw,cle,table);
       const acc={user:id,auth:ak,cle,authTable:table,ns};await rl('/init',{method:'POST',body:{auth:table,cle},acc:{},ns});
       localStorage.setItem('pn_acc',JSON.stringify(acc));localStorage.setItem('pn_dk',DK);GH={seq:0,revs:{}};saveGH();CLOUD.__gh=GH;await markAllOut(true);return'created'}
@@ -2017,7 +2023,7 @@ async function followMain(){if(!cloudOn())return toast('Connecte d\'abord la sau
 async function syncBoth(){const b=$('#sync2');if(!cloudOn())return openSyncModal();if(b.disabled)return;b.disabled=true;const lab=b.textContent;
   try{b.textContent='🔄 Envoi…';await fullSync(true);const rq=lastRq;b.textContent='🔄 Attente de l\'autre appareil…';let ok=null;
     for(let i=0;i<20&&!ok;i++){await new Promise(r=>setTimeout(r,3000));await syncOnce();if(DV.ack&&DV.ack.ts===rq)ok=DV.ack}
-    if(ok){await syncOnce();refresh();toast('✔ Les 2 appareils sont synchronisés ('+esc(ok.n||'autre appareil')+')')}
+    if(ok){await syncOnce();refresh();toast('✔ Appareils synchronisés ('+esc(ok.n||'autre appareil')+')')}
     else toast(LASTERR?'⚠ '+LASTERR:'✔ Cet appareil est à jour. L\'autre appareil n\'a pas répondu : ouvre l\'appli dessus, il se mettra à jour tout seul.')}
   catch(e){toast('⚠ '+errTxt(e))}finally{b.disabled=false;b.textContent=lab}}
 function errTxt(e){if(!e)return'?';if(e.name==='AbortError')return'serveur trop lent (délai dépassé)';if(e.name==='TypeError')return'pas d\'internet ou serveur injoignable';if(e.status)return'serveur '+e.status+' '+(e.message||'');return(e.name||'')+' '+(e.message||String(e))}
@@ -2032,7 +2038,7 @@ document.addEventListener('visibilitychange',()=>{if(cloudOn())syncOnce()});
 
 function devList(){const L=Object.entries(DV).filter(([k,v])=>k!=='rq'&&v&&v.ts).sort((a,b)=>b[1].ts-a[1].ts);if(!L.length)return'<p class="meta">Aucun autre appareil vu pour l\'instant (il apparaît dans les 2 minutes après l\'ouverture de l\'appli dessus).</p>';
   return L.map(([k,v])=>{const m=Math.round((Date.now()-v.ts)/60000);return`<p class="meta">${k===DEV?'👉 ':''}<b>${esc(v.n||'Appareil')}</b> · version n°${v.v||'?'} · ${m<1?'à l\'instant':'vu il y a '+(m<60?m+' min':Math.round(m/60)+' h')}${v.m?' · principal':v.f?' · suit le téléphone':''}${v.out?' · '+v.out+' en attente':''}${k===DEV?' (cet appareil)':''}</p>`}).join('')}
-function openSyncModal(fromStart){
+function openSyncModal(fromStart){if(cloudOn()&&RESTRICT()){info(`<h2>☁️ Synchronisation</h2><p><b>✔ Connecté</b> en tant que <b>${esc(ACC().user)}</b>.</p><p class="meta">${esc($('#syncDot').title||'')}</p><p class="meta">Tout se synchronise automatiquement. Les réglages sont réservés au responsable.</p><div class="row"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`);return}
   const on=cloudOn();
   info(`<h2>☁️ Sauvegarde en ligne</h2>
     <p class="meta">Tout est sauvegardé automatiquement et chiffré avec ton mot de passe. Sur un autre appareil ou après une réinstallation : connecte-toi avec le même compte et tout revient.</p>
@@ -2047,13 +2053,15 @@ function openSyncModal(fromStart){
     <label>Mot de passe<input id="cgPwd" type="password" autocomplete="off"></label>
     <label>Nom de cet appareil<input id="cgDev" value="${esc(localStorage.getItem('pn_devname')||(fromStart?'Téléphone':'Tablette'))}"></label>
     <p class="meta" id="syncStatus"></p>`}
-    <div class="row" style="margin-top:10px">${on?'<button class="btn danger" id="cgOff">Déconnecter cet appareil</button><button class="btn sec" id="cgNow">Synchroniser maintenant</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Fermer</button>${on?'':'<button class="btn ok" id="cgOk">Se connecter</button>'}</div>`,
+    <div class="row" style="margin-top:10px">${on?'<button class="btn danger" id="cgOff">Déconnecter cet appareil</button><button class="btn sec" id="cgNow">Synchroniser maintenant</button>':'<button class="btn ghost" id="cgWipe" style="color:#dc2626">🗑 Vider cet appareil</button>'}<span class="grow"></span><button class="btn ghost" id="iClose">Fermer</button>${on?'':'<button class="btn ok" id="cgOk">Se connecter</button>'}</div>`,
   ()=>{const ok=$('#cgOk');if(ok)ok.onclick=async()=>{const nom=$('#cgUser').value.trim(),pw=$('#cgPwd').value;if(!nom||!pw)return toast('Compte et mot de passe obligatoires');
       localStorage.setItem('pn_devname',$('#cgDev').value.trim()||'Appareil');$('#syncStatus').textContent='Connexion… (jusqu\'à 1 minute la première fois)';ok.disabled=true;
       const lu=(CFG.users||[]).find(u=>u.nom.trim().toLowerCase()===nom.toLowerCase()&&u.hash);
       let localOk=false;if(lu){localOk=await checkPwd(lu,pw);if(!localOk&&!fromStart){ok.disabled=false;$('#syncStatus').textContent='Mot de passe incorrect';return}}
       try{const r=await cloudLogin(nom,pw,localOk&&lu.role==='admin',($('#cgAcc')||{}).value||'');closeInfo();toast(r==='created'?'Sauvegarde en ligne activée ✔ — envoi des données…':'Connecté ✔ — récupération des données…');startSync()}
       catch(e){ok.disabled=false;$('#syncStatus').textContent=e.message||String(e);toast(e.message||'Erreur')}};
+    const wp=$('#cgWipe');if(wp)wp.onclick=async()=>{if(!confirm('Effacer toutes les données de CET appareil et repartir de zéro ? (Les autres appareils et la sauvegarde en ligne ne sont pas touchés.)'))return;
+      try{await clearAll()}catch(e){}localStorage.clear();location.reload()};
     const off=$('#cgOff');if(off)off.onclick=async()=>{closeInfo();if(!await askAuth('Déconnecter la sauvegarde en ligne',['admin']))return;
       localStorage.removeItem('pn_dk');localStorage.removeItem('pn_acc');clearInterval(syncTimer);DK=null;setSync('off');toast('Déconnecté')};
     const md=$('#cgMainDev');if(md)md.onchange=e=>{localStorage.setItem('pn_main',e.target.checked?'1':'0');if(localStorage.getItem('pn_bg')==null)setTimeout(bgApply,300);if(e.target.checked){localStorage.setItem('pn_follow','0');$('#cgFollow').checked=false}devT=0;kick();toast(e.target.checked?'Cet appareil est le principal':'Cet appareil n\'est plus le principal')};
@@ -2069,7 +2077,7 @@ async function checkUpdate(manual){try{const r=await fetch(UPD+'version.txt?t='+
     const n=parseInt((await r.text()).trim())||0;
     if(n>APPV&&native())showUpdate('n° '+n,'https://github.com/sarelherbelot-ops/neon-vanguard/raw/plan-nettoyage-apk/PlanNettoyage.apk');else if(manual)toast('Appli à jour (n° '+APPV+')')}
   catch(e){if(manual)toast('Pas de connexion internet')}}
-function showUpdate(tag,url){let b=$('#updBar');if(!b){b=document.createElement('div');b.id='updBar';
+function showUpdate(tag,url){if(RESTRICT())return;let b=$('#updBar');if(!b){b=document.createElement('div');b.id='updBar';
     b.style.cssText='background:#1d4ed8;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';document.body.insertBefore(b,$('main'))}
   b.innerHTML=`<b class="grow">🔄 Nouvelle version ${esc(tag)} disponible</b><button class="btn sm" style="background:#fff;color:#1d4ed8" id="updGo">Télécharger et installer</button><button class="btn sm ghost" id="updLater">Plus tard</button>`;
   $('#updGo').onclick=()=>{if(native()&&Android.openUrl)Android.openUrl(url);else open(url,'_blank');toast('Ouvre le fichier téléchargé pour installer')};
