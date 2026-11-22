@@ -339,7 +339,8 @@ h2{font-size:19px;margin:0}
   <div class="card"><h2>🧳 Départs</h2><div id="htDep"></div></div>
   <div class="card"><h2>🏨 Clients présents</h2><div id="htIn"></div></div>
   <div class="card"><h2>📅 Arrivées des 7 prochains jours</h2><div id="htNext7"></div></div>
-  <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="btn sec" id="htTxBtn">Modifier</button></div></div>
+  <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="btn sec" id="htTxBtn">Modifier</button></div>
+    <div class="row" style="margin-top:8px"><div class="grow"><b>En-tête des factures</b><div class="meta" id="htFsTxt"></div></div><button class="btn sec" id="htFsBtn">Modifier</button></div></div>
 </section>
 <section id="v-params" class="hidden">
   <div class="card" id="lockBox">
@@ -1083,6 +1084,34 @@ function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>
     if($('#mnNew'))$('#mnNew').onclick=()=>{closeInfo();editHotel(null,{arr:d,dep:addD(d,1),ch:n})}})}
 function roomsToClean(){return(CFG.rooms||[]).filter(r=>roomState(r.n,todayS()).sale)}
 
+/* ---- facture d'un séjour ---- */
+function factureNum(h){if(h.factNo)return h.factNo;const y=h.arr.slice(0,4);CFG.factSeq=CFG.factSeq||{};CFG.factSeq[y]=(CFG.factSeq[y]||0)+1;put('cfg',CFG);
+  h.factNo=y+'-'+String(CFG.factSeq[y]).padStart(3,'0');saveHt(h.arr.slice(0,7));return h.factNo}
+async function factureOut(h){if(!CFG.factEtab){await factSettings();if(!CFG.factEtab)return}
+  const no=factureNum(h),P=htPrix(h),T='style="border:1px solid #999;padding:6px 8px;text-align:left"',R='style="border:1px solid #999;padding:6px 8px;text-align:right"';
+  $('#printArea').innerHTML=`<style>@page{size:A4;margin:14mm}</style><div class="pg" style="font-size:12px">
+    <div style="display:flex;justify-content:space-between;gap:20px"><div style="white-space:pre-line"><b style="font-size:16px">${esc(CFG.factEtab)}</b>\n${esc(CFG.factAdr||'')}</div>
+      <div style="text-align:right"><h1 style="font-size:22px;margin:0">FACTURE</h1>N° ${esc(no)}<br>Date : ${frD(todayS())}</div></div>
+    <div style="margin:22px 0 14px 55%;white-space:pre-line"><b>${esc(h.nom)}</b>${h.adr?'\n'+esc(h.adr):''}${h.mail?'\n'+esc(h.mail):''}</div>
+    <p>Séjour chambre <b>${esc(h.ch)}</b> du <b>${frD(h.arr)}</b> au <b>${isRes(h)?frD(todayS()):frD(h.dep)}</b> · ${h.nb||'?'} personne(s)</p>
+    <table style="border-collapse:collapse;width:100%"><tr><th ${T}>Désignation</th><th ${R}>Quantité</th><th ${R}>Prix unitaire</th><th ${R}>Montant</th></tr>
+      <tr><td ${T}>Nuitée chambre ${esc(h.ch)}</td><td ${R}>${P.n}</td><td ${R}>${eur(h.prix)}</td><td ${R}>${eur(P.ch)}</td></tr>
+      ${P.tx?`<tr><td ${T}>Taxe de séjour (${P.tp} pers. × ${P.n} nuit(s))</td><td ${R}>${P.tp*P.n}</td><td ${R}>${eur(taxeTaux())}</td><td ${R}>${eur(P.tx)}</td></tr>`:''}
+      <tr><td ${T} colspan="3"><b>TOTAL</b></td><td ${R}><b>${eur(P.tot)}</b></td></tr>
+      <tr><td ${T} colspan="3">Déjà payé</td><td ${R}>${eur(P.pay)}</td></tr>
+      <tr><td ${T} colspan="3"><b>${P.reste>0?'Reste à payer':'Soldé'}</b></td><td ${R}><b>${eur(Math.max(0,P.reste))}</b></td></tr></table>
+    ${CFG.factMention?`<p style="margin-top:18px;white-space:pre-line;font-size:10px;color:#444">${esc(CFG.factMention)}</p>`:''}<p style="margin-top:24px">Merci de votre séjour.</p></div>`;
+  const t='Facture '+no+' — '+h.nom;
+  if(native()&&Android.mailPdf&&h.mail){info(`<h2>🧾 Facture ${esc(no)}</h2><p>Pour ${esc(h.nom)} · ${eur(P.tot)}</p><div class="row" style="flex-direction:column;align-items:stretch;gap:8px"><button class="btn ok" id="fMail">✉ Envoyer à ${esc(h.mail)}</button><button class="btn sec" id="fPrint">🖨 Imprimer / partager</button><button class="btn ghost" id="iClose">Annuler</button></div>`,
+    ()=>{$('#fMail').onclick=()=>{closeInfo();toast('Préparation de la facture…');setTimeout(()=>Android.mailPdf(t,0,h.mail,'Bonjour,\n\nVeuillez trouver ci-joint la facture de votre séjour.\n\nMerci et à bientôt.\n'+CFG.factEtab),250)};$('#fPrint').onclick=()=>{closeInfo();outDoc(t,0)}});return}
+  outDoc(t,0)}
+function factSettings(){return new Promise(res=>info(`<h2>🧾 En-tête des factures</h2><p class="meta">Ces informations apparaissent en haut de chaque facture.</p>
+  <label>Nom de l'établissement<input id="fsE" value="${esc(CFG.factEtab||'')}"></label>
+  <label>Adresse, téléphone, e-mail<textarea id="fsA" rows="3">${esc(CFG.factAdr||'')}</textarea></label>
+  <label>Mentions en bas (n° IDE/TVA, IBAN…)<textarea id="fsM" rows="2">${esc(CFG.factMention||'')}</textarea></label>
+  <div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="fsOk">Enregistrer</button></div>`,
+  ()=>{$('#iClose').onclick=()=>{closeInfo();res()};$('#fsOk').onclick=()=>{CFG.factEtab=$('#fsE').value.trim();CFG.factAdr=$('#fsA').value.trim();CFG.factMention=$('#fsM').value.trim();put('cfg',CFG);closeInfo();res()}}))}
+
 /* ===================== HÔTEL ===================== */
 let htDay=todayS();
 function htAll(){const L=[];for(const mo in HTL)for(const h of HTL[mo]||[])L.push(h);return L}
@@ -1100,8 +1129,8 @@ function htRow(h,mode){const n=nuits(h),done=h.etat==='parti'||h.etat==='annule'
     <div style="min-width:86px;text-align:center"><div class="meta" style="margin:0">Chambre</div><div style="font-size:22px;font-weight:800">${esc(h.ch||'?')}</div></div>
     <div class="grow"><div style="font-size:17px;font-weight:700">${esc(h.nom)} <span class="meta" style="font-weight:600">· ${h.nb||'?'} pers.</span> ${h.etat?`<span class="meta">${HETAT[h.etat]}</span>`:''}</div>
       <div class="meta" style="margin:2px 0">Arrivée <b>${JOURS[wd(h.arr)].slice(0,3)} ${frD(h.arr)}</b>${h.heure?' vers '+esc(h.heure):''} → départ <b>${depTxt(h)}</b> · ${isRes(h)?'depuis '+n+' nuit'+(n>1?'s':''):n+' nuit'+(n>1?'s':'')}</div>
-      <div>${telLink(h.tel)}${h.note?` <span class="meta">— ${esc(h.note)}</span>`:''}</div>
-      ${+h.prix?(()=>{const P=htPrix(h);return`<div style="margin-top:2px;font-weight:700">💶 ${eur(P.tot)}${P.tx?` <span class="meta" style="font-weight:500">(dont taxe de séjour ${eur(P.tx)})</span>`:h.sansTaxe?' <span class="meta" style="font-weight:500">(sans taxe de séjour)</span>':''} · ${P.reste<=0?'<span style="color:#16a34a">✔ payé</span>':`<span style="color:#dc2626">reste à payer ${eur(P.reste)}</span>`}</div>`})():''}</div></div>`}
+      <div>${telLink(h.tel)}${h.mail?` <span class="meta">✉ ${esc(h.mail)}</span>`:''}${h.note?` <span class="meta">— ${esc(h.note)}</span>`:''}</div>
+      ${+h.prix?(()=>{const P=htPrix(h);return`<div style="margin-top:2px;font-weight:700">💶 ${eur(P.tot)}${P.tx?` <span class="meta" style="font-weight:500">(dont taxe de séjour ${eur(P.tx)})</span>`:h.sansTaxe?' <span class="meta" style="font-weight:500">(sans taxe de séjour)</span>':''} · ${h.facture?'🧾 avec facture':'sans facture'} · ${P.reste<=0?'<span style="color:#16a34a">✔ payé</span>':`<span style="color:#dc2626">reste à payer ${eur(P.reste)}</span>`}</div>`})():''}</div></div>`}
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
@@ -1113,6 +1142,7 @@ function renderHotel(){const d=htDay,A=htAll().filter(actif);
   $('#htDep').innerHTML=dep.length?dep.map(h=>htRow(h,'dep')).join(''):'<p class="meta">Aucun départ ce jour-là.</p>';
   $('#htIn').innerHTML=pres.length?pres.map(h=>htRow(h,'in')).join(''):'<p class="meta">Aucun client cette nuit.</p>';
   let x='';for(let i=1;i<=7;i++){const j=addD(d,i),l=A.filter(h=>h.arr===j);if(l.length)x+=`<h3 style="margin:10px 0 2px">${longD(j)} — ${l.length} arrivée(s)</h3>`+l.map(h=>htRow(h,'arr')).join('')}
+  $('#htFsTxt').textContent=CFG.factEtab?CFG.factEtab:'pas encore rempli';
   $('#htTxTxt').textContent=eur(taxeTaux())+' par personne et par nuit ';
   $('#htNext7').innerHTML=x||'<p class="meta">Aucune arrivée prévue les 7 prochains jours.</p>';
   document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));bindTel($('#v-hotel'))}
@@ -1123,35 +1153,39 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
     <div class="row"><label class="grow">Arrivée<input type="date" id="hArr" value="${esc(h.arr)}"></label><label class="grow">Départ<input type="date" id="hDep" value="${isRes(h)?'':esc(h.dep)}" ${isRes(h)?'disabled':''}></label><label style="width:110px">Heure d'arrivée<input type="time" id="hHeure" value="${esc(h.heure||'')}"></label></div>
     <div class="row"><label style="width:210px">Chambre<input id="hCh" list="hChL" value="${esc(h.ch)}" placeholder="n°" autocomplete="off"><datalist id="hChL">${(CFG.rooms||[]).map(r=>`<option value="${esc(r.n)}">${esc(r.n)} — ${esc(r.t)}</option>`).join('')}</datalist></label><label style="width:110px">Personnes<input type="number" id="hNb" min="1" value="${esc(h.nb)}"></label><label class="grow">Nom du client<input id="hNom" value="${esc(h.nom)}" placeholder="ex : M. et Mme Martin" autocomplete="off"></label></div>
     <label class="row" style="gap:8px"><input type="checkbox" id="hRes" ${isRes(h)?'checked':''} style="width:auto"> 🏠 Résident : vit dans la chambre, pas de date de départ</label>
-    <label>Téléphone<input id="hTel" type="tel" value="${esc(h.tel)}" placeholder="06 12 34 56 78" autocomplete="off"></label>
+    <div class="row"><label class="grow">Téléphone<input id="hTel" type="tel" value="${esc(h.tel)}" placeholder="079 123 45 67" autocomplete="off"></label><label class="grow">E-mail<input id="hMail" type="email" value="${esc(h.mail||'')}" placeholder="client@exemple.ch" autocomplete="off"></label></div>
+    <label>Adresse (pour la facture)<input id="hAdr" value="${esc(h.adr||'')}" placeholder="rue, NPA, localité" autocomplete="off"></label>
     <label>Remarque<input id="hNote" value="${esc(h.note||'')}" placeholder="ex : lit bébé, petit-déjeuner, arrivée tardive…"></label>
     <div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px"><b>💶 Prix</b>
       <div class="row"><label style="width:150px">Prix par nuit (CHF)<input type="number" id="hPrix" min="0" step="0.5" value="${esc(h.prix||'')}" placeholder="ex : 65"></label>
         <label style="width:170px">Taxe de séjour : personnes<input type="number" id="hTaxP" min="0" value="${h.taxeP!=null&&h.taxeP!==''?esc(h.taxeP):''}" placeholder="= nb de personnes"></label>
         <label style="width:140px">Déjà payé (CHF)<input type="number" id="hPaye" min="0" step="0.5" value="${esc(h.paye||'')}" placeholder="0"></label></div>
       <label class="row" style="gap:8px"><input type="checkbox" id="hSansTx" ${h.sansTaxe?'checked':''} style="width:auto"> Sans taxe de séjour</label>
+      <div class="row" style="gap:14px;margin-top:4px"><b>🧾 Facture :</b><label class="row" style="gap:6px"><input type="radio" name="hFact" value="1" ${h.facture?'checked':''} style="width:auto"> avec facture</label><label class="row" style="gap:6px"><input type="radio" name="hFact" value="" ${h.facture?'':'checked'} style="width:auto"> sans facture</label></div>
       <div id="hTot" style="margin-top:6px;font-weight:700"></div><div class="meta">Taxe de séjour : ${eur(taxeTaux())} par personne et par nuit (modifiable en bas de l'onglet Hôtel).</div></div>
     <p class="meta" id="hNuits"></p>
     ${f?`<label>État<select id="hEtat">${Object.entries({'':'À venir','arrive':'✔ Arrivé','parti':'🧳 Parti','annule':'✖ Annulé'}).map(([k,v])=>`<option value="${k}" ${h.etat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}
-    <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
+    <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="hDel">Supprimer</button>':''}${f&&h.tel?'<button class="btn sec" id="hCall">📞 Appeler</button>':''}${f&&h.facture&&+h.prix?'<button class="btn sec" id="hFac">🧾 Facture</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="hOk">Enregistrer</button></div>`,
   ()=>{const upd=()=>{const r=$('#hRes').checked;$('#hDep').disabled=r;const a=$('#hArr').value,b=$('#hDep').value;
       {const tmp={arr:a,dep:r?RESID:b,prix:$('#hPrix').value,nb:$('#hNb').value,taxeP:$('#hTaxP').value,sansTaxe:$('#hSansTx').checked,paye:$('#hPaye').value},P=htPrix(tmp,(a&&(r||b>a))?nuits(tmp):0);
        $('#hTot').innerHTML=+tmp.prix?`${P.n} nuit(s) × ${eur(tmp.prix)} = ${eur(P.ch)}${tmp.sansTaxe?' · sans taxe de séjour':` + taxe ${P.tp} pers. × ${P.n} nuit(s) × ${eur(taxeTaux())} = ${eur(P.tx)}`}<br>Total : <span style="font-size:18px">${eur(P.tot)}</span> · payé ${eur(P.pay)} · <span style="color:${P.reste>0?'#dc2626':'#16a34a'}">${P.reste>0?'reste '+eur(P.reste):'✔ tout est payé'}</span>${r?' <span class="meta">(résident : calculé jusqu\'à aujourd\'hui)</span>':''}`:'<span class="meta">Indique le prix par nuit pour calculer le total.</span>'}
       $('#hNuits').textContent=r?'Résident : la chambre reste occupée sans date de fin.':a&&b&&b>a?nuits({arr:a,dep:b})+' nuit(s)':'⚠ La date de départ doit être après l\'arrivée'};['#hArr','#hDep','#hRes','#hSansTx'].forEach(q=>$(q).onchange=upd);['#hPrix','#hNb','#hTaxP','#hPaye'].forEach(q=>$(q).oninput=upd);upd();
-    $('#hOk').onclick=()=>{const v={arr:$('#hArr').value,dep:$('#hRes').checked?RESID:$('#hDep').value,heure:$('#hHeure').value,ch:$('#hCh').value.trim(),nb:+$('#hNb').value||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),note:$('#hNote').value.trim(),prix:+$('#hPrix').value||0,paye:+$('#hPaye').value||0,taxeP:$('#hTaxP').value===''?'':+$('#hTaxP').value,sansTaxe:$('#hSansTx').checked};
+    $('#hOk').onclick=()=>{const v={arr:$('#hArr').value,dep:$('#hRes').checked?RESID:$('#hDep').value,heure:$('#hHeure').value,ch:$('#hCh').value.trim(),nb:+$('#hNb').value||0,nom:$('#hNom').value.trim(),tel:$('#hTel').value.trim(),note:$('#hNote').value.trim(),prix:+$('#hPrix').value||0,paye:+$('#hPaye').value||0,taxeP:$('#hTaxP').value===''?'':+$('#hTaxP').value,sansTaxe:$('#hSansTx').checked,mail:$('#hMail').value.trim(),adr:$('#hAdr').value.trim(),facture:!!(document.querySelector('[name=hFact]:checked')||{}).value};
       if(!v.arr||!v.dep||!v.nom||!v.ch)return toast('Arrivée, départ, chambre et nom obligatoires');if(v.dep<=v.arr)return toast('La date de départ doit être après l\'arrivée');
       const c=htConflit(v,f?h.id:null);if(c.length&&!confirm('⚠ La chambre '+v.ch+' est déjà prise par '+c.map(x=>x.nom+' ('+frD(x.arr)+' → '+frD(x.dep)+')').join(', ')+'. Enregistrer quand même ?'))return;
       const mo=v.arr.slice(0,7);
       if(f){Object.assign(h,v,{etat:$('#hEtat').value,mod:Date.now()});if(mo!==f.mo){HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);(HTL[mo]=HTL[mo]||[]).push(h)}saveHt(mo)}
       else{(HTL[mo]=HTL[mo]||[]).push({id:'ht'+Date.now().toString(36),...v,etat:'',ts:Date.now()});saveHt(mo)}
       closeInfo();htDay=v.arr;refresh();toast('Client enregistré ✔')};
+    if(f&&$('#hFac'))$('#hFac').onclick=()=>{closeInfo();factureOut(h)};
     if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
 $('#htNew').onclick=()=>editHotel(null);
+$('#htFsBtn').onclick=async()=>{const a=await askAuth('En-tête des factures',['admin']);if(!a)return;await factSettings();renderHotel()};
 $('#htTxBtn').onclick=async()=>{const a=await askAuth('Modifier la taxe de séjour',['admin']);if(!a)return;const v=prompt('Taxe de séjour en CHF par personne et par nuit :',String(taxeTaux()).replace('.',','));if(v==null)return;const n=parseFloat(v.replace(',','.'));if(isNaN(n)||n<0)return toast('Montant invalide');CFG.taxe=n;put('cfg',CFG);renderHotel();toast('Taxe de séjour : '+eur(n))};
 $('#htPrev').onclick=()=>{htDay=addD(htDay,-1);renderHotel()};$('#htNext').onclick=()=>{htDay=addD(htDay,1);renderHotel()};
 $('#htToday').onclick=()=>{htDay=todayS();renderHotel()};$('#htDate').onchange=e=>{if(e.target.value){htDay=e.target.value;renderHotel()}};
 $('#htPrint').onclick=()=>{const d=htDay,A=htAll().filter(actif),T='style="border:1px solid #888;padding:5px 7px;text-align:left"';
-  const tab=(t,L)=>`<h2 style="font-size:15px;margin:14px 0 4px">${t} (${L.length})</h2>`+(L.length?`<table style="border-collapse:collapse;width:100%;font-size:12px"><tr><th ${T}>Chambre</th><th ${T}>Nom</th><th ${T}>Pers.</th><th ${T}>Arrivée</th><th ${T}>Départ</th><th ${T}>Nuits</th><th ${T}>Total</th><th ${T}>Reste</th><th ${T}>Téléphone</th><th ${T}>Remarque</th><th ${T}>État</th></tr>${L.map(h=>{const P=htPrix(h);return`<tr><td ${T}><b>${esc(h.ch)}</b></td><td ${T}>${esc(h.nom)}</td><td ${T}>${h.nb||''}</td><td ${T}>${frD(h.arr)}${h.heure?' '+esc(h.heure):''}</td><td ${T}>${isRes(h)?'résident':frD(h.dep)}</td><td ${T}>${nuits(h)}</td><td ${T}>${+h.prix?eur(P.tot)+(h.sansTaxe?' (sans taxe)':''):''}</td><td ${T}>${+h.prix?(P.reste>0?eur(P.reste):'payé'):''}</td><td ${T}>${esc(h.tel)}</td><td ${T}>${esc(h.note||'')}</td><td ${T}>${HETAT[h.etat||'']}</td></tr>`}).join('')}</table>`:'<p>—</p>');
+  const tab=(t,L)=>`<h2 style="font-size:15px;margin:14px 0 4px">${t} (${L.length})</h2>`+(L.length?`<table style="border-collapse:collapse;width:100%;font-size:12px"><tr><th ${T}>Chambre</th><th ${T}>Nom</th><th ${T}>Pers.</th><th ${T}>Arrivée</th><th ${T}>Départ</th><th ${T}>Nuits</th><th ${T}>Total</th><th ${T}>Reste</th><th ${T}>Téléphone</th><th ${T}>Remarque</th><th ${T}>État</th></tr>${L.map(h=>{const P=htPrix(h);return`<tr><td ${T}><b>${esc(h.ch)}</b></td><td ${T}>${esc(h.nom)}</td><td ${T}>${h.nb||''}</td><td ${T}>${frD(h.arr)}${h.heure?' '+esc(h.heure):''}</td><td ${T}>${isRes(h)?'résident':frD(h.dep)}</td><td ${T}>${nuits(h)}</td><td ${T}>${+h.prix?eur(P.tot)+(h.sansTaxe?' (sans taxe)':''):''}</td><td ${T}>${+h.prix?(P.reste>0?eur(P.reste):'payé'):''}</td><td ${T}>${esc(h.tel)}${h.mail?'<br>'+esc(h.mail):''}</td><td ${T}>${h.facture?'🧾 facture · ':''}${esc(h.note||'')}</td><td ${T}>${HETAT[h.etat||'']}</td></tr>`}).join('')}</table>`:'<p>—</p>');
   const byCh=(a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true});
   $('#printArea').innerHTML=`<style>@page{size:A4 landscape;margin:8mm}</style><div class="pg"><h1 style="font-size:19px;margin:0">Hôtel — ${longD(d)}</h1><p>${esc(CFG.nom)}</p>
     ${tab('Arrivées',A.filter(h=>h.arr===d).sort(byCh))}${tab('Départs',A.filter(h=>h.dep===d).sort(byCh))}${tab('Clients présents cette nuit',A.filter(h=>h.arr<=d&&h.dep>d&&h.etat!=='parti').sort(byCh))}</div>`;
@@ -1170,7 +1204,7 @@ function resaRow(r,big){const done=r.etat==='annule'||r.etat==='absent';
   return`<div class="row" data-rs="${r.id}" style="border:1px solid var(--line);border-left:5px solid ${r.etat==='arrive'?'#16a34a':done?'#9ca3af':'#f97316'};border-radius:10px;padding:10px 12px;margin:8px 0;cursor:pointer;${done?'opacity:.6':''}">
     <div style="font-size:${big?24:18}px;font-weight:800;min-width:78px">${esc(r.heure||'--:--')}</div>
     <div class="grow"><div style="font-size:${big?18:16}px;font-weight:700">${esc(r.nom)} <span class="meta" style="font-weight:600">· ${r.nb||'?'} pers.</span> ${r.etat?`<span class="meta">${ETAT[r.etat]}</span>`:''}</div>
-      <div>${telLink(r.tel)}${r.note?` <span class="meta">— ${esc(r.note)}</span>`:''}</div></div></div>`}
+      <div>${telLink(r.tel)}${r.mail?` <span class="meta">✉ ${esc(r.mail)}</span>`:''}${r.note?` <span class="meta">— ${esc(r.note)}</span>`:''}</div></div></div>`}
 function renderResa(){const d=rsDay,L=resaOf(d),act=L.filter(r=>r.etat!=='annule');
   $('#rsDate').value=d;$('#rsTitle').textContent=longD(d);
   $('#rsSub').textContent=act.length?`${act.length} réservation(s) · ${act.reduce((a,r)=>a+(+r.nb||0),0)} couvert(s)`:'Aucune réservation';
@@ -1183,11 +1217,11 @@ function editResa(id){const f=id?findResa(id):null,r=f?f.r:{date:rsDay,heure:'',
   info(`<h2>${f?'Réservation':'➕ Nouvelle réservation'}</h2>
     <div class="row"><label class="grow">Date<input type="date" id="rDate" value="${esc(r.date)}"></label><label class="grow">Heure<input type="time" id="rHeure" value="${esc(r.heure)}"></label><label style="width:110px">Personnes<input type="number" id="rNb" min="1" value="${esc(r.nb)}"></label></div>
     <label>Nom du client<input id="rNom" value="${esc(r.nom)}" placeholder="ex : Mme Martin" autocomplete="off"></label>
-    <label>Téléphone<input id="rTel" type="tel" value="${esc(r.tel)}" placeholder="06 12 34 56 78" autocomplete="off"></label>
+    <div class="row"><label class="grow">Téléphone<input id="rTel" type="tel" value="${esc(r.tel)}" placeholder="079 123 45 67" autocomplete="off"></label><label class="grow">E-mail<input id="rMail" type="email" value="${esc(r.mail||'')}" placeholder="client@exemple.ch" autocomplete="off"></label></div>
     <label>Remarque<input id="rNote" value="${esc(r.note||'')}" placeholder="ex : terrasse, anniversaire, chaise bébé…"></label>
     ${f?`<label>État<select id="rEtat">${Object.entries({'':'À venir','arrive':'✔ Arrivé','absent':'⚠ Pas venu','annule':'✖ Annulé'}).map(([k,v])=>`<option value="${k}" ${r.etat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}
     <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="rDel">Supprimer</button>':''}${f&&r.tel?'<button class="btn sec" id="rCall">📞 Appeler</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="rOk">Enregistrer</button></div>`,
-  ()=>{$('#rOk').onclick=()=>{const v={date:$('#rDate').value,heure:$('#rHeure').value,nom:$('#rNom').value.trim(),tel:$('#rTel').value.trim(),nb:+$('#rNb').value||0,note:$('#rNote').value.trim()};
+  ()=>{$('#rOk').onclick=()=>{const v={date:$('#rDate').value,heure:$('#rHeure').value,nom:$('#rNom').value.trim(),tel:$('#rTel').value.trim(),mail:$('#rMail').value.trim(),nb:+$('#rNb').value||0,note:$('#rNote').value.trim()};
       if(!v.date||!v.heure||!v.nom)return toast('Date, heure et nom obligatoires');
       if(f){const old=f.mo;Object.assign(r,v,{etat:$('#rEtat').value,ts:r.ts||Date.now(),mod:Date.now()});if(rsMo(v.date)!==old){RSV[old]=RSV[old].filter(x=>x.id!==r.id);saveRs(old);(RSV[rsMo(v.date)]=RSV[rsMo(v.date)]||[]).push(r)}saveRs(rsMo(v.date))}
       else{const n={id:'rs'+Date.now().toString(36),...v,etat:'',ts:Date.now()};(RSV[rsMo(v.date)]=RSV[rsMo(v.date)]||[]).push(n);saveRs(rsMo(v.date))}
