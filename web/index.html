@@ -1116,7 +1116,7 @@ function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.c
   const men=lastDep?done.find(r=>r.date>=lastDep)||null:null;
   const why=[];
   if(lastDep&&!men&&!(occ&&occ.arr>lastDep))why.push('départ');
-  {const vL=lastDone?verOf(lastDone):null;if(vL&&!vL.ok)why.push('❌ à refaire (refusée par '+vL.by+')')}
+  {const vL=lastDone?verOf(lastDone):null;if(vL&&!vL.ok)why.push('❌ à refaire (refusée par '+vL.by+')'+(vL.manque&&vL.manque.length?' — manque : '+vL.manque.join(', '):''))}
   const room=(CFG.rooms||[]).find(r=>chKey(r.n)===k);
   if(room&&room.hebdo&&!(lastDone&&lastDone.date>addD(d,-7)))why.push('ménage de la semaine');
   const P=M.filter(r=>r.prevu&&r.date<=d&&r.date>=addD(d,-14)&&!done.some(x=>x.date>=r.date&&x.ts>=r.ts-60000)).sort((a,b)=>a.date.localeCompare(b.date));
@@ -1131,6 +1131,19 @@ function roomState(n,d){const k=chKey(n),S=htAll().filter(h=>actif(h)&&chKey(h.c
 /* vérification d'un ménage : entrée séparée {verif:1,of:id du ménage,by,uid,ok} */
 function verOf(m){if(!m)return null;return menOf().filter(r=>r.verif&&r.of===m.id).sort((a,b)=>b.ts-a.ts)[0]||null}
 const locD=t=>{const x=new Date(t);return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')};
+/* ---- liste de contrôle des chambres après le ménage (tableau papier) ---- */
+const CHK={
+ double:[['🛏 Linge (sur le lit)',['2 linges de bain','2 linges à main']],['🥤 Boissons & verres',['2 bouteilles d\'eau','2 verres propres']],['☕ Coin café',['Machine à café','2 tasses + cuillères','Sucre & crème','Capsules à café']],['🚿 Salle de bain',['Papier toilette (plein)','Savon douche plein','Savon lavabo plein','Tapis dans la douche']],['📺 Télévision',['Télécommande + fiche explicative']]],
+ simple:[['🛏 Linge (sur le lit)',['1 linge de bain','1 linge à main']],['🥤 Boissons & verres',['1 bouteille d\'eau','1 verre propre']],['☕ Coin café',['Sucre & crème','Tasse / capsule selon équipement']],['🚿 Salle de bain',['Papier toilette (plein)','Savons pleins','Tapis de douche']],['📺 Télévision',['Télécommande + fiche explicative']]],
+ famille:[['🛏 Linge (sur le lit)',['3 linges de bain (4 si 4 pers.)','3 linges à main (4 si 4 pers.)']],['🥤 Boissons & verres',['3 bouteilles d\'eau','Verres propres']],['☕ Coin café / cuisine',['Machine / cuisine','3 tasses à café','Sucre & crème','Capsules à café']],['🚿 Salle de bain',['Papier toilette (plein)','Savons pleins','Tapis de douche']],['📺 Télévision',['Télécommande + fiche explicative']]]};
+function chkOf(n){const r=(CFG.rooms||[]).find(x=>chKey(x.n)===chKey(n)),t=((r&&r.t)||'').toLowerCase();return CHK[/famil|3 lits/.test(t)?'famille':/simple/.test(t)?'simple':'double']}
+function roomChecklist(n,ok){return new Promise(res=>{const G=chkOf(n);let k=0;
+  info(`<h2>${ok?'🔍 Contrôle':'❌ À refaire'} — chambre ${esc(n)}</h2><p class="meta">${ok?'Coche chaque chose vérifiée dans la chambre. Tout doit être coché pour valider.':'Coche ce qui est en ordre : ce qui reste décoché sera noté comme manquant.'}</p>
+    ${G.map(([g,L])=>`<div style="margin-top:10px"><b>${esc(g)}</b>${L.map(x=>`<label class="row" style="gap:10px;align-items:center;margin:6px 0;font-size:17px;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px"><input type="checkbox" data-ck="${k++}" data-lb="${esc(x)}" style="width:auto;margin:0;transform:scale(1.6)"> ${esc(x)}</label>`).join('')}</div>`).join('')}
+    <div class="row" style="margin-top:12px;align-items:center"><span class="meta" id="ckN"></span><span class="grow"></span><button class="btn ghost" id="ckNo">Annuler</button><button class="btn ${ok?'ok':'danger'}" id="ckGo">${ok?'✔ Tout est vérifié — valider':'❌ Valider : à refaire'}</button></div>`,
+  ()=>{const B=[...document.querySelectorAll('[data-ck]')];const up=()=>{const c=B.filter(b=>b.checked).length;$('#ckN').textContent=c+' / '+B.length+' vérifié(s)';if(ok){$('#ckGo').disabled=c<B.length;$('#ckGo').style.opacity=c<B.length?.45:1}};
+    B.forEach(b=>b.onchange=up);up();$('#ckNo').onclick=()=>{closeInfo();res(null)};
+    $('#ckGo').onclick=()=>{const c=B.filter(b=>b.checked);if(ok&&c.length<B.length)return toast('Coche tout ce qui a été vérifié');closeInfo();res({fait:c.length,total:B.length,manque:B.filter(b=>!b.checked).map(b=>b.dataset.lb)})}})})}
 const verTxt=v=>v?(v.ok?'🔍 vérifiée par '+esc(v.by)+' le '+locD(v.ts)+' à '+hhmm(v.ts):'❌ refusée par '+esc(v.by)+' le '+locD(v.ts)+' à '+hhmm(v.ts)):'⏳ pas encore vérifiée';
 function roomsHTML(d){return(CFG.rooms||[]).map(r=>{const st=roomState(r.n,d);
   const bg=st.light?'#ea580c':st.sale?'#dc2626':st.occ?'#2563eb':'#16a34a',lab=st.light?'✨ À RAFRAÎCHIR':st.sale?'🧹 À NETTOYER':st.occ?'Occupée':st.arr?'Libre — ⏳ arrivée en attente':'Libre, prête';
@@ -1159,8 +1172,8 @@ function roomClick(n){const d=htDay,st=roomState(n,d),r=(CFG.rooms||[]).find(x=>
   ()=>{$('#mnOk').onclick=()=>{const by=$('#mnBy').value.trim();localStorage.setItem('pn_mnBy',by);const now=Date.now(),T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7);
       (MEN[mo]=MEN[mo]||[]).push({id:'mn'+now.toString(36),ch:n,date:dd,ts:now,by});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast('✔ Chambre '+n+' : ménage fait')};
     const flag=(kind)=>{const T=todayS(),dd=d>T?d:T,mo=dd.slice(0,7),now=Date.now();(MEN[mo]=MEN[mo]||[]).push({id:'mp'+now.toString(36),ch:n,date:dd,ts:now,prevu:1,kind});put('mn:'+mo,MEN[mo]);closeInfo();refresh();toast(kind==='rafraichir'?'✨ Chambre '+n+' à rafraîchir':'🧹 Chambre '+n+' à nettoyer')};
-    const verif=async ok=>{const m=st.men;closeInfo();const u=await askAuth(ok?'🔍 Vérification chambre '+n:'❌ Chambre '+n+' à refaire',['admin','chef','emp'],'Qui a vérifié ? Le mot de passe confirme que c\'est bien vous.');if(!u)return;
-      const now=Date.now(),mo=m.date.slice(0,7);(MEN[mo]=MEN[mo]||[]).push({id:'mv'+now.toString(36),ch:n,date:m.date,ts:now,verif:1,of:m.id,ok:ok?1:0,by:u.nom,uid:u.id});put('mn:'+mo,MEN[mo]);
+    const verif=async ok=>{const m=st.men;closeInfo();const C=await roomChecklist(n,ok);if(!C)return;const u=await askAuth(ok?'🔍 Vérification chambre '+n:'❌ Chambre '+n+' à refaire',['admin','chef','emp'],'Qui a vérifié ? Le mot de passe confirme que c\'est bien vous.');if(!u)return;
+      const now=Date.now(),mo=m.date.slice(0,7);(MEN[mo]=MEN[mo]||[]).push({id:'mv'+now.toString(36),ch:n,date:m.date,ts:now,verif:1,of:m.id,ok:ok?1:0,by:u.nom,uid:u.id,chk:C.fait+'/'+C.total,...(C.manque.length?{manque:C.manque}:{})});put('mn:'+mo,MEN[mo]);
       refresh();if(!ok)return toast('❌ Chambre '+n+' à refaire');toast('🔍 Chambre '+n+' vérifiée par '+u.nom)};
     if($('#mnVer'))$('#mnVer').onclick=()=>verif(true);if($('#mnKo'))$('#mnKo').onclick=()=>verif(false);
     $('#mnSale').onclick=()=>flag('nettoyer');$('#mnRaf').onclick=()=>flag('rafraichir');
