@@ -742,8 +742,8 @@ function myTasks(uid,d){if(!worksOn(uid,d))return[];const P=plannedTasks(uid,d);
 const myLeft=(uid,d)=>{const u=(CFG.users||[]).find(x=>x.id===uid);return u&&u.libre?[]:myTasks(uid,d).filter(x=>!x.done)};
 function mineCardHTML(s){const U=(CFG.users||[]).filter(u=>u.role!=='boss');let h='';
   for(const u of U){const L=myTasks(u.id,s);if(!L.length)continue;
-    h+=`<div class="card" style="border:2px solid #7c3aed;margin-bottom:10px"><b style="font-size:17px">👤 Tâches de ${esc(u.nom)} aujourd'hui</b><div class="meta" style="margin:2px 0 6px">Placées automatiquement selon son planning. Obligatoire avant son départ, avec photo.</div>
-    ${L.map(x=>`<div class="row" data-mt="${x.t.id}" style="align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;margin:5px 0;cursor:pointer;${x.done?'background:#f0fdf4':''}"><span style="font-size:20px">${x.done?'✅':'⬜'}</span><span class="grow"><b>${esc(x.t.nom)}</b>${x.n>1?` <b style="color:#7c3aed">(${x.k+1}/${x.n})</b>`:''} <span class="meta">${x.ty==='H'?(x.n>1?x.n+' fois par semaine':'hebdo'):'mensuel'}${x.pool&&!x.jour?' · à partir de 16h':''}${x.day<s?' · en retard (prévue le '+frD(x.day).slice(0,5)+')':''}</span></span>${x.done?`<span class="meta">fait par ${esc(x.done.r.emp||'')} à ${hhmm(x.done.r.ts)}</span>`:'<button class="btn ok sm">📸 Fait</button>'}</div>`).join('')}</div>`}
+    h+=`<div class="card" style="border:2px solid #7c3aed;margin-bottom:10px"><b style="font-size:17px">👤 Tâches de ${esc(u.nom)} aujourd'hui</b><div class="meta" style="margin:2px 0 6px">Placées automatiquement selon son planning. Obligatoire avant son départ. ✔ Fait pendant le service (sans photo) ; au départ, avec photo.</div>
+    ${L.map(x=>`<div class="row" data-mt="${x.t.id}" style="align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;margin:5px 0;cursor:pointer;${x.done?'background:#f0fdf4':''}"><span style="font-size:20px">${x.done?'✅':'⬜'}</span><span class="grow"><b>${esc(x.t.nom)}</b>${x.n>1?` <b style="color:#7c3aed">(${x.k+1}/${x.n})</b>`:''} <span class="meta">${x.ty==='H'?(x.n>1?x.n+' fois par semaine':'hebdo'):'mensuel'}${x.pool&&!x.jour?' · à partir de 16h':''}${x.day<s?' · en retard (prévue le '+frD(x.day).slice(0,5)+')':''}</span></span>${x.done?`<span class="meta">fait par ${esc(x.done.r.emp||'')} à ${hhmm(x.done.r.ts)}</span>`:'<button class="btn ok sm">✔ Fait</button>'}</div>`).join('')}</div>`}
   return h}
 /* au départ : bloquer tant que ses tâches du jour ne sont pas faites (photo), ou partir en laissant une alerte */
 async function myTasksBlock(u,d){if(u.libre)return{end:0};let end=0;
@@ -765,16 +765,16 @@ async function myTasksBlock(u,d){if(u.libre)return{end:0};let end=0;
 /* fenêtre « tes tâches du jour » : chaque tâche avec un bouton 📸 Fait */
 function myTasksPopup(u,d,arrive){const L=myTasks(u.id,d);if(!L.length)return;const left=L.filter(x=>!x.done).length;
   info(`<h2>👤 ${esc(u.nom)}, ${arrive?'tes tâches de ménage aujourd\'hui':'tes tâches du jour'}</h2>
-    <p class="meta" style="margin-top:-4px">Placées selon ton planning. Quand c'est fini : <b>📸 Fait</b> et une photo. <b>Obligatoire avant ton départ.</b></p>
+    <p class="meta" style="margin-top:-4px">Placées selon ton planning. Quand c'est fini : appuie sur <b>✔ Fait</b>. <b>Obligatoire avant ton départ</b> (sinon, photo au départ).</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0">${L.map(x=>`<div class="row" style="align-items:center;gap:10px;border:2px solid ${x.done?'#16a34a':'#7c3aed'};border-radius:12px;padding:10px 12px;${x.done?'background:#f0fdf4':''}">
       <span style="font-size:26px">${x.done?'✅':'🧹'}</span><div class="grow"><b style="font-size:18px">${esc(x.t.nom)}</b>${x.n>1?` <b style="color:#7c3aed">(${x.k+1}/${x.n})</b>`:''}${x.pool&&!x.jour?' <span class="meta">· à partir de 16h</span>':''}
       ${x.t.det?`<div class="meta">${esc(x.t.det)}</div>`:''}${x.day<d&&!x.done?'<div style="color:#b45309;font-size:13px;font-weight:700">en retard (prévue le '+frD(x.day).slice(0,5)+')</div>':''}</div>
-      ${x.done?`<span class="meta">fait à ${hhmm(x.done.r.ts)}</span>`:`<button class="btn ok" data-pf="${x.t.id}" style="font-size:17px;padding:10px 14px">📸 Fait</button>`}</div>`).join('')}</div>
+      ${x.done?`<span class="meta">fait à ${hhmm(x.done.r.ts)}</span>`:`<button class="btn ok" data-pf="${x.t.id}" style="font-size:17px;padding:10px 14px">✔ Fait</button>`}</div>`).join('')}</div>
     <div class="row"><span class="meta grow">${left?left+' à faire avant ton départ':'✔ Tout est fait, merci !'}</span><button class="btn ${left?'ghost':'ok'}" id="iClose">${left?'Plus tard':'Fermer'}</button></div>`,
   ()=>document.querySelectorAll('[data-pf]').forEach(b=>b.onclick=async()=>{closeInfo();await myTaskDo(u,d,b.dataset.pf);myTasksPopup(u,d,false)}))}
+/* pendant le service : un appui suffit (pas de photo). La photo n'est demandée que si la tâche est faite au moment du départ. */
 async function myTaskDo(u,d,tid){const t=CFG.tasks.find(x=>x.id===tid);if(!t)return;
-  const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer, pour montrer que c\'est fait.');if(!img)return toast('Photo obligatoire pour valider la tâche');
-  const pid='pt'+Date.now().toString(36);await photoPut(pid,img);dayObj(d).tasks[t.id]={emp:u.nom,uid:u.id,ts:Date.now(),photo:pid};saveDay(d);refresh();toast('✔ '+t.nom+' — fait')}
+  dayObj(d).tasks[t.id]={emp:u.nom,uid:u.id,ts:Date.now()};saveDay(d);refresh();toast('✔ '+t.nom+' — fait')}
 function periodicHTML(s,z,inter){let h='';
   for(const[ty,tit,rng]of[['H',secT('H'),[monday(s),addD(monday(s),6)]],['M',secT('M')+' — '+MOIS[parse(s).getMonth()],monthBounds(s)]]){
     const L=perZ(z,ty);if(!L.length)continue;
