@@ -400,6 +400,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
     <div class="row" style="margin-top:8px"><button class="btn" id="pinOk">🔒 Se connecter</button></div>
   </div>
   <div id="paramBox" class="hidden">
+    <div class="card"><h2>🔀 Onglets du menu</h2><p class="meta">Change l'ordre des onglets en haut de l'écran avec ▲ ▼, et décoche ceux que tu ne veux pas voir. C'est enregistré tout de suite, sur tous les appareils.</p><div id="navEd"></div><div class="row" style="margin-top:8px"><button class="btn ghost sm" id="navReset">↺ Ordre d'origine</button></div></div>
     <div class="card"><h2>🌐 Accès à distance (iPhone, autre appareil)</h2><p class="meta">Donne à un employé son propre accès en ligne : il voit et remplit tout depuis son téléphone, avec son mot de passe, sans accès aux Réglages.</p><div id="webAcc"></div></div>
     <div class="card"><h2>📧 Récapitulatif de la semaine par e-mail</h2><p class="meta">Le récapitulatif d'une semaine (heures, repas, retards, hygiène, réservations, hôtel, ménages) en PDF : choisis la semaine et appuie sur « Envoyer » quand tu veux. L'appli ne le demande jamais d'elle-même.</p>
       <div class="row"><label class="grow">Adresse e-mail<input type="email" id="rcMail" placeholder="ton.adresse@exemple.fr" autocomplete="off"></label><button class="btn sec" id="rcSave" style="align-self:flex-end">Enregistrer</button></div>
@@ -1608,7 +1609,7 @@ function drawEU(){$('#pUsers').innerHTML=EU.map((u,i)=>`<div class="et" style="g
   <button class="btn danger sm" data-ux="${i}">✕</button></div>`).join('');
   $('#pUsers').querySelectorAll('[data-k]').forEach(el=>el.oninput=el.onchange=()=>{EU[el.dataset.ui][el.dataset.k]=el.type==='checkbox'?el.checked:el.type==='number'?(el.value===''?0:+el.value):el.value;if(el.dataset.k==='poste')EU[el.dataset.ui].salle=el.value==='salle'});
   $('#pUsers').querySelectorAll('[data-ux]').forEach(b=>b.onclick=()=>{EU.splice(+b.dataset.ux,1);drawEU()})}
-function renderParams(){renderArchives();renderUpd();$('#pNom').value=CFG.nom;$('#pStart').value=CFG.start||'';EU=CFG.users.map(u=>({...u}));drawEU();
+function renderParams(){renderNavEd();renderArchives();renderUpd();$('#pNom').value=CFG.nom;$('#pStart').value=CFG.start||'';EU=CFG.users.map(u=>({...u}));drawEU();
   $('#pDays').innerHTML=[1,2,3,4,5,6,7].map(i=>`<label><input type="checkbox" value="${i}" ${CFG.open.includes(i)?'checked':''}>${JOURS[i]}</label>`).join('');
   ET=JSON.parse(JSON.stringify(CFG.tasks));EC=JSON.parse(JSON.stringify(CFG.cons));EF=JSON.parse(JSON.stringify(CFG.frigos||[]));$('#pSlots').value=(CFG.tslots||['Matin','Soir']).join(', ');drawET();drawEC();drawEF()}
 function drawET(){$('#pTasks').innerHTML=ET.map((t,i)=>`<div class="et" style="grid-template-columns:2.2fr 1fr 1fr 1fr auto">
@@ -1661,7 +1662,20 @@ $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new F
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
-function applyCfg(){setTimeout(applyRestrict,0);setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
+/* ---- ordre et affichage des onglets du menu ---- */
+const NAVDEF=[...document.querySelectorAll('nav button[data-v]')].map(b=>({v:b.dataset.v,t:b.textContent.trim()}));
+function navOrder(){const o=(CFG.navOrder||[]).filter(v=>NAVDEF.some(x=>x.v===v));for(const x of NAVDEF)if(!o.includes(x.v))o.push(x.v);return o}
+const navHidden=v=>v!=='params'&&(CFG.navHide||[]).includes(v);
+function applyNav(){const nav=document.querySelector('nav');if(!nav)return;for(const v of navOrder()){const b=nav.querySelector(`button[data-v="${v}"]`);if(b){nav.appendChild(b);b.classList.toggle('hidden',navHidden(v))}}}
+function firstTab(){return navOrder().find(v=>!navHidden(v)&&v!=='params')||'jour'}
+function renderNavEd(){const el=$('#navEd');if(!el)return;const o=navOrder();
+  el.innerHTML=o.map((v,i)=>{const d=NAVDEF.find(x=>x.v===v);return`<div class="row" style="align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><label class="row grow" style="gap:8px;margin:0;font-size:16px;color:var(--ink)"><input type="checkbox" data-nh="${v}" ${navHidden(v)?'':'checked'} ${v==='params'?'disabled':''} style="width:auto;margin:0;transform:scale(1.3)"> ${esc(d.t)}</label><button class="btn ghost sm" data-nu="${i}" ${i?'':'disabled'}>▲</button><button class="btn ghost sm" data-nd="${i}" ${i<o.length-1?'':'disabled'}>▼</button></div>`}).join('');
+  const save=o2=>{CFG.navOrder=o2;put('cfg',CFG);applyNav();renderNavEd()};
+  el.querySelectorAll('[data-nu]').forEach(b=>b.onclick=()=>{const i=+b.dataset.nu,a=navOrder();[a[i-1],a[i]]=[a[i],a[i-1]];save(a)});
+  el.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>{const i=+b.dataset.nd,a=navOrder();[a[i+1],a[i]]=[a[i],a[i+1]];save(a)});
+  el.querySelectorAll('[data-nh]').forEach(c=>c.onchange=()=>{const H=new Set(CFG.navHide||[]);if(c.checked)H.delete(c.dataset.nh);else H.add(c.dataset.nh);if(NAVDEF.every(x=>x.v==='params'||H.has(x.v))){c.checked=true;return toast('Garde au moins un onglet')}CFG.navHide=[...H];put('cfg',CFG);applyNav();renderNavEd()})}
+$('#navReset').onclick=()=>{delete CFG.navOrder;delete CFG.navHide;put('cfg',CFG);applyNav();renderNavEd();toast('Ordre d\'origine remis')};
+function applyCfg(){setTimeout(applyRestrict,0);applyNav();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
 
 /* ===================== POINTEUSE ===================== */
 let PTS={}; // PTS[date] = [{id,uid,nom,in,out,photo}]
@@ -2337,7 +2351,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   if(!localStorage.getItem('pn_chNotif')){chNotified=Date.now();localStorage.setItem('pn_chNotif',chNotified)}
   setTimeout(bgApply,2500);
-  applyCfg();show('jour');setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);
+  applyCfg();show(firstTab());setTimeout(()=>{resaBanner();resaPopup(false);resaTick()},1200);
   $('#sync2').onclick=syncBoth;$('#syBtn').onclick=()=>openSyncModal();$('#syncDot').onclick=()=>openSyncModal();
   $('#upCheck').onclick=()=>checkUpdate(true);$('#upAuto').onchange=e=>localStorage.setItem('pn_autoupd',e.target.checked?'1':'0');
   try{APPV=parseInt(await (await fetch('version.txt',{cache:'no-store'})).text())||0}catch(e){}
