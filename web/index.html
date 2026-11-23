@@ -2078,8 +2078,14 @@ const MOISRX=['janv','f[ée]v','mars','avr','mai','juin','juil','ao[uû]','sept'
 /* lit le ticket : est-ce une clôture ? de quel jour ? à quelle heure ? */
 async function readTicket(dataUrl){const w=await Promise.race([ocrWorker(),new Promise((_,ko)=>setTimeout(()=>ko(new Error('délai')),45000))]);
   await w.setParameters({tessedit_char_whitelist:'',tessedit_pageseg_mode:'3'});
-  const r=await w.recognize(dataUrl),txt=r.data.text||'',flat=txt.toLowerCase().replace(/\s+/g,' ');
-  const res={txt,clot:/cl[o0]t[uü]re/.test(flat)||/cl[o0]t[uü]?re?\s*d[e3]?\s*p[eé]r/.test(flat)};
+  // nettoyage de la photo : canal rouge (les taches rouges / roses disparaissent, le texte noir reste), contraste
+  const clean=await new Promise(res=>{const i=new Image();i.onload=()=>{const k=Math.min(2.2,Math.max(1,1800/Math.max(i.width,i.height))),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);
+      const x=c.getContext('2d');x.drawImage(i,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),a=d.data;
+      for(let j=0;j<a.length;j+=4){let v=a[j];v=v<110?0:v>185?255:Math.round((v-110)*255/75);a[j]=a[j+1]=a[j+2]=v}x.putImageData(d,0,0);res(c.toDataURL('image/png'))};i.onerror=()=>res(dataUrl);i.src=dataUrl});
+  let txt='';for(const src of [clean,dataUrl]){const r=await w.recognize(src);txt+='\n'+(r.data.text||'');const f=txt.toLowerCase();if(/(20\d\d)\D{1,2}\d\d\D{1,2}\d\d\s+\d{1,2}\s?[:.;]\s?\d\d/.test(f)&&/cl[o0]\s*t\s*[uü]\s*r/.test(f.replace(/[^a-z0-9ü]/g,'')))break}
+  const flat=txt.toLowerCase().replace(/\s+/g,' '),ns=flat.replace(/[^a-z0-9éü]/g,'');
+  /* « Clôture de période » même mal lu (« clotur e ad per coud ») ; un ticket de vente n'a pas de fonds de caisse initial/final */
+  const res={txt,clot:/cl[o0][tf][uü]?r/.test(ns)||/p[eé]r[i1l]od/.test(ns)||(/fondsde/.test(ns)&&/(initial|final)/.test(ns)&&/tickets?/.test(ns))};
   const now=new Date(),T=todayS(),y=now.getFullYear();
   // date : forme numérique 2026-11-21 ou « samedi 21 novembre 2026 »
   let ds=null;const m1=flat.match(/(20\d\d)\D{1,2}(\d\d)\D{1,2}(\d\d)/);if(m1){const c=m1[1]+'-'+m1[2]+'-'+m1[3];if(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(c))ds=c}
@@ -2103,7 +2109,7 @@ async function closingTicket(u){
     else{if(!R.clot)pb.push('ce n\'est pas un ticket « Clôture de période »');
       if(!R.date)pb.push('la date du ticket est illisible');else if(R.date!==T&&R.date!==Y)pb.push('le ticket date du '+frD(R.date)+', pas d\'aujourd\'hui');
       if(R.time&&R.date&&!pb.length){const t=parse(R.date).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;
-        if(t<=tPhoto+5*60000&&t>=tPhoto-3*3600e3){ts=t;src='ticket'}}}
+        if(t<=tPhoto+10*60000&&t>=tPhoto-8*3600e3){ts=t;src='ticket'}}}
     if(!pb.length){ts=ts||tPhoto;
       const ok=await new Promise(res=>info(`<h2>✔ Clôture de période reconnue</h2>
         <p>Date du service : <b>${frD(R.date)}</b><br>Fin de service : <b style="font-size:22px">${hms(ts)}</b><br><span class="meta">${src==='ticket'?'heure lue sur le ticket':'heure de la photo (l\'heure du ticket n\'a pas pu être lue avec certitude)'}</span></p>
