@@ -297,6 +297,7 @@ body.readonly #roBar{display:block!important}
 <!-- ================= POINTEUSE ================= -->
 <section id="v-point" class="hidden">
   <div class="card"><div class="clock" id="pClock"></div><div class="meta" style="text-align:center" id="pDate"></div></div>
+  <div id="myPlan" class="card hidden" style="border:2px solid #2563eb"></div>
   <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : le pointage se fait uniquement sur la tablette du restaurant.</div>
   <div class="pgrid" id="pGrid"></div>
   <div class="card" style="margin-top:14px">
@@ -1942,7 +1943,11 @@ function openShift(uid){for(let i=0;i<8;i++){const d=addD(todayS(),-i),L=PTS[d]|
 function savePts(d){if(PTS[d]&&PTS[d].length)put('pt:'+d,PTS[d]);else{delete PTS[d];del('pt:'+d)}}
 function tick(){const n=new Date();$('#pClock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());$('#pDate').textContent=longD(todayS())}
 setInterval(()=>{if(VIEW==='point')tick()},1000);
-function renderPoint(){setTimeout(oubliBadge,0);tick();
+/* sur le téléphone d'un employé : « Mon planning » en haut (cette semaine et la suivante) */
+function renderMyPlan(){const el=$('#myPlan');if(!el)return;const me=RO()&&CUR_U();el.classList.toggle('hidden',!me);if(!me)return;const T=todayS();
+  const wk=m=>[...Array(7).keys()].map(i=>{const d=addD(m,i),h=planStr(me.id,d);return`<tr style="${d===T?'background:#eff6ff;font-weight:700':''}"><td style="padding:6px 8px;border-bottom:1px solid var(--line)">${JOURS[wd(d)]} ${frD(d).slice(0,5)}${d===T?' · aujourd\'hui':''}</td><td style="padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-size:17px">${h?esc(h):'<span class="meta">repos</span>'}</td></tr>`}).join('');
+  const m=monday(T);el.innerHTML=`<h2 style="margin:0 0 6px">📅 Mon planning — ${esc(me.nom)}</h2><table style="width:100%;border-collapse:collapse"><tr><th colspan="2" style="text-align:left;padding:4px 8px;background:#f1f5f9">Cette semaine</th></tr>${wk(m)}<tr><th colspan="2" style="text-align:left;padding:4px 8px;background:#f1f5f9">Semaine prochaine</th></tr>${wk(addD(m,7))}</table><p class="meta" style="margin-top:6px">Le planning de toute l'équipe est plus bas.</p>`}
+function renderPoint(){setTimeout(oubliBadge,0);tick();renderMyPlan();
   $('#pRemote')&&$('#pRemote').classList.toggle('hidden',!remoteNoPunch());$('#pGrid').innerHTML=staff().map(u=>{const o=openShift(u.id);
     return `<button class="pbtn ${o?'in':''}" data-u="${u.id}"><b>${esc(u.nom)}</b>
       <span class="meta">${o?'Présent depuis '+hhmm(o.e.in)+(o.d!==todayS()?' ('+frD(o.d)+')':''):'Absent'}${poste(u)==='salle'?' · 🍽 Salle':poste(u)==='chef'?' · 👨‍🍳 Chef':' · 👨‍🍳 Cuisine'}${u.libre?' · sans tâches':''}</span>
@@ -1950,7 +1955,7 @@ function renderPoint(){setTimeout(oubliBadge,0);tick();
       <span class="act">${o?'Pointer le départ':'Pointer l\'arrivée'}</span></button>`}).join('');
   $('#pGrid').querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>punch(b.dataset.u));
   if(!$('#phFrom').value){$('#phFrom').value=monday(todayS());$('#phTo').value=addD(monday(todayS()),6)}
-  $('#phUser').innerHTML='<option value="">Tous</option>'+staff().map(u=>`<option value="${u.id}" ${$('#phUser').value===u.id?'selected':''}>${esc(u.nom)}</option>`).join('');
+  {$('#phUser').disabled=false;$('#phUser').innerHTML='<option value="">Tous</option>'+staff().map(u=>`<option value="${u.id}" ${$('#phUser').value===u.id?'selected':''}>${esc(u.nom)}</option>`).join('')}
   renderPlan();renderPH()}
 /* depuis un téléphone (accès à distance), on peut tout voir mais pas pointer : le pointage se fait sur la tablette du restaurant */
 /* lecture seule : toute personne connectée à distance, sauf le chef */
