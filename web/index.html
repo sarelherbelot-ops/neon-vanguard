@@ -191,6 +191,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
     <button data-v="semaine">🗓 Semaine</button>
     <button data-v="cal">📅 Calendrier</button>
     <button data-v="resa">📞 Réservations</button>
+    <button data-v="pdj">🍽 Plat du jour</button>
     <button data-v="hotel">🏨 Hôtel</button>
     <button data-v="cmd">🛒 Commandes</button>
     <button data-v="chat">💬 Messages</button>
@@ -382,6 +383,11 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
   </div>
   <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
   <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
+</section>
+<section id="v-pdj" class="hidden">
+  <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px"><h2 style="margin:0">🍽 Plat du jour</h2><span class="grow"></span><button class="btn sec sm" id="pjPrint">🖨 Imprimer le menu</button><button class="btn ok sm" id="pjEdit">✏️ Modifier</button></div>
+  <div class="card"><div class="row" style="align-items:center"><button class="btn ghost sm" id="pjPrev">◀</button><b class="grow" id="pjTitle" style="text-align:center;font-size:18px"></b><button class="btn ghost sm" id="pjNext">▶</button></div>
+  <div id="pjList"></div><div class="row"><button class="btn ghost sm hidden" id="pjCopy">📋 Copier la semaine d'avant</button></div></div>
 </section>
 <section id="v-instr" class="hidden">
   <div class="row" style="align-items:center;margin-bottom:8px"><h2 class="grow" style="margin:0">📖 Instructions</h2><button class="btn ok" id="inNew">➕ Nouvelle instruction</button></div>
@@ -729,8 +735,8 @@ let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFull
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
 function show(v){if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ['jour','point','semaine','cal','resa','hotel','cmd','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
-  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();if(v==='instr')renderInstr();
+    ['jour','point','semaine','cal','resa','pdj','hotel','cmd','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();if(v==='instr')renderInstr();if(v==='pdj')renderPdj();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
 
@@ -931,7 +937,7 @@ function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
 function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false;const u=(CFG.users||[]).find(x=>x.nom.trim().toLowerCase()===a.user);return!(u&&u.role==='admin')}
 function applyRestrict(){const r=RESTRICT();document.body.classList.toggle('restricted',r);if(r&&VIEW==='params')show('jour')}
-function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
+function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -1453,6 +1459,44 @@ async function editInstr(i){if(RESTRICT())return;if(!MAIN()&&!await askAuth('Mod
   ()=>{$('#inOk').onclick=()=>{const t=$('#inT').value.trim(),tx=$('#inX').value;if(!t)return toast('Mets un titre');x.titre=t;x.texte=tx;if(nw)L.push(x);CFG.instr=L;put('cfg',CFG);closeInfo();renderInstr();toast('Instruction enregistrée ✔')};
     if($('#inDel'))$('#inDel').onclick=()=>{if(!confirm('Supprimer cette instruction ?'))return;L.splice(i,1);CFG.instr=L;put('cfg',CFG);closeInfo();renderInstr()}})}
 $('#inNew').onclick=()=>editInstr(null);
+/* ===================== PLAT DU JOUR (menu de la semaine) ===================== */
+const PJOURS=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+let pdjWeek=null;
+function pdjOf(m){const P=CFG.pdj||{};return P[m]||null}
+function pdjDefault(){if(CFG.pdjInit)return;CFG.pdjInit=1;CFG.pdj=CFG.pdj||{};
+  if(!CFG.pdj['2026-11-23'])CFG.pdj['2026-11-23']={note:'Entrée au choix comprise avec chaque menu',j:{1:{plat:'Polpette · polenta',prix:21},2:{plat:'Rôti de porc · riz & sauce aux champignons',prix:21},3:{plat:'Calamars farcis · riz',prix:21},4:{plat:'Papet vaudois · saucisse aux choux',prix:21},5:{plat:'Filets de perche · frites & sauce tartare',prix:23}}};
+  put('cfg',CFG)}
+const CUR_U=()=>{let a=null;try{a=ACC()}catch(e){}return a&&a.user?(CFG.users||[]).find(x=>x.nom.trim().toLowerCase()===a.user):null};
+const pdjCan=()=>!RESTRICT()||['chef','boss'].includes((CUR_U()||{}).role);
+function renderPdj(){if(!pdjWeek)pdjWeek=monday(todayS());const m=pdjWeek,W=pdjOf(m),T=todayS();
+  $('#pjTitle').textContent='Semaine du '+frD(m).slice(0,5)+' au '+frD(addD(m,4));
+  const rows=PJOURS.map((j,i)=>{const d=addD(m,i),x=W&&W.j&&W.j[i+1];if(i===5&&!(x&&x.plat))return'';const now=d===T;
+    return`<div class="row" style="align-items:center;gap:12px;padding:12px 14px;margin:8px 0;border:${now?'3px solid #16a34a':'1px solid var(--line)'};border-radius:12px;${now?'background:#f0fdf4':''}">
+      <div style="min-width:96px"><div style="font-size:19px;font-weight:800;${now?'color:#15803d':''}">${j}</div><div class="meta" style="margin:0">${frD(d).slice(0,5)}${now?' · aujourd\'hui':''}</div></div>
+      <div class="grow" style="font-size:19px">${x&&x.plat?esc(x.plat):'<span class="meta">—</span>'}</div>
+      <div style="font-size:21px;font-weight:800;white-space:nowrap">${x&&+x.prix?(+x.prix).toFixed(0)+' CHF':''}</div></div>`}).join('');
+  $('#pjList').innerHTML=W?rows+(W.note?`<p style="text-align:center;font-style:italic;color:#555;margin-top:10px">${esc(W.note)}</p>`:''):'<p class="meta">Pas encore de plats du jour pour cette semaine.'+(pdjCan()?' Appuie sur « ✏️ Modifier » ou « Copier la semaine d\'avant ».':'')+'</p>';
+  $('#pjEdit').classList.toggle('hidden',!pdjCan());$('#pjCopy').classList.toggle('hidden',!pdjCan()||!!W)}
+function pdjHTML(m){const W=pdjOf(m)||{j:{}},S="font-family:Georgia,'Times New Roman',serif";
+  return`<div style="text-align:center;color:#333;font-family:Arial,sans-serif">
+   <div style="${S};font-size:30pt;color:#444">${esc(ficheNom())}</div>
+   <div style="${S};font-style:italic;font-size:34pt;margin:8mm 0 3mm;color:#3b4250">Menu de la semaine</div>
+   <div style="letter-spacing:.25em;color:#666;font-size:12pt;margin-bottom:7mm">DU ${+m.slice(8)} AU ${frD(addD(m,4)).slice(0,2).replace(/^0/,'')} ${MOIS[+addD(m,4).slice(5,7)-1].toUpperCase()} ${addD(m,4).slice(0,4)}</div>
+   ${PJOURS.map((j,i)=>{const x=W.j[i+1];if(!x||!x.plat)return'';return`<div style="${S};font-style:italic;font-size:22pt;color:#555;margin-top:5mm">${j}</div><div style="font-size:17pt;margin-top:1mm">${esc(x.plat)}${+x.prix?` &nbsp;<b>${(+x.prix).toFixed(0)} CHF</b>`:''}</div>`}).join('')}
+   ${W.note?`<div style="font-style:italic;color:#666;margin-top:8mm;font-size:12pt">${esc(W.note)}</div>`:''}
+   ${CFG.facAdr?`<div style="margin-top:12mm;color:#555;font-size:11pt;white-space:pre-line">${esc(CFG.facAdr)}</div>`:''}</div>`}
+$('#pjPrev').onclick=()=>{pdjWeek=addD(pdjWeek||monday(todayS()),-7);renderPdj()};
+$('#pjNext').onclick=()=>{pdjWeek=addD(pdjWeek||monday(todayS()),7);renderPdj()};
+$('#pjPrint').onclick=()=>{const m=pdjWeek||monday(todayS());if(!pdjOf(m))return toast('Pas de menu cette semaine');$('#printArea').innerHTML='<style>@page{size:A4;margin:15mm}</style>'+pdjHTML(m);outDoc('Menu de la semaine',0)};
+$('#pjCopy').onclick=()=>{const m=pdjWeek,prev=pdjOf(addD(m,-7));if(!prev)return toast('Rien la semaine d\'avant');CFG.pdj=CFG.pdj||{};CFG.pdj[m]=JSON.parse(JSON.stringify(prev));put('cfg',CFG);renderPdj();editPdj()};
+$('#pjEdit').onclick=()=>editPdj();
+async function editPdj(){if(!pdjCan())return;if(!RESTRICT()&&!MAIN()&&!await askAuth('Plats du jour',['chef']))return;const m=pdjWeek,W=JSON.parse(JSON.stringify(pdjOf(m)||{note:'Entrée au choix comprise avec chaque menu',j:{}}));
+  info(`<h2>✏️ Plats du jour — semaine du ${frD(m).slice(0,5)}</h2>
+    ${PJOURS.map((j,i)=>{const x=W.j[i+1]||{};return`<div class="row" style="gap:8px;align-items:flex-end"><label class="grow">${j} ${frD(addD(m,i)).slice(0,5)}<input data-pp="${i+1}" value="${esc(x.plat||'')}" placeholder="${i===5?'(facultatif)':'ex : Rôti de porc · riz'}"></label><label style="width:100px">Prix CHF<input type="number" data-px="${i+1}" min="0" step="0.5" value="${esc(x.prix||'')}"></label></div>`}).join('')}
+    <label>Remarque sous le menu<input id="pjNote" value="${esc(W.note||'')}"></label>
+    <div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="pjOk">Enregistrer</button></div>`,
+  ()=>{$('#pjOk').onclick=()=>{const j={};document.querySelectorAll('[data-pp]').forEach(e=>{const k=e.dataset.pp,p=e.value.trim(),px=+document.querySelector(`[data-px="${k}"]`).value||0;if(p)j[k]={plat:p,prix:px}});
+    CFG.pdj=CFG.pdj||{};CFG.pdj[m]={note:$('#pjNote').value.trim(),j};put('cfg',CFG);closeInfo();renderPdj();toast('Plats du jour enregistrés ✔')}})}
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=htAll().filter(h=>h.etat!=='annule'&&h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
@@ -1750,7 +1794,7 @@ function renderNavEd(){const el=$('#navEd');if(!el)return;const o=navOrder();
   el.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>{const i=+b.dataset.nd,a=navOrder();[a[i+1],a[i]]=[a[i],a[i+1]];save(a)});
   el.querySelectorAll('[data-nh]').forEach(c=>c.onchange=()=>{const H=new Set(CFG.navHide||[]);if(c.checked)H.delete(c.dataset.nh);else H.add(c.dataset.nh);if(NAVDEF.every(x=>x.v==='params'||H.has(x.v))){c.checked=true;return toast('Garde au moins un onglet')}CFG.navHide=[...H];put('cfg',CFG);applyNav();renderNavEd()})}
 $('#navReset').onclick=()=>{delete CFG.navOrder;delete CFG.navHide;put('cfg',CFG);applyNav();renderNavEd();toast('Ordre d\'origine remis')};
-function applyCfg(){setTimeout(applyRestrict,0);applyNav();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
+function applyCfg(){setTimeout(applyRestrict,0);applyNav();if(!RESTRICT()&&MAIN())pdjDefault();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
 
 /* ===================== POINTEUSE ===================== */
 let PTS={}; // PTS[date] = [{id,uid,nom,in,out,photo}]
