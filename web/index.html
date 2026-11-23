@@ -688,6 +688,8 @@ function dueZ(s,z){return due(s).filter(t=>tz(t)===z)}
 const SECT_DEF={Q:'Nettoyage Quotidien (Chaque fin de service / journée)',H:'Nettoyage hebdomadaire — à planifier dans la semaine',M:'Nettoyage mensuel (profond)'};
 const secT=ty=>((CFG.secT||{})[ty]||'').trim()||SECT_DEF[ty];
 const perZ=(z,ty)=>CFG.tasks.filter(t=>tz(t)===z&&t.type===ty);
+/* placement dans la semaine : '' réparti, 'fin' = dernier jour, 'debfin' = premier et dernier jour */
+const plW=t=>t.pl||(t.fin?'fin':'');
 const nbW=t=>t.type==='H'?Math.max(1,Math.min(7,+t.nb||1)):1;
 function doneAll(tid,a,b){const o=[];for(let s=a;s<=b;s=addD(s,1)){const r=rec(s,tid);if(r)o.push({s,r})}return o}
 function doneIn(tid,a,b){for(let s=b;s>=a;s=addD(s,-1)){const r=rec(s,tid);if(r)return{s,r}}return null}
@@ -704,9 +706,11 @@ function plannedTasks(uid,d){const out=[],st=CFG.mineStart||'2000-01-01';
     /* « fin de semaine » (ex : friteuse) = son dernier jour de travail ; les autres réparties sur les jours d'avant */
     if(L.length&&D.length){/* une tâche « 2 fois par semaine » = 2 passages, espacés sur ses jours de travail */
       const mx=Math.max(...L.map(nbW)),I=[];for(let k=0;k<mx;k++)for(const t of L)if(k<nbW(t))I.push({t,k});
-      const F=I.filter(x=>x.t.fin&&x.k===nbW(x.t)-1),O=I.filter(x=>!(x.t.fin&&x.k===nbW(x.t)-1)),Do=F.length&&D.length>1?D.slice(0,-1):D,DN={};
+      const isF=x=>(plW(x.t)==='fin'||plW(x.t)==='debfin')&&x.k===nbW(x.t)-1,isS=x=>plW(x.t)==='debfin'&&x.k===0&&nbW(x.t)>1;
+      const F=I.filter(isF),S=I.filter(isS),O=I.filter(x=>!isF(x)&&!isS(x)),Do=(F.length&&D.length>1?D.slice(0,-1):D),DN={};
       const dn=t=>DN[t.id]=DN[t.id]||doneAll(t.id,a,b),mk=(x,day)=>({t:x.t,k:x.k,n:nbW(x.t),day,done:dn(x.t)[x.k]||null,ty:'H'});
       F.forEach(x=>{const day=fix(D[D.length-1],D);if(day)out.push(mk(x,day))});
+      S.forEach(x=>{const day=fix(D[0],D);if(day)out.push(mk(x,day))});
       O.forEach((x,i)=>{const day=fix(Do[Math.min(Do.length-1,Math.floor(i*Do.length/O.length))],D);if(day)out.push(mk(x,day))});
       out.sort((p,q)=>p.t.id===q.t.id?p.day.localeCompare(q.day):0);
       for(const t of L){const P=out.filter(x=>x.t.id===t.id&&x.ty==='H').sort((p,q)=>p.day.localeCompare(q.day)),dd=dn(t);P.forEach((x,k)=>{x.k=k;x.done=dd[k]||null})}}}
@@ -1832,10 +1836,10 @@ function drawET(){document.querySelectorAll('#pTZ [data-tz]').forEach(b=>{b.clas
   <select data-i="${i}" data-k="type" style="width:auto;margin:0"><option value="Q" ${t.type==='Q'?'selected':''}>Quotidien</option><option value="J" ${t.type==='J'?'selected':''}>Jour</option><option value="H" ${t.type==='H'?'selected':''}>Hebdo</option><option value="M" ${t.type==='M'?'selected':''}>Mensuel</option></select>
   ${t.type==='J'?`<select data-i="${i}" data-k="jour" style="width:auto;margin:0">${[1,2,3,4,5,6,7].map(j=>`<option value="${j}" ${t.jour===j?'selected':''}>${JOURS[j]}</option>`).join('')}</select>`:''}
   ${t.type==='H'||t.type==='M'?`<select data-i="${i}" data-k="qui" title="Qui fait cette tâche" style="width:auto;margin:0"><option value="" ${!t.qui?'selected':''}>👤 Auto</option><option value="*" ${t.qui==='*'?'selected':''}>Tout le monde</option>${(CFG.users||[]).filter(u=>u.role!=='boss').map(u=>`<option value="${u.id}" ${t.qui===u.id?'selected':''}>👤 ${esc(u.nom)}</option>`).join('')}</select>`:''}
-  ${t.type==='H'?`<select data-i="${i}" data-k="nb" style="width:auto;margin:0" title="Combien de fois par semaine">${[1,2,3].map(n=>`<option value="${n}" ${nbW(t)===n?'selected':''}>${n} fois par semaine</option>`).join('')}</select><label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--ink);white-space:nowrap;margin:0"><input type="checkbox" data-fin="${i}" ${t.fin?'checked':''} style="width:auto;margin:0"> fin de semaine</label>`:''}
+  ${t.type==='H'?`<select data-i="${i}" data-k="nb" style="width:auto;margin:0" title="Combien de fois par semaine">${[1,2,3].map(n=>`<option value="${n}" ${nbW(t)===n?'selected':''}>${n} fois par semaine</option>`).join('')}</select><select data-i="${i}" data-k="pl" style="width:auto;margin:0" title="Quand dans la semaine"><option value="" ${plW(t)===''?'selected':''}>réparti dans la semaine</option><option value="fin" ${plW(t)==='fin'?'selected':''}>en fin de semaine</option><option value="debfin" ${plW(t)==='debfin'?'selected':''}>début et fin de semaine</option></select>`:''}
   </div></div>`}).join('')||'<p class="meta">Aucune tâche dans cette zone.</p>';
   $('#pTasks').querySelectorAll('[data-k]').forEach(el=>el.onchange=el.oninput=()=>{const t=ET[el.dataset.i];
-    if(el.dataset.k==='jour')t.jour=+el.value;else if(el.dataset.k==='nb')t.nb=+el.value;else t[el.dataset.k]=el.value;
+    if(el.dataset.k==='jour')t.jour=+el.value;else if(el.dataset.k==='nb')t.nb=+el.value;else if(el.dataset.k==='pl'){t.pl=el.value;delete t.fin;if(el.value==='debfin'&&nbW(t)<2)t.nb=2;drawET()}else t[el.dataset.k]=el.value;
     if(el.dataset.k==='type'){if(t.type==='J'&&!t.jour)t.jour=1;drawET()}if(el.dataset.k==='zone')drawET()});
   $('#pTasks').querySelectorAll('[data-fin]').forEach(el=>el.onchange=()=>{ET[el.dataset.fin].fin=el.checked});
   $('#pTasks').querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const[i,d]=b.dataset.mv.split('|').map(Number),pos=idx.indexOf(i),o=idx[pos+d];if(o==null)return;[ET[i],ET[o]]=[ET[o],ET[i]];drawET()});
@@ -1895,7 +1899,7 @@ function renderNavEd(){const el=$('#navEd');if(!el)return;const o=navOrder();
   el.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>{const i=+b.dataset.nd,a=navOrder();[a[i+1],a[i]]=[a[i],a[i+1]];save(a)});
   el.querySelectorAll('[data-nh]').forEach(c=>c.onchange=()=>{const H=new Set(CFG.navHide||[]);if(c.checked)H.delete(c.dataset.nh);else H.add(c.dataset.nh);if(NAVDEF.every(x=>x.v==='params'||H.has(x.v))){c.checked=true;return toast('Garde au moins un onglet')}CFG.navHide=[...H];put('cfg',CFG);applyNav();renderNavEd()})}
 $('#navReset').onclick=()=>{delete CFG.navOrder;delete CFG.navHide;put('cfg',CFG);applyNav();renderNavEd();toast('Ordre d\'origine remis')};
-function applyCfg(){setTimeout(applyRestrict,0);applyNav();if(!RESTRICT()&&!CFG.mineStart){CFG.mineStart=todayS();put('cfg',CFG)}if(!RESTRICT()&&!CFG.libreInit){CFG.libreInit=1;(CFG.users||[]).forEach(u=>{if(u.role==='admin')u.libre=true});put('cfg',CFG)}if(!RESTRICT()&&!CFG.finInit){CFG.finInit=1;(CFG.tasks||[]).forEach(t=>{if(t.type==='H'&&/friteuse/i.test(t.nom))t.fin=true});put('cfg',CFG)}if(!RESTRICT()&&MAIN())pdjDefault();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
+function applyCfg(){setTimeout(applyRestrict,0);applyNav();if(!RESTRICT()&&!CFG.mineStart){CFG.mineStart=todayS();put('cfg',CFG)}if(!RESTRICT()&&!CFG.libreInit){CFG.libreInit=1;(CFG.users||[]).forEach(u=>{if(u.role==='admin')u.libre=true});put('cfg',CFG)}if(!RESTRICT()&&!CFG.aluInit){const a=(CFG.tasks||[]).filter(t=>/alu\W*piano|piano\W*alu/i.test(t.nom));if(a.length){a.forEach(t=>{t.type='H';t.nb=2;t.pl='debfin';delete t.fin;t.jour=0});CFG.aluInit=1;put('cfg',CFG)}}if(!RESTRICT()&&!CFG.finInit){CFG.finInit=1;(CFG.tasks||[]).forEach(t=>{if(t.type==='H'&&/friteuse/i.test(t.nom))t.fin=true});put('cfg',CFG)}if(!RESTRICT()&&MAIN())pdjDefault();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
 
 /* ===================== POINTEUSE ===================== */
 let PTS={}; // PTS[date] = [{id,uid,nom,in,out,photo}]
