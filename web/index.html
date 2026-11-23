@@ -345,6 +345,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
   <div class="card"><h2>🏨 Clients présents</h2><div id="htIn"></div></div>
   <div class="card"><h2>📅 Arrivées des 7 prochains jours</h2><div id="htNext7"></div></div>
   <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="adm-only btn sec" id="htTxBtn">Modifier</button></div></div>
+  <div class="card"><div class="row"><div class="grow"><b>Nom en haut de la fiche hôtel</b><div class="meta" id="htNomTxt"></div></div><button class="adm-only btn sec" id="htNomBtn">Modifier</button></div></div>
 </section>
 <section id="v-cmd" class="hidden">
   <div class="card">
@@ -1290,12 +1291,12 @@ function ficheHTML(h){const B='color:#1d4ed8;font-weight:700;font-family:sans-se
   const TD='border:1.3px solid #333;padding:4px 8px;font-weight:700;font-size:12pt;height:19px';
   const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:3.5mm">${b.split('\n').map(l=>`<p style="margin:0 0 1.5mm;line-height:1.35">${esc(l)}</p>`).join('')}</div>`).join('');
   return`<div style="font-family:Calibri,Carlito,'DejaVu Sans',Arial,sans-serif;font-size:12pt;color:#111">
-  <div style="text-align:center;font-size:22pt;font-weight:700;color:#333;margin:0 0 4mm">${esc(CFG.nom||'Hôtel')}</div>
+  <div style="text-align:center;font-size:22pt;font-weight:700;color:#333;margin:0 0 4mm">${esc(ficheNom())}</div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin:0 4mm 2mm;font-size:17pt;font-weight:700"><span>Fiche hôtel</span><span>Date : ${h?`<span style="${B}">${frD(h.arr)}</span>`:'____________________'}</span></div>
   <table style="width:100%;border-collapse:collapse">${L.map(([k,x])=>`<tr><td style="${TD}">${k} :${v(x)}</td></tr>`).join('')}</table>
   <table style="width:100%;border-collapse:collapse;margin-top:5mm"><tr><td style="${TD}">Total :${v(o.total)}</td></tr>${h&&h.booking?`<tr><td style="${TD};color:#003580">Payé par Booking :${v(+h.bkMontant?'CHF '+(+h.bkMontant).toFixed(2):'oui')}</td></tr>`:''}</table>
   <h2 style="font-size:15pt;margin:5mm 0 0">Charte Hôtel :</h2>${ch}
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:7mm;gap:10mm"><div><p style="margin:0 0 1.5mm">Pour le room-service, adressez-vous au personnel du restaurant.</p><p style="margin:0">Nos sincères salutations, ${esc(CFG.nom||'')}.</p></div><div style="width:65mm;font-weight:700;font-size:13pt;border-bottom:1px solid #333;padding-bottom:13mm;flex:none">Signature</div></div></div>`}
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:7mm;gap:10mm"><div><p style="margin:0 0 1.5mm">Pour le room-service, adressez-vous au personnel du restaurant.</p><p style="margin:0">Nos sincères salutations, ${esc(ficheNom())}.</p></div><div style="width:65mm;font-weight:700;font-size:13pt;border-bottom:1px solid #333;padding-bottom:13mm;flex:none">Signature</div></div></div>`}
 function printFiche(h){$('#printArea').innerHTML='<style>@page{size:A4;margin:10mm 16mm}</style>'+ficheHTML(h);outDoc(h?'Fiche hôtel '+h.nom:'Fiche hôtel vierge',0)}
 $('#htFicheV').onclick=()=>printFiche(null);
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
@@ -1309,7 +1310,7 @@ function renderHotel(){const d=htDay,A=htAll().filter(actif);
   $('#htDep').innerHTML=dep.length?dep.map(h=>htRow(h,'dep')).join(''):'<p class="meta">Aucun départ ce jour-là.</p>';
   $('#htIn').innerHTML=pres.length?pres.map(h=>htRow(h,'in')).join(''):'<p class="meta">Aucun client cette nuit.</p>';
   let x='';for(let i=1;i<=7;i++){const j=addD(d,i),l=A.filter(h=>h.arr===j);if(l.length)x+=`<h3 style="margin:10px 0 2px">${longD(j)} — ${l.length} arrivée(s)</h3>`+l.map(h=>htRow(h,'arr')).join('')}
-  $('#htTxTxt').textContent=eur(taxeTaux())+' par personne et par nuit ';
+  $('#htTxTxt').textContent=eur(taxeTaux())+' par personne et par nuit ';$('#htNomTxt').textContent=ficheNom();
   $('#htNext7').innerHTML=x||'<p class="meta">Aucune arrivée prévue les 7 prochains jours.</p>';
   document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));document.querySelectorAll('#v-hotel [data-hta]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=findHt(b.dataset.hta);if(x){x.h.etat='arrive';x.h.mod=Date.now();saveHt(x.mo);refresh();toast('✔ '+x.h.nom+' est arrivé — chambre '+x.h.ch+' occupée')}});document.querySelectorAll('#v-hotel [data-htp]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=findHt(b.dataset.htp);if(x)printFiche(x.h)});bindTel($('#v-hotel'))}
 function payMonth(h){const m=todayS().slice(0,7);
@@ -1325,7 +1326,7 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
   const old=fichePrefill(h),ln=(lab,idx,val,type)=>`<tr><td style="${TD}"><div style="display:flex;align-items:center;gap:6px"><span style="white-space:nowrap">${lab} :</span><input id="${idx}" ${type?`type="${type}"`:''} value="${esc(val==null?'':String(val))}" autocomplete="off" style="${IN}"></div></td></tr>`;
   const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:8px">${b.split('\n').map(l=>`<div style="margin-bottom:3px">${esc(l)}</div>`).join('')}</div>`).join('');
   info(`<div style="background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-family:Calibri,Carlito,'Segoe UI',sans-serif">
-    <div style="position:sticky;top:-14px;z-index:2;background:#fff;text-align:center;font-size:22px;font-weight:700;color:#333;padding:6px 0 8px;margin:-6px 0 4px;border-bottom:1px solid #eee">${esc(CFG.nom||'Hôtel')}</div>
+    <div style="position:sticky;top:-14px;z-index:2;background:#fff;text-align:center;font-size:22px;font-weight:700;color:#333;padding:6px 0 8px;margin:-6px 0 4px;border-bottom:1px solid #eee">${esc(ficheNom())}</div>
     <div style="display:flex;align-items:center;gap:8px;margin:0 6px 4px"><b style="font-size:19px">Fiche hôtel</b><button class="btn ok" id="hPrint" title="Enregistrer et imprimer" style="padding:4px 10px;font-size:18px">🖨</button><span class="grow"></span><b style="font-size:17px">Date :</b><input type="date" id="hArr" value="${esc(h.arr)}" style="${IN};flex:none;width:170px"></div>
     <table style="width:100%;border-collapse:collapse">
     ${ln('Nom','hNom',h.nom)}${ln('Contact','hTel',h.tel,'tel')}${ln('E-mail','hMail',h.mail||'','email')}${ln('Adresse','hAdr',h.adr||'')}
@@ -1335,7 +1336,7 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
     </table>
     <table style="width:100%;border-collapse:collapse;margin-top:14px">${ln('Total','hTotT',old.total)}<tr><td style="${TD};color:#003580"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label class="row" style="gap:6px;margin:0;color:#003580;font-weight:700;font-size:15px"><input type="checkbox" id="hBook" ${h.booking?'checked':''} style="width:auto;margin:0;transform:scale(1.3)"> Payé par Booking</label><span id="hBookM" class="row" style="gap:4px;align-items:center;${h.booking?'':'display:none'}">: CHF<input type="number" id="hBkM" min="0" step="0.5" value="${esc(h.bkMontant||'')}" placeholder="montant" style="${IN};flex:none;width:110px;color:#003580"></span></div></td></tr></table>
     <div style="font-size:13px;color:#333;margin-top:12px"><b style="font-size:17px;color:#111">Charte Hôtel :</b>${ch}
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px;gap:14px"><div><div>Pour le room-service, adressez-vous au personnel du restaurant.</div><div>Nos sincères salutations, ${esc(CFG.nom||'')}.</div></div><b style="font-size:15px;border-bottom:1px solid #333;padding-bottom:26px;width:160px;flex:none">Signature</b></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px;gap:14px"><div><div>Pour le room-service, adressez-vous au personnel du restaurant.</div><div>Nos sincères salutations, ${esc(ficheNom())}.</div></div><b style="font-size:15px;border-bottom:1px solid #333;padding-bottom:26px;width:160px;flex:none">Signature</b></div></div>
     </div>
     <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted)">Options de l'application (facultatif)</summary>
       <label class="row" style="gap:8px"><input type="checkbox" id="hRes" ${isRes(h)?'checked':''} style="width:auto"> 🏠 Résident : vit dans la chambre, pas de date de départ</label>
@@ -1365,6 +1366,8 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
     if(f&&$('#hPay'))$('#hPay').onclick=()=>{closeInfo();payMonth(h)};
     if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
 $('#htNew').onclick=()=>editHotel(null);
+$('#htNomBtn').onclick=async()=>{const a=await askAuth('Nom de la fiche hôtel',['admin']);if(!a)return;const v=prompt('Nom de l\'établissement, écrit en haut de la fiche hôtel :',ficheNom());if(v==null||!v.trim())return;CFG.hotelNom=v.trim();put('cfg',CFG);renderHotel();toast('Fiche hôtel : '+CFG.hotelNom)};
+const ficheNom=()=>CFG.hotelNom||CFG.nom||'Hôtel';
 $('#htTxBtn').onclick=async()=>{const a=await askAuth('Modifier la taxe de séjour',['admin']);if(!a)return;const v=prompt('Taxe de séjour en CHF par personne et par nuit :',String(taxeTaux()).replace('.',','));if(v==null)return;const n=parseFloat(v.replace(',','.'));if(isNaN(n)||n<0)return toast('Montant invalide');CFG.taxe=n;put('cfg',CFG);renderHotel();toast('Taxe de séjour : '+eur(n))};
 $('#htPrev').onclick=()=>{htDay=addD(htDay,-1);renderHotel()};$('#htNext').onclick=()=>{htDay=addD(htDay,1);renderHotel()};
 $('#htToday').onclick=()=>{htDay=todayS();renderHotel()};$('#htDate').onchange=e=>{if(e.target.value){htDay=e.target.value;renderHotel()}};
