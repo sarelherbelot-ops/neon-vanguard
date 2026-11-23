@@ -422,7 +422,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
     <div class="card"><h2>💾 Sauvegarde automatique chaque soir</h2><p class="meta" id="bkTxt"></p>
       <div class="row" style="margin-top:8px"><button class="btn sec hidden" id="bkDir">📁 Choisir le dossier sur ce PC</button><span class="grow"></span><button class="btn ok" id="bkNow">💾 Sauvegarder maintenant</button></div></div>
     <div class="card" style="border:2px solid #dc2626"><div class="row"><h2 class="grow" style="color:#dc2626">⚠ Tâches non faites à la fermeture</h2><button class="btn sec sm" id="oVu">Marquer comme vu</button></div><div id="oList"></div></div>
-    <div class="card"><h2>🧾 Tickets de clôture refusés</h2><p class="meta">Chaque photo de ticket refusée à la fermeture, avec la raison (30 derniers jours). Toucher pour voir la photo.</p><div id="tkrList"></div></div>
+    <div class="card"><h2>🧾 Tickets de clôture refusés</h2><p class="meta">Chaque photo de ticket refusée à la fermeture, avec la raison. Les photos de tickets (refusés et validés) sont gardées 2 jours, puis supprimées. Toucher pour voir la photo.</p><div id="tkrList"></div></div>
     <div class="card">
       <h2>☁️ Sauvegarde en ligne</h2>
       <p class="meta">Sauvegarde automatique et chiffrée. Sur n'importe quel appareil (ou après réinstallation) : se connecter avec le compte administrateur et son mot de passe, et tout revient.</p>
@@ -609,9 +609,14 @@ function oublis(days){const lim=days?addD(todayS(),-days):'';const L=[];for(cons
 const OVU=()=>{try{return new Set(JSON.parse(localStorage.getItem('pn_oubliVu')||'[]'))}catch(e){return new Set()}};
 function oubliBadge(){const n=oublis(60).filter(x=>!OVU().has(x.e.id)).length,b=document.querySelector('nav button[data-v=params]');if(!b)return;
   let s=b.querySelector('.obadge');if(!n){if(s)s.remove();return}if(!s){s=document.createElement('span');s.className='obadge';s.style.cssText='background:#dc2626;color:#fff;border-radius:9px;padding:0 6px;margin-left:4px;font-size:12px;font-weight:700';b.appendChild(s)}s.textContent=n}
-function tkrAll(){const L=[];for(const k in TKR)for(const x of TKR[k]||[])L.push(x);const lim=Date.now()-30*864e5;return L.filter(x=>x.ts>=lim).sort((a,b)=>b.ts-a.ts)}
+/* tickets de clôture (refusés et validés) gardés 2 jours, puis supprimés */
+function cleanupTickets(){if(RESTRICT())return;const lim=Date.now()-2*864e5;let n=0;
+  for(const mo in TKR){const L=TKR[mo]||[],keep=L.filter(x=>x.ts>=lim);if(keep.length!==L.length){L.filter(x=>x.ts<lim).forEach(x=>{if(x.photo)photoDel(x.photo);n++});if(keep.length){TKR[mo]=keep;put('tr:'+mo,keep)}else{delete TKR[mo];del('tr:'+mo)}}}
+  for(const d in PTS){if(d>=ymd(new Date(lim)))continue;let ch=0;for(const e of PTS[d]||[])if(e.photo&&(e.out||e.in||0)<lim){photoDel(e.photo);delete e.photo;ch=1;n++}if(ch)savePts(d)}
+  return n}
+function tkrAll(){const L=[];for(const k in TKR)for(const x of TKR[k]||[])L.push(x);const lim=Date.now()-2*864e5;return L.filter(x=>x.ts>=lim).sort((a,b)=>b.ts-a.ts)}
 function renderTkr(){const el=$('#tkrList');if(!el)return;const L=tkrAll();
-  el.innerHTML=L.length?L.map(x=>`<div class="row" data-tkr="${x.id}" style="gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px;margin:6px 0;cursor:pointer"><img class="thumb" data-ph="${x.photo}" style="width:54px;height:72px;object-fit:cover;border-radius:6px"><div class="grow"><b>${esc(x.nom)}</b> · ${frD(ymd(new Date(x.ts)))} à ${hhmm(x.ts)}<div style="color:#dc2626">${(x.why||[]).map(esc).join('<br>')}</div></div></div>`).join(''):'<p class="meta">Aucun ticket refusé ces 30 derniers jours.</p>';
+  el.innerHTML=L.length?L.map(x=>`<div class="row" data-tkr="${x.id}" style="gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px;margin:6px 0;cursor:pointer"><img class="thumb" data-ph="${x.photo}" style="width:54px;height:72px;object-fit:cover;border-radius:6px"><div class="grow"><b>${esc(x.nom)}</b> · ${frD(ymd(new Date(x.ts)))} à ${hhmm(x.ts)}<div style="color:#dc2626">${(x.why||[]).map(esc).join('<br>')}</div></div></div>`).join(''):'<p class="meta">Aucun ticket refusé ces 2 derniers jours.</p>';
   el.querySelectorAll('img[data-ph]').forEach(async im=>{const d=await photoGet(im.dataset.ph);if(d)im.src=d});
   el.querySelectorAll('[data-tkr]').forEach(r=>r.onclick=async()=>{const x=L.find(y=>y.id===r.dataset.tkr),d=await photoGet(x.photo);
     info(`<h2>🧾 Ticket refusé — ${esc(x.nom)}</h2><p class="meta">${frD(ymd(new Date(x.ts)))} à ${hms(x.ts)}</p><p style="color:#dc2626;font-weight:700">${(x.why||[]).map(esc).join('<br>')}</p>
@@ -2578,6 +2583,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   for(const k in all)if(k.startsWith('cl:')&&all[k]!=null)CLOUD[k.slice(3)]=all[k];
   CLOUD.__gh=all['gh:state']||null;
   startSync();
+  setTimeout(cleanupTickets,20000);setInterval(cleanupTickets,6*3600e3);
   if(localStorage.getItem('pn_autoupd')!=='0'){setTimeout(()=>checkUpdate(false),5000);setInterval(()=>checkUpdate(false),30*60e3)}
   {const u=localStorage.getItem('pn_updDone');if(u){localStorage.removeItem('pn_updDone');setTimeout(()=>toast('✔ Mise à jour n° '+u+' installée automatiquement'),1500)}}
   window.addEventListener('hashchange',()=>{if((location.hash||'').startsWith('#inscription'))location.reload()});
