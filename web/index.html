@@ -838,11 +838,14 @@ function bindTempCells(root){root.querySelectorAll('[data-tm]').forEach(b=>b.onc
   root.querySelectorAll('.tcell,td.tv[data-d]').forEach(td=>td.onclick=()=>clickTemp(td.dataset.d,td.dataset.f,td.dataset.sl))}
 async function clickTemp(s,fid,sl){const f=(CFG.frigos||[]).find(x=>x.id===fid);if(!f)return;const r=trec(s,fid,sl);
   info(`<h2>🌡 ${esc(f.nom)} — ${esc(sl)}</h2><p class="meta">${longD(s)} · ${esc(tLim(f))}</p>
-    <label>Température (°C)<input id="tV" class="tbig" inputmode="decimal" placeholder="ex : 3,5" value="${r?String(r.v).replace('.',','):''}"></label>
+    <label>Température (°C)</label><div class="row" style="gap:8px;align-items:center"><button type="button" class="btn" id="tNeg" style="font-size:26px;font-weight:800;min-width:96px;padding:8px 12px">− moins</button><input id="tV" class="tbig grow" inputmode="decimal" placeholder="${f.max<0?'ex : -18':'ex : 3,5'}" value="${r?String(r.v).replace('.',','):(f.max<0?'-':'')}" style="margin:0"></div>
+    <p class="meta" style="margin-top:4px">${f.max<0?'Congélateur : le signe moins est déjà mis, il suffit de taper le chiffre (ex : 18 → -18).':'Pour une température négative, appuie sur « − moins ».'}</p>
     <div id="tWarn" class="${r&&!tOk(f,r.v)?'':'hidden'}" style="margin-top:8px"><p class="late">⚠ Hors limite : noter l'action corrective</p><textarea id="tAct" rows="2" placeholder="ex : porte mal fermée, produits déplacés, technicien appelé…">${esc(r&&r.act||'')}</textarea></div>
     <div class="row" style="margin-top:12px">${r?'<button class="btn danger" id="tDel">Effacer</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="tOk">✔ Valider</button></div>`,
-  ()=>{const val=()=>parseFloat(($('#tV').value||'').replace(',','.').replace('−','-'));
-    $('#tV').oninput=()=>{const v=val();$('#tWarn').classList.toggle('hidden',isNaN(v)||tOk(f,v))};setTimeout(()=>{$('#tV').focus();$('#tV').select()},50);
+  ()=>{const val=()=>parseFloat(($('#tV').value||'').replace(',','.').replace(/[−–—]/g,'-').replace(/\s/g,''));
+    const negUi=()=>{const n=($('#tV').value||'').trim().startsWith('-');$('#tNeg').style.background=n?'#2563eb':'';$('#tNeg').style.color=n?'#fff':''};
+    $('#tNeg').onclick=()=>{let v=($('#tV').value||'').trim();v=v.startsWith('-')?v.slice(1):'-'+v;$('#tV').value=v;negUi();$('#tV').dispatchEvent(new Event('input'));const e=$('#tV');e.focus();try{e.setSelectionRange(v.length,v.length)}catch(x){}};
+    $('#tV').oninput=()=>{const v=val();negUi();$('#tWarn').classList.toggle('hidden',isNaN(v)||tOk(f,v))};negUi();setTimeout(()=>{const e=$('#tV');e.focus();if(e.value==='-'){try{e.setSelectionRange(1,1)}catch(x){}}else e.select()},50);
     const d=$('#tDel');if(d)d.onclick=()=>{delete DAYS[s].temps[tkey(fid,sl)];saveDay(s);closeInfo();refresh()};
     $('#tOk').onclick=()=>{const v=val();if(isNaN(v))return toast('Température invalide');const act=($('#tAct').value||'').trim();
       const o=dayObj(s);o.temps=o.temps||{};o.temps[tkey(fid,sl)]={v,emp:'',ts:Date.now(),...(act?{act}:{})};
@@ -888,7 +891,7 @@ function newRecep(mo){const s=curDay.slice(0,7)===mo?curDay:todayS();
     <div class="row"><label class="grow">Fournisseur / transporteur<input id="rF" list="rcFour"></label><label class="grow">N° bon de livraison<input id="rB"></label></div>
     <datalist id="rcFour">${[...new Set(Object.values(RCP).flat().map(x=>x.four))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
     <div class="row"><label class="grow">Nature des produits<select id="rC">${RCAT.map(c=>`<option>${c[0]}</option>`).join('')}</select></label><label class="grow">Détail (facultatif)<input id="rP" placeholder="ex : 5 kg entrecôte"></label></div>
-    <div class="row"><label class="grow">T° à cœur (°C)<input id="rTc" inputmode="decimal"></label><label class="grow">T° camion (°C)<input id="rTk" inputmode="decimal"></label></div>
+    <div class="row"><label class="grow">T° à cœur (°C)<span class="row" style="gap:6px;align-items:center"><button type="button" class="btn sm" data-neg="rTc" style="font-size:20px;font-weight:800;padding:4px 10px;flex:none">−</button><input id="rTc" inputmode="decimal" class="grow" style="margin:0"></span></label><label class="grow">T° camion (°C)<span class="row" style="gap:6px;align-items:center"><button type="button" class="btn sm" data-neg="rTk" style="font-size:20px;font-weight:800;padding:4px 10px;flex:none">−</button><input id="rTk" inputmode="decimal" class="grow" style="margin:0"></span></label></div>
     <p class="meta" id="rNorm"></p>
     <div class="days" style="margin:8px 0"><label><input type="checkbox" id="rPr" checked>Propreté OK</label><label><input type="checkbox" id="rEm" checked>Emballages OK</label><label><input type="checkbox" id="rDl" checked>DLC / DDM OK</label></div>
     <div id="rConf" style="font-size:18px;font-weight:800"></div>
@@ -897,7 +900,8 @@ function newRecep(mo){const s=curDay.slice(0,7)===mo?curDay:todayS();
   ()=>{const num=id=>{const v=parseFloat(($(id).value||'').replace(',','.').replace('−','-'));return isNaN(v)?null:v};
     const calc=()=>{const c=rcat($('#rC').value),tc=num('#rTc'),ok=rcTempOk(c[0],tc)&&$('#rPr').checked&&$('#rEm').checked&&$('#rDl').checked;
       $('#rNorm').textContent='Norme : '+c[3];$('#rConf').innerHTML=ok?'<span style="color:var(--grn)">Conforme : OUI</span>':'<span style="color:var(--red)">Conforme : NON</span>';$('#rActL').classList.toggle('hidden',ok);return ok};
-    ['#rC','#rTc','#rPr','#rEm','#rDl'].forEach(x=>{$(x).oninput=$(x).onchange=calc});calc();
+    ['#rC','#rTc','#rPr','#rEm','#rDl'].forEach(x=>{$(x).oninput=$(x).onchange=calc});
+    document.querySelectorAll('[data-neg]').forEach(bt=>bt.onclick=e=>{e.preventDefault();const i=$('#'+bt.dataset.neg);let v=(i.value||'').trim();v=v.startsWith('-')?v.slice(1):'-'+v;i.value=v;i.dispatchEvent(new Event('input'));i.focus()});calc();
     $('#rOk').onclick=async()=>{const ok=calc(),four=$('#rF').value.trim(),c=$('#rC').value,tc=num('#rTc');
       if(!four)return toast('Fournisseur obligatoire');if(rcat(c)[2]!=null&&tc==null)return toast('Température à cœur obligatoire');
       const act=$('#rA').value.trim();if(!ok&&!act)return toast('Action corrective obligatoire');
