@@ -219,6 +219,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
       <input type="date" id="dPick" style="width:auto;margin:0">
       <button class="btn ghost sm" id="dWeek">Voir la semaine</button>
       <button class="btn ghost sm" id="dClose">Marquer fermé</button>
+      <button class="btn ghost sm adm-only" id="dEditL">✏️ Modifier la liste</button>
     </div>
   </div>
   <div class="ztabs" id="dZones"></div>
@@ -454,7 +455,9 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
     <div class="card">
       <h2>Tâches</h2>
       <p class="meta">QUOTIDIEN = tous les jours d'ouverture. JOUR = seulement le jour choisi. HEBDO = une fois dans la semaine, n'importe quel jour. MENSUEL = une fois dans le mois.</p>
-      <div class="et meta" style="font-weight:700;grid-template-columns:2.2fr 1fr 1fr 1fr auto"><span>Tâche</span><span>Zone</span><span>Type</span><span>Jour</span><span></span></div>
+      <div class="row" style="gap:6px;margin:6px 0" id="pTZ"><button class="btn sm" data-tz="cuisine">👨‍🍳 Cuisine</button><button class="btn sm" data-tz="salle">🍽 Salle</button><button class="btn sm" data-tz="">Toutes</button></div>
+      <details style="margin:6px 0"><summary style="cursor:pointer;font-weight:700">✏️ Titres des parties (quotidien, hebdomadaire, mensuel)</summary>
+        <label>Quotidien<input id="pSecQ"></label><label>Hebdomadaire<input id="pSecH"></label><label>Mensuel<input id="pSecM"></label></details>
       <div id="pTasks"></div>
       <button class="btn sec sm" id="pAdd" style="margin-top:10px">+ Ajouter une tâche</button>
       <button class="btn ghost sm" id="pModel" style="margin-top:10px">📋 Charger un modèle (cuisine HACCP, frigos, salle)</button>
@@ -682,6 +685,8 @@ const tz=t=>t.zone||'salle';
 const poste=u=>u.poste||(u.salle?'salle':'cuisine');
 function dueZ(s,z){return due(s).filter(t=>tz(t)===z)}
 /* tâches hebdomadaires (à planifier dans la semaine) et mensuelles (profondes) */
+const SECT_DEF={Q:'Nettoyage Quotidien (Chaque fin de service / journée)',H:'Nettoyage hebdomadaire — à planifier dans la semaine',M:'Nettoyage mensuel (profond)'};
+const secT=ty=>((CFG.secT||{})[ty]||'').trim()||SECT_DEF[ty];
 const perZ=(z,ty)=>CFG.tasks.filter(t=>tz(t)===z&&t.type===ty);
 function doneIn(tid,a,b){for(let s=b;s>=a;s=addD(s,-1)){const r=rec(s,tid);if(r)return{s,r}}return null}
 const monthBounds=s=>{const d=parse(s);return[ymd(new Date(d.getFullYear(),d.getMonth(),1)),ymd(new Date(d.getFullYear(),d.getMonth()+1,0))]};
@@ -733,7 +738,7 @@ async function myTaskDo(u,d,tid){const t=CFG.tasks.find(x=>x.id===tid);if(!t)ret
   const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer.');if(!img)return;
   const pid='pt'+Date.now().toString(36);await photoPut(pid,img);dayObj(d).tasks[t.id]={emp:u.nom,uid:u.id,ts:Date.now(),photo:pid};saveDay(d);refresh();toast('✔ '+t.nom+' — fait')}
 function periodicHTML(s,z,inter){let h='';
-  for(const[ty,tit,rng]of[['H','Nettoyage hebdomadaire — à planifier dans la semaine',[monday(s),addD(monday(s),6)]],['M','Nettoyage mensuel (profond) — '+MOIS[parse(s).getMonth()],monthBounds(s)]]){
+  for(const[ty,tit,rng]of[['H',secT('H'),[monday(s),addD(monday(s),6)]],['M',secT('M')+' — '+MOIS[parse(s).getMonth()],monthBounds(s)]]){
     const L=perZ(z,ty);if(!L.length)continue;
     h+=`<h3 style="margin:14px 0 4px;font-size:15px;color:var(--navy)">${tit}</h3>`+L.map(t=>{const d=doneIn(t.id,rng[0],rng[1]);
       return `<div class="task ${d?(d.r.na?'na':'done'):''}" ${inter?`data-pt="${t.id}" data-ps="${d?d.s:''}"`:''}><div class="chk">${d?(d.r.na?'N/A':'✓'):''}</div>
@@ -883,7 +888,7 @@ function cuisineSheetHTML(m,inter){const D=[0,1,2,3,4,5,6].map(i=>addD(m,i)),w=W
     <div class="row" style="margin:0 0 8px">${inter?'<button class="btn ghost sm" data-wk="-7">‹ semaine</button>':''}<span>Semaine du : <b>${frD(D[0]).slice(0,5)}</b> au : <b>${frD(D[6]).slice(0,5)}</b></span>${inter?'<button class="btn ghost sm" data-wk="7">semaine ›</button>':''}
       <span class="grow"></span>Responsable :${inter?`<input id="csResp" value="${esc(w.respC||'')}" placeholder="nom" style="width:180px;margin:0">`:` <b>${esc(w.respC||'')}</b>`}</div>
     <table class="sheet"><tr><th>Équipement / Zone</th><th>Action de nettoyage</th>${['Lu','Ma','Me','Je','Ve','Sa','Di'].map((x,i)=>`<th>${x}<br><span style="font-weight:400;font-size:11px">${frD(D[i]).slice(0,2)}</span></th>`).join('')}<th>Date</th><th>Heure</th><th>Signature / Visa</th></tr>
-    ${sect('Q','Nettoyage Quotidien (Chaque fin de service / journée)')}${sect('H','Nettoyage Hebdomadaire (À planifier dans la semaine)')}${sect('M','Nettoyage Mensuel (Profond)')}</table>
+    ${sect('Q',esc(secT('Q')))}${sect('H',esc(secT('H')))}${sect('M',esc(secT('M')))}</table>
     ${inter?'<p class="meta" style="margin-top:8px">Toucher une case pour mettre ou enlever la croix ✓. Toucher Date / Heure pour les écrire. Toucher « Signature / Visa » pour signer au doigt.</p>':''}</div>`}
 function bindCuisine(root,m){root.querySelectorAll('[data-ck]').forEach(td=>td.onclick=()=>quickTick(td.dataset.d,td.dataset.ck));
   root.querySelectorAll('[data-wk]').forEach(b=>b.onclick=()=>{const d=+b.dataset.wk;if(VIEW==='jour'){curDay=addD(curDay,d);renderDay()}else{curWeek=addD(curWeek,d);renderWeek()}});
@@ -1807,20 +1812,27 @@ function drawEU(){$('#pUsers').innerHTML=EU.map((u,i)=>`<div class="et" style="g
   $('#pUsers').querySelectorAll('[data-ux]').forEach(b=>b.onclick=()=>{EU.splice(+b.dataset.ux,1);drawEU()})}
 function renderParams(){renderNavEd();renderTkr();renderArchives();renderUpd();$('#pNom').value=CFG.nom;$('#pStart').value=CFG.start||'';EU=CFG.users.map(u=>({...u}));drawEU();
   $('#pDays').innerHTML=[1,2,3,4,5,6,7].map(i=>`<label><input type="checkbox" value="${i}" ${CFG.open.includes(i)?'checked':''}>${JOURS[i]}</label>`).join('');
-  ET=JSON.parse(JSON.stringify(CFG.tasks));EC=JSON.parse(JSON.stringify(CFG.cons));EF=JSON.parse(JSON.stringify(CFG.frigos||[]));$('#pSlots').value=(CFG.tslots||['Matin','Soir']).join(', ');drawET();drawEC();drawEF()}
-function drawET(){$('#pTasks').innerHTML=ET.map((t,i)=>`<div class="et" style="grid-template-columns:2.2fr 1fr 1fr 1.2fr auto 1fr auto">
-  <input data-i="${i}" data-k="nom" value="${esc(t.nom)}">
-  <select data-i="${i}" data-k="zone"><option value="salle" ${tz(t)==='salle'?'selected':''}>Salle</option><option value="cuisine" ${tz(t)==='cuisine'?'selected':''}>Cuisine</option></select>
-  <select data-i="${i}" data-k="type"><option value="Q" ${t.type==='Q'?'selected':''}>Quotidien</option><option value="J" ${t.type==='J'?'selected':''}>Jour</option><option value="H" ${t.type==='H'?'selected':''}>Hebdo</option><option value="M" ${t.type==='M'?'selected':''}>Mensuel</option></select>
-  ${t.type==='H'||t.type==='M'?`<select data-i="${i}" data-k="qui" title="Qui fait cette tâche"><option value="" ${!t.qui?'selected':''}>👤 Auto</option><option value="*" ${t.qui==='*'?'selected':''}>Tout le monde</option>${(CFG.users||[]).filter(u=>u.role!=='boss').map(u=>`<option value="${u.id}" ${t.qui===u.id?'selected':''}>👤 ${esc(u.nom)}</option>`).join('')}</select>`:'<span></span>'}
-  ${t.type==='H'?`<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--ink);white-space:nowrap"><input type="checkbox" data-fin="${i}" ${t.fin?'checked':''} style="width:auto;margin:0"> fin de sem.</label>`:'<span></span>'}
-  <select data-i="${i}" data-k="jour" ${t.type!=='J'?'disabled':''}>${[1,2,3,4,5,6,7].map(j=>`<option value="${j}" ${t.jour===j?'selected':''}>${JOURS[j]}</option>`).join('')}</select>
-  <button class="btn danger sm" data-x="${i}">✕</button></div>`).join('');
+  ET=JSON.parse(JSON.stringify(CFG.tasks));EC=JSON.parse(JSON.stringify(CFG.cons));EF=JSON.parse(JSON.stringify(CFG.frigos||[]));$('#pSlots').value=(CFG.tslots||['Matin','Soir']).join(', ');['Q','H','M'].forEach(k=>$('#pSec'+k).value=secT(k));drawET();drawEC();drawEF()}
+let ETZ='cuisine';
+function drawET(){document.querySelectorAll('#pTZ [data-tz]').forEach(b=>{b.className='btn sm '+(b.dataset.tz===ETZ?'ok':'ghost');b.onclick=()=>{ETZ=b.dataset.tz;drawET()}});
+  const idx=ET.map((t,i)=>i).filter(i=>!ETZ||tz(ET[i])===ETZ);
+  $('#pTasks').innerHTML=idx.map((i,k)=>{const t=ET[i];return`<div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:8px 0;background:var(--card,#fff)">
+  <div class="row" style="gap:6px;align-items:center"><input data-i="${i}" data-k="nom" value="${esc(t.nom)}" placeholder="Nom de la tâche" class="grow" style="font-weight:700;margin:0">
+    <button class="btn ghost sm" data-mv="${i}|-1" ${k?'':'disabled'} title="Monter">▲</button><button class="btn ghost sm" data-mv="${i}|1" ${k<idx.length-1?'':'disabled'} title="Descendre">▼</button><button class="btn danger sm" data-x="${i}">✕</button></div>
+  <textarea data-i="${i}" data-k="det" rows="2" placeholder="Sous-titre / détail (ex : vidange complète, bouillir avec dégraissant…)" style="margin:6px 0 4px;font-size:14px">${esc(t.det||'')}</textarea>
+  <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+  <select data-i="${i}" data-k="zone" style="width:auto;margin:0"><option value="salle" ${tz(t)==='salle'?'selected':''}>🍽 Salle</option><option value="cuisine" ${tz(t)==='cuisine'?'selected':''}>👨‍🍳 Cuisine</option></select>
+  <select data-i="${i}" data-k="type" style="width:auto;margin:0"><option value="Q" ${t.type==='Q'?'selected':''}>Quotidien</option><option value="J" ${t.type==='J'?'selected':''}>Jour</option><option value="H" ${t.type==='H'?'selected':''}>Hebdo</option><option value="M" ${t.type==='M'?'selected':''}>Mensuel</option></select>
+  ${t.type==='J'?`<select data-i="${i}" data-k="jour" style="width:auto;margin:0">${[1,2,3,4,5,6,7].map(j=>`<option value="${j}" ${t.jour===j?'selected':''}>${JOURS[j]}</option>`).join('')}</select>`:''}
+  ${t.type==='H'||t.type==='M'?`<select data-i="${i}" data-k="qui" title="Qui fait cette tâche" style="width:auto;margin:0"><option value="" ${!t.qui?'selected':''}>👤 Auto</option><option value="*" ${t.qui==='*'?'selected':''}>Tout le monde</option>${(CFG.users||[]).filter(u=>u.role!=='boss').map(u=>`<option value="${u.id}" ${t.qui===u.id?'selected':''}>👤 ${esc(u.nom)}</option>`).join('')}</select>`:''}
+  ${t.type==='H'?`<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--ink);white-space:nowrap;margin:0"><input type="checkbox" data-fin="${i}" ${t.fin?'checked':''} style="width:auto;margin:0"> fin de semaine</label>`:''}
+  </div></div>`}).join('')||'<p class="meta">Aucune tâche dans cette zone.</p>';
   $('#pTasks').querySelectorAll('[data-k]').forEach(el=>el.onchange=el.oninput=()=>{const t=ET[el.dataset.i];
     if(el.dataset.k==='jour')t.jour=+el.value;else t[el.dataset.k]=el.value;
-    if(el.dataset.k==='type'){if(t.type==='J'&&!t.jour)t.jour=1;drawET()}});
-  $('#pTasks').querySelectorAll('[data-fin]').forEach(el=>el.onchange=()=>{ET[el.dataset.fin].fin=el.checked})
-  $('#pTasks').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ET.splice(+b.dataset.x,1);drawET()})}
+    if(el.dataset.k==='type'){if(t.type==='J'&&!t.jour)t.jour=1;drawET()}if(el.dataset.k==='zone')drawET()});
+  $('#pTasks').querySelectorAll('[data-fin]').forEach(el=>el.onchange=()=>{ET[el.dataset.fin].fin=el.checked});
+  $('#pTasks').querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const[i,d]=b.dataset.mv.split('|').map(Number),pos=idx.indexOf(i),o=idx[pos+d];if(o==null)return;[ET[i],ET[o]]=[ET[o],ET[i]];drawET()});
+  $('#pTasks').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{if(!confirm('Supprimer la tâche « '+ET[+b.dataset.x].nom+' » ?'))return;ET.splice(+b.dataset.x,1);drawET()})}
 $('#pAddU').onclick=()=>{EU.push({id:'u'+Date.now().toString(36),nom:'',role:'emp',poste:'salle',salle:true});drawEU()};
 const MODELE={"tasks": [{"id": "k1", "nom": "Sol", "det": "Balayage, lavage et désinfection complète des sols de la cuisine.", "type": "Q", "jour": 0, "zone": "cuisine"}, {"id": "k2", "nom": "Piano de cuisson", "det": "Grattez grilles, nettoyez plan, videz bacs à graisses.", "type": "Q", "jour": 0, "zone": "cuisine"}, {"id": "k3", "nom": "Four", "det": "Grattez parois, nettoyez grilles et vitres.", "type": "Q", "jour": 0, "zone": "cuisine"}, {"id": "k4", "nom": "Micro-onde", "det": "Nettoyez parois intérieures et plaque.", "type": "Q", "jour": 0, "zone": "cuisine"}, {"id": "k5", "nom": "Cuiseur à pâtes", "det": "Vidangez, nettoyez cuve et rampes.", "type": "Q", "jour": 0, "zone": "cuisine"}, {"id": "k6", "nom": "Maintien au chaud", "det": "Vidangez, nettoyez cuve et rampes.", "type": "Q", "jour": 0, "zone": "cuisine"}, {"id": "k7", "nom": "Friteuse", "det": "Vidange complète, bouillir avec dégraissant, rincer, sécher.", "type": "H", "jour": 0, "zone": "cuisine"}, {"id": "k8", "nom": "Frigos & congélateurs", "det": "Désinfectez poignées, joints de portes et grilles intérieures.", "type": "H", "jour": 0, "zone": "cuisine"}, {"id": "k9", "nom": "Étagères de stockage", "det": "Videz les étagères, nettoyez et désinfectez les plateaux.", "type": "H", "jour": 0, "zone": "cuisine"}, {"id": "k10", "nom": "Piano de cuisson (profond)", "det": "Démontage des brûleurs/injecteurs, dégraissage intensif complet.", "type": "M", "jour": 0, "zone": "cuisine"}, {"id": "k11", "nom": "Frigos & congélateurs (profond)", "det": "Dégivrage complet, nettoyage parois et dépoussiérage condenseurs.", "type": "M", "jour": 0, "zone": "cuisine"}, {"id": "k12", "nom": "Étagères de stockage (profond)", "det": "Nettoyage et désinfection approfondis de l'ensemble des structures.", "type": "M", "jour": 0, "zone": "cuisine"}, {"id": "k13", "nom": "Fours (dégraissage intensif)", "det": "Nettoyage approfondi des turbines, déflecteurs et décapant.", "type": "M", "jour": 0, "zone": "cuisine"}, {"id": "m1", "nom": "Toilettes : nettoyage complet & désinfection", "type": "Q", "jour": 0, "zone": "salle"}, {"id": "m2", "nom": "Sols : salle et entrée", "type": "Q", "jour": 0, "zone": "salle"}, {"id": "m3", "nom": "Bar : comptoir, verres et frigos", "type": "J", "jour": 2, "zone": "salle"}, {"id": "m4", "nom": "Vitres (si nécessaire)", "type": "J", "jour": 4, "zone": "salle"}, {"id": "m5", "nom": "Machine à vaisselle : nettoyage complet & filtres", "type": "J", "jour": 5, "zone": "salle"}], "frigos": [{"id": "f1", "nom": "Frigo 1", "min": 0, "max": 5, "lab": "0 / +5 °C"}, {"id": "f2", "nom": "Frigo 2", "min": 0, "max": 5, "lab": "0 / +5 °C"}, {"id": "f3", "nom": "Frigo 3", "min": 0, "max": 5, "lab": "0 / +5 °C"}, {"id": "f4", "nom": "Chambre froide", "min": 0, "max": 5, "lab": "0 / +5 °C"}, {"id": "f5", "nom": "Congélateur 1", "min": -40, "max": -15, "lab": "≤ -18 °C (alerte > -15 °C)"}, {"id": "f6", "nom": "Congélateur 2", "min": -40, "max": -15, "lab": "≤ -18 °C (alerte > -15 °C)"}]};
 $('#pModel').onclick=()=>{if(!confirm('Ajouter le modèle (tâches cuisine HACCP, tâches salle de base, 6 frigos/congélateurs) ? Rien n\'est supprimé.'))return;
@@ -1828,7 +1840,8 @@ $('#pModel').onclick=()=>{if(!confirm('Ajouter le modèle (tâches cuisine HACCP
   for(const f of MODELE.frigos)if(!EF.some(x=>x.nom===f.nom))EF.push({...f,id:f.id+Date.now().toString(36)});
   drawET();drawEF();toast('Modèle ajouté — appuie sur Enregistrer')};
 $('#pAddF').onclick=()=>{EF.push({id:'f'+Date.now().toString(36),nom:'',min:0,max:4});drawEF()};
-$('#pAdd').onclick=()=>{ET.push({id:'t'+Date.now().toString(36),nom:'',type:'J',jour:1,zone:'salle'});drawET();const a=$('#pTasks').querySelectorAll('input');a[a.length-1].focus()};
+$('#dEditL').onclick=()=>{ETZ=['salle','cuisine'].includes(ZONE)?ZONE:'cuisine';show('params');toast('Déverrouille les réglages : la liste est dans « Tâches »')};
+$('#pAdd').onclick=()=>{ET.push({id:'t'+Date.now().toString(36),nom:'',det:'',type:'Q',jour:0,zone:ETZ||'cuisine'});drawET();const a=$('#pTasks').querySelectorAll('[data-k=nom]');a[a.length-1].focus()};
 function drawEC(){$('#pCons').innerHTML=EC.map((c,i)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px">
   <div class="row"><input class="grow" data-ci="${i}" data-k="titre" value="${esc(c.titre)}" style="margin:0">
   <select data-ci="${i}" data-k="zone" style="width:auto;margin:0"><option value="salle" ${(c.zone||'salle')==='salle'?'selected':''}>Salle</option><option value="cuisine" ${c.zone==='cuisine'?'selected':''}>Cuisine</option></select>
@@ -1848,7 +1861,8 @@ $('#pSave').onclick=async()=>{
   CFG.users=U;
   CFG.nom=$('#pNom').value.trim()||DEFCFG.nom;if($('#pStart').value)CFG.start=$('#pStart').value;
   CFG.open=[...$('#pDays').querySelectorAll('input:checked')].map(x=>+x.value);
-  CFG.tasks=ET.filter(t=>t.nom.trim()).map(t=>({...t,nom:t.nom.trim(),jour:t.type==='J'?(t.jour||1):0}));
+  CFG.tasks=ET.filter(t=>t.nom.trim()).map(t=>({...t,nom:t.nom.trim(),det:(t.det||'').trim(),jour:t.type==='J'?(t.jour||1):0}));
+  CFG.secT={};['Q','H','M'].forEach(k=>{const v=$('#pSec'+k).value.trim();if(v&&v!==SECT_DEF[k])CFG.secT[k]=v});
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
