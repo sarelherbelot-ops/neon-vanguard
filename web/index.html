@@ -2082,7 +2082,7 @@ async function readTicket(dataUrl){const w=await Promise.race([ocrWorker(),new P
   const clean=await new Promise(res=>{const i=new Image();i.onload=()=>{const k=Math.min(2.2,Math.max(1,1800/Math.max(i.width,i.height))),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);
       const x=c.getContext('2d');x.drawImage(i,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),a=d.data;
       for(let j=0;j<a.length;j+=4){let v=a[j];v=v<110?0:v>185?255:Math.round((v-110)*255/75);a[j]=a[j+1]=a[j+2]=v}x.putImageData(d,0,0);res(c.toDataURL('image/png'))};i.onerror=()=>res(dataUrl);i.src=dataUrl});
-  let txt='';for(const src of [clean,dataUrl]){const r=await w.recognize(src);txt+='\n'+(r.data.text||'');const f=txt.toLowerCase();if(/(20\d\d)\D{1,2}\d\d\D{1,2}\d\d\s+\d{1,2}\s?[:.;]\s?\d\d/.test(f)&&/cl[o0]\s*t\s*[uü]\s*r/.test(f.replace(/[^a-z0-9ü]/g,'')))break}
+  let txt='';for(const src of [clean,dataUrl]){const r=await w.recognize(src);txt+='\n'+(r.data.text||'');const f=txt.toLowerCase();if(/\d{1,2}\s?[:.;]\s?\d\d\s?[:.;]\s?\d\d/.test(f)&&/cl[o0]\s*t\s*[uü]\s*r/.test(f.replace(/[^a-z0-9ü]/g,'')))break}
   const flat=txt.toLowerCase().replace(/\s+/g,' '),ns=flat.replace(/[^a-z0-9éü]/g,'');
   /* « Clôture de période » même mal lu (« clotur e ad per coud ») ; un ticket de vente n'a pas de fonds de caisse initial/final */
   const res={txt,clot:/cl[o0][tf][uü]?r/.test(ns)||/p[eé]r[i1l]od/.test(ns)||(/fondsde/.test(ns)&&/(initial|final)/.test(ns)&&/tickets?/.test(ns))};
@@ -2094,6 +2094,9 @@ async function readTicket(dataUrl){const w=await Promise.race([ocrWorker(),new P
   // heure : sur la ligne de la date numérique, après la date
   let tm=null;if(m1){const after=flat.slice(flat.indexOf(m1[0])+m1[0].length,flat.indexOf(m1[0])+m1[0].length+14);const m3=after.match(/(\d{1,2})\s?[:.;]\s?(\d\d)(?:\s?[:.;]\s?(\d\d))?/);
     if(m3&&+m3[1]<24&&+m3[2]<60)tm={h:+m3[1],mi:+m3[2],s:+(m3[3]||0)}}
+  // sinon : la première heure hh:mm:ss du ticket (sous le titre), puis hh:mm
+  if(!tm){const k=Math.max(0,flat.search(/cl[o0]\s*t\s*[uü]/)),tail=flat.slice(k);const m4=tail.match(/(\d{1,2})\s?[:.;]\s?(\d\d)\s?[:.;]\s?(\d\d)/)||tail.match(/\b(\d{1,2})\s?[:h]\s?(\d\d)\b/);
+    if(m4&&+m4[1]<24&&+m4[2]<60)tm={h:+m4[1],mi:+m4[2],s:+(m4[3]||0)}}
   res.time=tm;return res}
 function busy(msg){let b=$('#busyOv');if(!msg){if(b)b.remove();return}
   if(!b){b=document.createElement('div');b.id='busyOv';b.className='modal';document.body.appendChild(b)}
@@ -2106,13 +2109,12 @@ async function closingTicket(u){
     try{R=await readTicket(img)}catch(e){err=e}finally{busy(null)}
     const T=todayS(),Y=addD(T,-1);let pb=[],ts=null,src='photo';
     if(err)pb.push('lecture impossible sur cet appareil ('+(err.message||err)+')');
+    /* seuls comptent : « Clôture de période » + l'heure. La date imprimée n'est pas vérifiée. */
     else{if(!R.clot)pb.push('ce n\'est pas un ticket « Clôture de période »');
-      if(!R.date)pb.push('la date du ticket est illisible');else if(R.date!==T&&R.date!==Y)pb.push('le ticket date du '+frD(R.date)+', pas d\'aujourd\'hui');
-      if(R.time&&R.date&&!pb.length){const t=parse(R.date).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;
-        if(t<=tPhoto+10*60000&&t>=tPhoto-8*3600e3){ts=t;src='ticket'}}}
+      if(R.time&&!pb.length){let t=parse(T).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;if(t>tPhoto+10*60000)t-=864e5;ts=t;src='ticket'}}
     if(!pb.length){ts=ts||tPhoto;
       const ok=await new Promise(res=>info(`<h2>✔ Clôture de période reconnue</h2>
-        <p>Date du service : <b>${frD(R.date)}</b><br>Fin de service : <b style="font-size:22px">${hms(ts)}</b><br><span class="meta">${src==='ticket'?'heure lue sur le ticket':'heure de la photo (l\'heure du ticket n\'a pas pu être lue avec certitude)'}</span></p>
+        <p>Fin de service : <b style="font-size:22px">${hms(ts)}</b><br><span class="meta">${src==='ticket'?'heure lue sur le ticket':'heure de la photo (l\'heure du ticket n\'a pas pu être lue avec certitude)'}</span></p>
         <div class="row"><button class="btn ghost" id="ckRe">Reprendre la photo</button><span class="grow"></span><button class="btn ok" id="ckOk">✔ Valider le départ</button></div>`,
         ()=>{$('#ckOk').onclick=()=>{closeInfo();res(true)};$('#ckRe').onclick=()=>{closeInfo();res(false)}}));
       if(ok)return{img,ts,src};continue}
