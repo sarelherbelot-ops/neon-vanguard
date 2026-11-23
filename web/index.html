@@ -194,6 +194,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
     <button data-v="hotel">🏨 Hôtel</button>
     <button data-v="cmd">🛒 Commandes</button>
     <button data-v="chat">💬 Messages</button>
+    <button data-v="instr">📖 Instructions</button>
     <button data-v="params">⚙️ Réglages</button>
   </nav>
 </header>
@@ -381,6 +382,10 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
   </div>
   <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
   <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
+</section>
+<section id="v-instr" class="hidden">
+  <div class="row" style="align-items:center;margin-bottom:8px"><h2 class="grow" style="margin:0">📖 Instructions</h2><button class="btn ok" id="inNew">➕ Nouvelle instruction</button></div>
+  <div id="inList"></div>
 </section>
 <section id="v-chat" class="hidden">
   <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:420px;padding:0;overflow:hidden">
@@ -724,8 +729,8 @@ let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFull
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
 function show(v){if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ['jour','point','semaine','cal','resa','hotel','cmd','chat','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
-  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();
+    ['jour','point','semaine','cal','resa','hotel','cmd','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();if(v==='instr')renderInstr();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
 
@@ -926,7 +931,7 @@ function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
 function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false;const u=(CFG.users||[]).find(x=>x.nom.trim().toLowerCase()===a.user);return!(u&&u.role==='admin')}
 function applyRestrict(){const r=RESTRICT();document.body.classList.toggle('restricted',r);if(r&&VIEW==='params')show('jour')}
-function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal()}
+function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -1399,6 +1404,50 @@ function editFac(pre){const T=todayS(),y=T.slice(0,4),no=facNextNo(y);
     $('#faOk').onclick=go;$('#faPrint').onclick=go;
     if($('#faSet'))$('#faSet').onclick=async()=>{closeInfo();const a=await askAuth('En-tête des factures',['admin']);if(!a)return editFac();const ad=prompt('Adresse sous le nom (facultatif) :',CFG.facAdr||'');if(ad!=null)CFG.facAdr=ad.trim();const tv=prompt('N° TVA (facultatif, ex : CHE-123.456.789 TVA) :',CFG.facTva||'');if(tv!=null)CFG.facTva=tv.trim();put('cfg',CFG);toast('En-tête des factures enregistré');editFac()};setTimeout(()=>$('#faMt').focus(),60)})}
 $('#rsFac').onclick=()=>editFac();
+/* ===================== INSTRUCTIONS (procédures internes) ===================== */
+const INSTR_DEF=[{id:'accueil',titre:"Procédure d'accueil client - {nom}",texte:`## 1. Arrivée et prise en charge
+- Proposer systématiquement une aide pour !!porter les valises!! jusqu'à l'étage.
+- Demander le prénom du client et vérifier la fiche correspondante.
+- !!Obligatoire :!! demander la pièce d'identité et en effectuer une copie.
+## 2. Paiement et facturation
+- Vérifier le montant indiqué en bas de la fiche client.
+- Si **« Payé par Booking »** est indiqué sur la fiche : le client ne règle que la !!taxe de séjour (CHF 4.50 par personne et par nuit)!!.
+## 3. Présentation de la chambre
+- **WiFi :** indiquer le code affiché derrière la porte. Préciser que la partie haute du document n'est plus valide.
+- **Services :** informer le client que le petit-déjeuner n'est plus proposé.
+- **Équipements :**
+-- Présenter le fonctionnement de la télévision.
+-- Informer le client qu'il peut se servir librement en eau plate et en café (compris dans le prix).
+-- Confirmer la présence de savon dans la salle de bain.
+## 4. Départ
+- Informer le client que la chambre doit être libérée à !!10h00!!.
+- Préciser de laisser la !!clé sur le comptoir!! au moment du départ. Il n'est pas nécessaire de nous téléphoner ou de nous prévenir ; nous nous en occuperons ensuite.`}];
+const instrAll=()=>CFG.instr||INSTR_DEF;
+const instrTitre=x=>String(x.titre||'').replace('{nom}',ficheNom());
+function instrInline(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/!!(.+?)!!/g,'<b style="color:#c0392b">$1</b>')}
+function instrHTML(x,print){const C='#2c4a7c';let h='',ul=0,sub=0;const close=()=>{if(sub){h+='</ul>';sub=0}if(ul){h+='</ul>';ul=0}};
+  for(const raw of String(x.texte||'').split('\n')){const l=raw.replace(/\s+$/,'');if(!l.trim()){close();continue}
+    if(l.startsWith('## ')){close();h+=`<h3 style="background:#dbe4f0;border-left:5px solid ${C};color:${C};padding:5px 10px;margin:${print?'7mm':'16px'} 0 6px;font-size:${print?'15pt':'19px'};-webkit-print-color-adjust:exact;print-color-adjust:exact">${instrInline(l.slice(3))}</h3>`;continue}
+    if(/^\s*--\s|^\s{2,}-\s/.test(l)){if(!ul){h+='<ul style="margin:4px 0">';ul=1}if(!sub){h+='<ul style="list-style:circle;margin:2px 0">';sub=1}h+=`<li style="margin:4px 0">${instrInline(l.replace(/^\s*-+\s/,''))}</li>`;continue}
+    if(/^\s*-\s/.test(l)){if(sub){h+='</ul>';sub=0}if(!ul){h+='<ul style="margin:4px 0">';ul=1}h+=`<li style="margin:5px 0">${instrInline(l.replace(/^\s*-\s/,''))}</li>`;continue}
+    close();h+=`<p style="margin:6px 0">${instrInline(l)}</p>`}
+  close();
+  return`<div style="font-size:${print?'12.5pt':'17px'};line-height:1.45;color:#222"><h2 style="text-align:center;color:${C};font-size:${print?'20pt':'22px'};border-bottom:3px solid ${C};padding-bottom:8px;margin:0 0 6px">${esc(instrTitre(x))}</h2>${h}</div>`}
+function renderInstr(){const L=instrAll(),adm=!RESTRICT();
+  $('#inList').innerHTML=L.map((x,i)=>`<div class="card"><div class="row" style="justify-content:flex-end;gap:6px;margin-bottom:6px"><button class="btn sec sm" data-inp="${i}">🖨 Imprimer</button>${adm?`<button class="btn ghost sm" data-ine="${i}">✏️ Modifier</button>`:''}</div>${instrHTML(x,false)}</div>`).join('')||'<p class="meta">Aucune instruction.</p>';
+  $('#inNew').classList.toggle('hidden',!adm);
+  document.querySelectorAll('[data-inp]').forEach(b=>b.onclick=()=>{const x=instrAll()[+b.dataset.inp];$('#printArea').innerHTML='<style>@page{size:A4;margin:16mm 18mm}</style>'+instrHTML(x,true);outDoc(instrTitre(x),0)});
+  document.querySelectorAll('[data-ine]').forEach(b=>b.onclick=()=>editInstr(+b.dataset.ine))}
+async function editInstr(i){if(RESTRICT())return;if(!MAIN()&&!await askAuth('Modifier les instructions',['admin']))return;
+  const L=JSON.parse(JSON.stringify(instrAll())),nw=i==null,x=nw?{id:'in'+Date.now().toString(36),titre:'',texte:'## 1. Première étape\n- '}:L[i];
+  info(`<h2>${nw?'➕ Nouvelle instruction':'✏️ Modifier l\'instruction'}</h2>
+    <label>Titre<input id="inT" value="${esc(x.titre)}" placeholder="ex : Procédure de fermeture"></label>
+    <label>Texte<textarea id="inX" rows="16" style="font-family:monospace;font-size:15px">${esc(x.texte)}</textarea></label>
+    <p class="meta">Écriture : <b>## </b>titre de partie · <b>- </b>point · <b>-- </b>sous-point · <b>**mot**</b> en gras · <b>!!mot!!</b> en rouge. {nom} = nom de l'établissement.</p>
+    <div class="row" style="margin-top:10px">${nw?'':'<button class="btn danger" id="inDel">Supprimer</button>'}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="inOk">Enregistrer</button></div>`,
+  ()=>{$('#inOk').onclick=()=>{const t=$('#inT').value.trim(),tx=$('#inX').value;if(!t)return toast('Mets un titre');x.titre=t;x.texte=tx;if(nw)L.push(x);CFG.instr=L;put('cfg',CFG);closeInfo();renderInstr();toast('Instruction enregistrée ✔')};
+    if($('#inDel'))$('#inDel').onclick=()=>{if(!confirm('Supprimer cette instruction ?'))return;L.splice(i,1);CFG.instr=L;put('cfg',CFG);closeInfo();renderInstr()}})}
+$('#inNew').onclick=()=>editInstr(null);
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=htAll().filter(h=>h.etat!=='annule'&&h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
