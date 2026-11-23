@@ -707,14 +707,14 @@ function plannedTasks(uid,d){const out=[],st=CFG.mineStart||'2000-01-01';
   return out}
 /* ce qu'il doit faire ce jour-là : les tâches prévues ce jour + celles des jours d'avant pas encore faites */
 function myTasks(uid,d){if(!worksOn(uid,d))return[];return plannedTasks(uid,d).filter(x=>x.day<=d&&(!x.done||x.done.s===d))}
-const myLeft=(uid,d)=>myTasks(uid,d).filter(x=>!x.done);
+const myLeft=(uid,d)=>{const u=(CFG.users||[]).find(x=>x.id===uid);return u&&u.libre?[]:myTasks(uid,d).filter(x=>!x.done)};
 function mineCardHTML(s){const U=(CFG.users||[]).filter(u=>u.role!=='boss');let h='';
   for(const u of U){const L=myTasks(u.id,s);if(!L.length)continue;
     h+=`<div class="card" style="border:2px solid #7c3aed;margin-bottom:10px"><b style="font-size:17px">👤 Tâches de ${esc(u.nom)} aujourd'hui</b><div class="meta" style="margin:2px 0 6px">Placées automatiquement selon son planning. À faire avant son départ, avec photo.</div>
     ${L.map(x=>`<div class="row" data-mt="${x.t.id}" style="align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;margin:5px 0;cursor:pointer;${x.done?'background:#f0fdf4':''}"><span style="font-size:20px">${x.done?'✅':'⬜'}</span><span class="grow"><b>${esc(x.t.nom)}</b> <span class="meta">${x.ty==='H'?'hebdo':'mensuel'}${x.day<s?' · en retard (prévue le '+frD(x.day).slice(0,5)+')':''}</span></span>${x.done?`<span class="meta">fait par ${esc(x.done.r.emp||'')} à ${hhmm(x.done.r.ts)}</span>`:'<span class="meta" style="color:#b45309;font-weight:700">à faire</span>'}</div>`).join('')}</div>`}
   return h}
 /* au départ : bloquer tant que ses tâches du jour ne sont pas faites (photo), ou partir en laissant une alerte */
-async function myTasksBlock(u,d){let end=0;
+async function myTasksBlock(u,d){if(u.libre)return{end:0};let end=0;
   for(;;){const L=myLeft(u.id,d);if(!L.length)return{end};
     const r=await new Promise(res=>info(`<h2>⛔ Tâche de ménage pas faite</h2><p style="font-size:17px">${esc(u.nom)}, aujourd'hui tu dois faire ${L.length>1?'ces tâches':'cette tâche'} avant de partir :</p>
       <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0">${L.map(x=>`<div class="row" style="border:1px solid var(--line);border-radius:10px;padding:8px;align-items:center"><div class="grow"><b>${esc(x.t.nom)}</b>${x.t.det?`<div class="meta">${esc(x.t.det)}</div>`:''}</div><button class="btn ok" data-mf="${x.t.id}">📸 Fait</button></div>`).join('')}</div>
@@ -1796,12 +1796,12 @@ function drawEF(){$('#pFrigos').innerHTML=EF.map((f,i)=>`<div class="et" style="
   <button class="btn danger sm" data-fx="${i}">✕</button></div>`).join('')||'<p class="meta">Aucun appareil.</p>';
   $('#pFrigos').querySelectorAll('[data-k]').forEach(el=>el.oninput=el.onchange=()=>{EF[el.dataset.fi][el.dataset.k]=el.type==='number'?+el.value:el.value});
   $('#pFrigos').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{EF.splice(+b.dataset.fx,1);drawEF()})}
-function drawEU(){$('#pUsers').innerHTML=EU.map((u,i)=>`<div class="et" style="grid-template-columns:1.3fr 1fr 1.3fr 1.2fr auto auto">
+function drawEU(){$('#pUsers').innerHTML=EU.map((u,i)=>`<div class="et" style="grid-template-columns:1.3fr 1fr 1.3fr 1.2fr 1.4fr auto auto">
   <input data-ui="${i}" data-k="nom" value="${esc(u.nom)}" placeholder="Nom">
   <select data-ui="${i}" data-k="role">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${u.role===k?'selected':''}>${v}</option>`).join('')}</select>
   <input type="password" data-ui="${i}" data-k="pw" placeholder="${u.hash?'••••  (vide = inchangé)':'⚠ à créer'}" autocomplete="new-password">
   <select data-ui="${i}" data-k="pmode" title="Pause">${Object.entries(PMODES).map(([k,v])=>`<option value="${k}" ${(u.pmode||'aucune')===k?'selected':''}>${k==='regle'?'Pause 15 min / 1 h':'Pas de pause'}</option>`).join('')}</select>
-  <select data-ui="${i}" data-k="poste" title="Poste"><option value="salle" ${poste(u)==='salle'?'selected':''}>🍽 Salle</option><option value="cuisine" ${poste(u)==='cuisine'?'selected':''}>👨‍🍳 Cuisine</option><option value="chef" ${poste(u)==='chef'?'selected':''}>👨‍🍳 Cuisine — chef, sans tâches de fermeture</option></select>
+  <select data-ui="${i}" data-k="poste" title="Poste"><option value="salle" ${poste(u)==='salle'?'selected':''}>🍽 Salle</option><option value="cuisine" ${poste(u)==='cuisine'?'selected':''}>👨‍🍳 Cuisine</option><option value="chef" ${poste(u)==='chef'?'selected':''}>👨‍🍳 Cuisine — chef, sans tâches de fermeture</option></select><label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink);white-space:nowrap"><input type="checkbox" data-ui="${i}" data-k="libre" ${u.libre?'checked':''} style="width:auto;margin:0;transform:scale(1.2)"> sans tâches</label>
   <button class="btn danger sm" data-ux="${i}">✕</button></div>`).join('');
   $('#pUsers').querySelectorAll('[data-k]').forEach(el=>el.oninput=el.onchange=()=>{EU[el.dataset.ui][el.dataset.k]=el.type==='checkbox'?el.checked:el.type==='number'?(el.value===''?0:+el.value):el.value;if(el.dataset.k==='poste')EU[el.dataset.ui].salle=el.value==='salle'});
   $('#pUsers').querySelectorAll('[data-ux]').forEach(b=>b.onclick=()=>{EU.splice(+b.dataset.ux,1);drawEU()})}
@@ -1874,7 +1874,7 @@ function renderNavEd(){const el=$('#navEd');if(!el)return;const o=navOrder();
   el.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>{const i=+b.dataset.nd,a=navOrder();[a[i+1],a[i]]=[a[i],a[i+1]];save(a)});
   el.querySelectorAll('[data-nh]').forEach(c=>c.onchange=()=>{const H=new Set(CFG.navHide||[]);if(c.checked)H.delete(c.dataset.nh);else H.add(c.dataset.nh);if(NAVDEF.every(x=>x.v==='params'||H.has(x.v))){c.checked=true;return toast('Garde au moins un onglet')}CFG.navHide=[...H];put('cfg',CFG);applyNav();renderNavEd()})}
 $('#navReset').onclick=()=>{delete CFG.navOrder;delete CFG.navHide;put('cfg',CFG);applyNav();renderNavEd();toast('Ordre d\'origine remis')};
-function applyCfg(){setTimeout(applyRestrict,0);applyNav();if(!RESTRICT()&&!CFG.mineStart){CFG.mineStart=todayS();put('cfg',CFG)}if(!RESTRICT()&&!CFG.finInit){CFG.finInit=1;(CFG.tasks||[]).forEach(t=>{if(t.type==='H'&&/friteuse/i.test(t.nom))t.fin=true});put('cfg',CFG)}if(!RESTRICT()&&MAIN())pdjDefault();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
+function applyCfg(){setTimeout(applyRestrict,0);applyNav();if(!RESTRICT()&&!CFG.mineStart){CFG.mineStart=todayS();put('cfg',CFG)}if(!RESTRICT()&&!CFG.libreInit){CFG.libreInit=1;(CFG.users||[]).forEach(u=>{if(u.role==='admin')u.libre=true});put('cfg',CFG)}if(!RESTRICT()&&!CFG.finInit){CFG.finInit=1;(CFG.tasks||[]).forEach(t=>{if(t.type==='H'&&/friteuse/i.test(t.nom))t.fin=true});put('cfg',CFG)}if(!RESTRICT()&&MAIN())pdjDefault();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
 
 /* ===================== POINTEUSE ===================== */
 let PTS={}; // PTS[date] = [{id,uid,nom,in,out,photo}]
@@ -1886,7 +1886,7 @@ setInterval(()=>{if(VIEW==='point')tick()},1000);
 function renderPoint(){setTimeout(oubliBadge,0);tick();
   $('#pGrid').innerHTML=staff().map(u=>{const o=openShift(u.id);
     return `<button class="pbtn ${o?'in':''}" data-u="${u.id}"><b>${esc(u.nom)}</b>
-      <span class="meta">${o?'Présent depuis '+hhmm(o.e.in)+(o.d!==todayS()?' ('+frD(o.d)+')':''):'Absent'}${poste(u)==='salle'?' · 🍽 Salle':poste(u)==='chef'?' · 👨‍🍳 Chef':' · 👨‍🍳 Cuisine'}</span>
+      <span class="meta">${o?'Présent depuis '+hhmm(o.e.in)+(o.d!==todayS()?' ('+frD(o.d)+')':''):'Absent'}${poste(u)==='salle'?' · 🍽 Salle':poste(u)==='chef'?' · 👨‍🍳 Chef':' · 👨‍🍳 Cuisine'}${u.libre?' · sans tâches':''}</span>
       ${cardPlan(u,o)}<br>
       <span class="act">${o?'Pointer le départ':'Pointer l\'arrivée'}</span></button>`}).join('');
   $('#pGrid').querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>punch(b.dataset.u));
@@ -1912,7 +1912,7 @@ async function punch(uid){const u=userById(uid),o=openShift(uid);
   const mt=await myTasksBlock(u,o.d);if(!mt)return toast('Départ non pointé : tâche de ménage à faire');
   let ferm=false;
   const zf=poste(u);
-  if(zf==='cuisine')ferm=await new Promise(res=>info(`<h2>Départ de ${esc(u.nom)}</h2><p style="font-size:18px">Tu es le dernier en cuisine et tu fais la <b>fermeture de la cuisine</b> ?</p><p class="meta">Si oui, les tâches de nettoyage de la cuisine du jour doivent être faites (avec photo).</p>
+  if(zf==='cuisine'&&!u.libre)ferm=await new Promise(res=>info(`<h2>Départ de ${esc(u.nom)}</h2><p style="font-size:18px">Tu es le dernier en cuisine et tu fais la <b>fermeture de la cuisine</b> ?</p><p class="meta">Si oui, les tâches de nettoyage de la cuisine du jour doivent être faites (avec photo).</p>
       <div class="row" style="margin-top:14px"><button class="btn ghost" id="fNo" style="flex:1">Non, je pars seulement</button><button class="btn ok" id="fYes" style="flex:1">Oui, fermeture cuisine</button></div>`,
     ()=>{$('#fNo').onclick=()=>{closeInfo();res(false)};$('#fYes').onclick=()=>{closeInfo();res(true)}}));
   else if(zf==='salle')ferm=await new Promise(res=>info(`<h2>Départ de ${esc(u.nom)}</h2><p style="font-size:18px">Tu fais la <b>fermeture de la caisse</b> ?</p><p class="meta">Si oui, la photo du rapport de caisse est obligatoire.</p>
@@ -1936,7 +1936,7 @@ async function punch(uid){const u=userById(uid),o=openShift(uid);
 /* ---- fermeture : toutes les tâches de la salle du jour doivent être faites ---- */
 const PENDCK={};
 function choresLeft(d,z){return due(d).filter(t=>tz(t)===(z||'salle')&&!rec(d,t.id))}
-async function closingChores(u,d,z){z=z||'salle';const ZN=z==='cuisine'?'de la cuisine':'de la salle';let end=0;
+async function closingChores(u,d,z){if(u.libre)return{end:0};z=z||'salle';const ZN=z==='cuisine'?'de la cuisine':'de la salle';let end=0;
   for(;;){const L=choresLeft(d,z);if(!L.length)return{end};
     const r=await new Promise(res=>info(`<h2>⛔ Fermeture bloquée</h2><p style="font-size:17px">Tu ne peux pas fermer tant que les tâches de nettoyage ${ZN} ne sont pas terminées.</p>
       <p class="meta">Il reste <b>${L.length}</b> tâche(s). Fais-la, puis appuie sur « Fait » et prends la photo de ce que tu as nettoyé. L'heure de départ sera l'heure de la dernière tâche finie.</p>
