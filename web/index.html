@@ -146,6 +146,9 @@ body{padding-top:env(safe-area-inset-top,0px);padding-left:env(safe-area-inset-l
 .sheet tr.today td{outline:2px solid var(--navy);outline-offset:-2px}
 .sheet td.tv.ko{background:var(--red2);color:var(--red);-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body.restricted .adm-only,body.restricted nav button[data-v=params],body.restricted #updBar{display:none!important}
+/* employés sur leur téléphone : lecture seule */
+body.readonly #htNew,body.readonly #htFicheV,body.readonly #rsNew,body.readonly #rsFac,body.readonly #pjPhoto,body.readonly #pjEdit,body.readonly #pjCopy,body.readonly #cmClear,body.readonly #inNew,body.readonly [data-htq],body.readonly [data-rsq],body.readonly [data-cadd],body.readonly #rcNew,body.readonly #dClose{display:none!important}
+body.readonly #roBar{display:block!important}
 @media print{.sheet{font-size:9px}.sheet td.ck{height:20px;width:22px;font-size:11px}.sheet td.sg{height:22px;width:80px}.sheet td.sg svg{width:76px;height:20px}.sheet td,.sheet th{padding:2px 3px}}
 /* planning */
 .pltab{width:100%;border-collapse:collapse;font-size:14px}
@@ -201,6 +204,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
 </header>
 
 <div id="resaBar" class="hidden" style="background:#fff7ed;border-bottom:2px solid #f97316;padding:8px 16px;cursor:pointer;font-size:15px"></div>
+<div id="roBar" style="display:none;background:#fef3c7;color:#92400e;padding:8px 14px;font-weight:700;text-align:center">📱 Accès à distance : consultation seulement. Tout se fait sur la tablette du restaurant.</div>
 <main>
 <!-- ================= JOUR ================= -->
 <section id="v-jour">
@@ -1043,11 +1047,11 @@ function printRecep(list){const months=[...new Set(list.map(m=>m.slice(0,7)))];
   outDoc('Réception marchandises',1)}
 
 /* ===================== INFO MODALE ===================== */
-function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after()}
+function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after();if(typeof RO==='function'&&RO())roModal()}
 function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
 function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false;const u=(CFG.users||[]).find(x=>x.nom.trim().toLowerCase()===a.user);return!(u&&u.role==='admin')}
-function applyRestrict(){const r=RESTRICT();document.body.classList.toggle('restricted',r);if(r&&VIEW==='params')show('jour')}
+function applyRestrict(){const r=RESTRICT();document.body.classList.toggle('restricted',r);document.body.classList.toggle('readonly',RO());if(r&&VIEW==='params')show('jour')}
 function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
@@ -1949,6 +1953,10 @@ function renderPoint(){setTimeout(oubliBadge,0);tick();
   $('#phUser').innerHTML='<option value="">Tous</option>'+staff().map(u=>`<option value="${u.id}" ${$('#phUser').value===u.id?'selected':''}>${esc(u.nom)}</option>`).join('');
   renderPlan();renderPH()}
 /* depuis un téléphone (accès à distance), on peut tout voir mais pas pointer : le pointage se fait sur la tablette du restaurant */
+/* lecture seule : toute personne connectée à distance, sauf le chef */
+const RO=()=>{if(!RESTRICT())return false;const u=(typeof CUR_U==='function'&&CUR_U())||{};return u.role!=='chef'}; // enregistrer : seulement ton téléphone (admin), le téléphone du chef et la tablette
+function roModal(){const b=$('#mInfoBody');if(!b)return;b.querySelectorAll('input,select,textarea').forEach(e=>e.disabled=true);b.querySelectorAll('button').forEach(x=>{if(x.id==='iClose'||/Fermer|Annuler|^OK$|Plus tard|🖨/.test(x.textContent.trim()))return;x.style.display='none'});if(!b.querySelector('#roNote'))b.insertAdjacentHTML('afterbegin','<div id="roNote" style="background:#fef3c7;color:#92400e;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-weight:700">📱 Consultation seulement depuis le téléphone</div>')}
+['click','pointerdown'].forEach(ev=>document.addEventListener(ev,e=>{if(!RO())return;const t=e.target.closest('.task,.tcell,td.tv,[data-pt],[data-mt],[data-ci],[data-cq],[data-fre],[data-room],[data-ht],[data-rs],[data-mf],[data-pf]');if(t&&!t.closest('#mInfo')){e.preventDefault();e.stopPropagation();if(ev==='click'){const v=t.closest('[data-ht]')||t.closest('[data-rs]')||t.closest('[data-room]');if(v&&v.dataset.ht)editHotel(v.dataset.ht);else if(v&&v.dataset.rs)editResa(v.dataset.rs);else if(v&&v.dataset.room)roomClick(v.dataset.room);else toast('📱 Consultation seulement : à faire sur la tablette')}}},true));
 const remoteNoPunch=()=>RESTRICT()&&((typeof CUR_U==='function'&&CUR_U())||{}).role!=='chef';
 /* le chef peut pointer depuis son téléphone (lui seulement), même sans horaire prévu */
 async function punch(uid){if(RESTRICT()&&!remoteNoPunch()&&uid!==(CUR_U()||{}).id)return toast('Depuis ton téléphone, tu peux pointer seulement pour toi');if(remoteNoPunch())return info(`<h2>⏱ Pointage sur la tablette uniquement</h2><p style="font-size:17px">Depuis ton téléphone, tu peux tout consulter, mais <b>le pointage (arrivée et départ) se fait seulement sur la tablette du restaurant</b>, sur place.</p><div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`);const u=userById(uid),o=openShift(uid);
