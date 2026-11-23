@@ -340,6 +340,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
       <span class="grow"></span>
       <button class="btn sec" id="rsPrint">🖨 Imprimer / partager</button>
       <button class="btn ok" id="rsNew">➕ Nouvelle réservation</button>
+      <button class="btn sec" id="rsFac">🧾 Facture restaurant</button>
     </div>
   </div>
   <div class="card"><div id="rsList"></div></div>
@@ -637,7 +638,8 @@ const dayObj=s=>DAYS[s]||(DAYS[s]={tasks:{}});
 function isClosed(s){const o=DAYS[s];if(o&&o.closed!==undefined)return o.closed;return !CFG.open.includes(wd(s))}
 function due(s){if(isClosed(s))return [];const w=wd(s);return CFG.tasks.filter(t=>t.type==='Q'||t.jour===w)}
 const ZONES={salle:'🍽 Nettoyage salle',cuisine:'👨‍🍳 Nettoyage cuisine',temp:'🌡 Températures',recep:'📦 Réception'};
-let RCP={},RSV={},HTL={},MEN={},CMD={},MSG={}; // MSG['2026-11'] = [{id,ts,from,dev,txt}]
+let RCP={},RSV={},HTL={},MEN={},CMD={},MSG={},FAC={}; // FAC['2026'] = factures restaurant [{id,no,date,nom,nb,des,montant,pay,sig,ts,by}]
+ // MSG['2026-11'] = [{id,ts,from,dev,txt}]
  // CMD['cuisine-2026-11-22'] = {date,zone,items:{id:{c,q}},extra,st,ts}
  // MEN['2026-12'] = [{id,ch,date,ts,by}] ménage des chambres fait
  // HTL['2026-12'] = séjours dont l'arrivée est dans ce mois
@@ -1060,7 +1062,7 @@ function recapCheck(){const last=addD(monday(todayS()),-7);if(!CFG.recapMail||lo
     ()=>{$('#rcSend').onclick=()=>{closeInfo();sendRecap(last)};$('#rcLater').onclick=()=>closeInfo()})}
 
 /* ===================== SAUVEGARDE AUTOMATIQUE (chaque soir) ===================== */
-function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG})}
+function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC})}
 async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:addD(T,-30);
   const body=await dossierHTML(a,T,['salle','cuisine','temp','recep','plan','heures']);
   const rs=[];for(const mo of Object.keys(RSV).sort())for(const r of (RSV[mo]||[]).slice().sort((x,y)=>(x.date+x.heure).localeCompare(y.date+y.heure)))rs.push(r);
@@ -1320,6 +1322,64 @@ function ficheHTML(h){const B='color:#1d4ed8;font-weight:700;font-family:sans-se
   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:7mm;gap:10mm"><div><p style="margin:0 0 1.5mm">Pour le room-service, adressez-vous au personnel du restaurant.</p><p style="margin:0">Nos sincères salutations, ${esc(ficheNom())}.</p></div><div style="width:65mm;font-weight:700;font-size:13pt;border-bottom:1px solid #333;padding-bottom:13mm;flex:none">Signature</div></div></div>`}
 function printFiche(h){$('#printArea').innerHTML='<style>@page{size:A4;margin:10mm 16mm}</style>'+ficheHTML(h);outDoc(h?'Fiche hôtel '+h.nom:'Fiche hôtel vierge',0)}
 $('#htFicheV').onclick=()=>printFiche(null);
+/* ===================== FACTURE RESTAURANT (comme à la main, sans détail) ===================== */
+const facAll=()=>{const L=[];for(const y in FAC)for(const f of FAC[y]||[])L.push(f);return L.sort((a,b)=>b.ts-a.ts)};
+function facNextNo(y){let m=0;for(const f of FAC[y]||[]){const n=parseInt(String(f.no||'').split('-').pop(),10);if(n>m)m=n}return 'F'+y+'-'+String(m+1).padStart(4,'0')}
+function facHTML(f){const B='color:#1d4ed8;font-weight:700;font-family:sans-serif';const TD='border:1.3px solid #333;padding:7px 10px;font-size:13pt';
+  const sig=f.sig?`<svg viewBox="0 0 ${f.sw||300} ${f.sh||110}" style="width:70mm;height:26mm"><path d="${f.sig}" fill="none" stroke="#1d4ed8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`:'';
+  return`<div style="font-family:Calibri,Carlito,'DejaVu Sans',Arial,sans-serif;color:#111;font-size:12pt">
+  <div style="text-align:center;font-size:22pt;font-weight:700;color:#333">${esc(ficheNom())}</div>
+  ${CFG.facAdr?`<div style="text-align:center;font-size:10.5pt;color:#555;white-space:pre-line">${esc(CFG.facAdr)}</div>`:''}
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin:7mm 2mm 3mm"><b style="font-size:18pt">Facture / Quittance</b><span style="font-size:12pt">N° <b style="${B}">${esc(f.no)}</b></span></div>
+  <div style="display:flex;justify-content:space-between;margin:0 2mm 3mm"><span>Date : <b style="${B}">${frD(f.date)}</b></span>${f.nom?`<span>Client : <b style="${B}">${esc(f.nom)}</b></span>`:''}</div>
+  <table style="width:100%;border-collapse:collapse"><tr><th style="${TD};text-align:left;background:#f3f3f3">Désignation</th><th style="${TD};width:26mm;background:#f3f3f3">Personnes</th><th style="${TD};width:38mm;text-align:right;background:#f3f3f3">Montant</th></tr>
+  <tr><td style="${TD}"><span style="${B}">${esc(f.des||'Repas')}</span></td><td style="${TD};text-align:center"><span style="${B}">${f.nb||''}</span></td><td style="${TD};text-align:right"><span style="${B}">CHF ${(+f.montant||0).toFixed(2)}</span></td></tr>
+  <tr><td colspan="2" style="${TD};text-align:right;font-weight:700">Total${CFG.facTva?' TTC':''}</td><td style="${TD};text-align:right;font-weight:800;font-size:15pt"><span style="${B}">CHF ${(+f.montant||0).toFixed(2)}</span></td></tr></table>
+  <div style="margin:3mm 2mm 0;font-size:10.5pt;color:#444">${CFG.facTva?'TVA incluse — N° TVA : '+esc(CFG.facTva):'TVA incluse'}</div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:6mm 2mm 0;gap:10mm">
+    <div>${f.pay?`Payé : <b style="${B}">${esc(f.pay)}</b>`:''}<div style="margin-top:4mm;font-size:11pt">Merci de votre visite.</div></div>
+    <div style="text-align:center"><div style="height:26mm;border-bottom:1px solid #333;min-width:70mm">${sig}</div><div style="font-size:10pt;margin-top:1mm">Signature${f.by?' — '+esc(f.by):''}</div></div></div>
+  <div style="margin-top:10mm;border-top:1px dashed #999"></div></div>`}
+function printFac(f){$('#printArea').innerHTML='<style>@page{size:A4;margin:12mm 16mm}</style>'+facHTML(f);outDoc('Facture '+f.no,0)}
+function editFac(pre){const T=todayS(),y=T.slice(0,4),no=facNextNo(y);
+  const IN='border:none;border-bottom:1.5px dashed #93c5fd;border-radius:0;background:transparent;color:#1d4ed8;font-weight:700;font-size:17px;padding:2px 4px;margin:0;min-width:0;flex:1 1 80px;width:auto;box-shadow:none';
+  const TD='border:1.3px solid #333;padding:5px 8px;font-weight:700;font-size:15px';
+  const chip=(grp,v)=>`<button type="button" class="btn ghost sm" data-${grp}="${esc(v)}" style="padding:3px 9px">${esc(v)}</button>`;
+  const recent=facAll().slice(0,8);
+  info(`<div style="background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;padding:12px 14px;font-family:Calibri,Carlito,'Segoe UI',sans-serif">
+    <div style="text-align:center;font-size:21px;font-weight:700;color:#333;margin-bottom:6px">${esc(ficheNom())}</div>
+    <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px"><b style="font-size:19px">Facture / Quittance</b><button class="btn ok" id="faPrint" style="padding:4px 10px;font-size:18px" title="Enregistrer et imprimer">🖨</button><span class="grow"></span><span>N° <b>${esc(no)}</b></span></div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td style="${TD}"><div class="fh-row"><span>Date :</span><input type="date" id="faDate" value="${T}" style="${IN};flex:none;width:165px"></div></td></tr>
+      <tr><td style="${TD}"><div class="fh-row"><span>Client :</span><input id="faNom" placeholder="facultatif" autocomplete="off" style="${IN}"></div></td></tr>
+      <tr><td style="${TD}"><div class="fh-row"><span>Nombre de personnes :</span><input type="number" id="faNb" min="1" value="${esc((pre&&pre.nb)||'')}" style="${IN};flex:0 0 70px"></div></td></tr>
+      <tr><td style="${TD}"><div class="fh-row"><span>Désignation :</span><input id="faDes" value="Repas" autocomplete="off" style="${IN}"></div><div class="row" style="gap:5px;margin-top:4px;flex-wrap:wrap;font-weight:400">${['Repas','Menu','Repas et boissons','Boissons'].map(v=>chip('fd',v)).join('')}</div></td></tr>
+      <tr><td style="${TD}"><div class="fh-row"><span>Montant total : CHF</span><input type="number" id="faMt" min="0" step="0.05" inputmode="decimal" style="${IN};flex:0 0 120px;font-size:20px"></div></td></tr>
+      <tr><td style="${TD}"><div class="fh-row"><span>Payé :</span><input id="faPay" placeholder="espèces, carte…" autocomplete="off" style="${IN}"></div><div class="row" style="gap:5px;margin-top:4px;flex-wrap:wrap;font-weight:400">${['Espèces','Carte','Twint','À payer'].map(v=>chip('fp',v)).join('')}</div></td></tr>
+    </table>
+    <div style="margin-top:10px"><div class="row" style="align-items:center"><b class="grow">Signature</b><input id="faBy" placeholder="nom (facultatif)" value="${esc(localStorage.getItem('pn_faBy')||'')}" style="width:150px;margin:0"><button class="btn ghost sm" id="faClr">Effacer</button></div>
+      <canvas id="faPad" style="width:100%;height:110px;border:1.5px dashed #93c5fd;border-radius:8px;touch-action:none;background:#fafcff;margin-top:4px"></canvas></div>
+    </div>
+    ${recent.length?`<details style="margin-top:10px"><summary style="cursor:pointer">📋 Dernières factures (réimprimer)</summary>${recent.map(f=>`<div class="row" style="padding:4px 0;border-bottom:1px dotted var(--line);align-items:center"><span class="grow">${esc(f.no)} · ${frD(f.date)} · ${f.nb||'?'} pers. · <b>CHF ${(+f.montant||0).toFixed(2)}</b>${f.nom?' · '+esc(f.nom):''}</span><button class="btn sec sm" data-fre="${f.id}">🖨</button></div>`).join('')}</details>`:''}
+    <div class="row" style="margin-top:12px">${RESTRICT()?'':'<button class="btn ghost sm" id="faSet">⚙ Adresse et n° TVA</button>'}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="faOk">🖨 Imprimer la facture</button></div>`,
+  ()=>{const cv=$('#faPad'),cx=cv.getContext('2d');let S=[],cur=null;
+    const size=()=>{const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;cv.width=r.width*d;cv.height=r.height*d;cx.setTransform(d,0,0,d,0,0);draw()};
+    const draw=()=>{const r=cv.getBoundingClientRect();cx.clearRect(0,0,r.width,r.height);cx.lineWidth=2.5;cx.lineCap='round';cx.lineJoin='round';cx.strokeStyle='#1d4ed8';for(const s of S){cx.beginPath();s.forEach(([x,y],i)=>i?cx.lineTo(x,y):cx.moveTo(x,y));if(s.length===1)cx.lineTo(s[0][0]+1,s[0][1]);cx.stroke()}};
+    const pt=e=>{const r=cv.getBoundingClientRect();return[Math.round(e.clientX-r.left),Math.round(e.clientY-r.top)]};
+    cv.addEventListener('pointerdown',e=>{e.preventDefault();cv.setPointerCapture(e.pointerId);cur=[pt(e)];S.push(cur);draw()});
+    cv.addEventListener('pointermove',e=>{if(!cur)return;cur.push(pt(e));draw()});['pointerup','pointercancel'].forEach(v=>cv.addEventListener(v,()=>cur=null));
+    setTimeout(size,30);$('#faClr').onclick=()=>{S=[];draw()};
+    document.querySelectorAll('[data-fd]').forEach(b=>b.onclick=()=>{$('#faDes').value=b.dataset.fd});
+    document.querySelectorAll('[data-fp]').forEach(b=>b.onclick=()=>{$('#faPay').value=b.dataset.fp});
+    document.querySelectorAll('[data-fre]').forEach(b=>b.onclick=()=>{const f=facAll().find(x=>x.id===b.dataset.fre);if(f){closeInfo();printFac(f)}});
+    const go=()=>{const mt=parseFloat(String($('#faMt').value).replace(',','.'));if(!(mt>0))return toast('Indique le montant total');
+      const date=$('#faDate').value||T,yy=date.slice(0,4),r=cv.getBoundingClientRect(),by=$('#faBy').value.trim();localStorage.setItem('pn_faBy',by);
+      const f={id:'fa'+Date.now().toString(36),no:facNextNo(yy),date,nom:$('#faNom').value.trim(),nb:parseInt($('#faNb').value,10)||'',des:$('#faDes').value.trim()||'Repas',montant:Math.round(mt*100)/100,pay:$('#faPay').value.trim(),
+        sig:S.map(s=>'M'+s.map(p=>p.join(' ')).join('L')+(s.length===1?'l1 0':'')).join(''),sw:Math.round(r.width),sh:Math.round(r.height),by,ts:Date.now()};
+      (FAC[yy]=FAC[yy]||[]).push(f);put('fa:'+yy,FAC[yy]);closeInfo();printFac(f);toast('Facture '+f.no+' enregistrée ✔')};
+    $('#faOk').onclick=go;$('#faPrint').onclick=go;
+    if($('#faSet'))$('#faSet').onclick=async()=>{closeInfo();const a=await askAuth('En-tête des factures',['admin']);if(!a)return editFac();const ad=prompt('Adresse sous le nom (facultatif) :',CFG.facAdr||'');if(ad!=null)CFG.facAdr=ad.trim();const tv=prompt('N° TVA (facultatif, ex : CHE-123.456.789 TVA) :',CFG.facTva||'');if(tv!=null)CFG.facTva=tv.trim();put('cfg',CFG);toast('En-tête des factures enregistré');editFac()};setTimeout(()=>$('#faMt').focus(),60)})}
+$('#rsFac').onclick=()=>editFac();
 function renderHotel(){const d=htDay,A=htAll().filter(actif);
   const arr=A.filter(h=>h.arr===d).sort((a,b)=>(a.heure||'').localeCompare(b.heure||'')||String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
   const dep=A.filter(h=>h.dep===d).sort((a,b)=>String(a.ch).localeCompare(String(b.ch),'fr',{numeric:true}));
@@ -1592,12 +1652,12 @@ $('#pSave').onclick=async()=>{
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
-$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG}),'application/json');
+$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC}),'application/json');
 $('#pRestoreBtn').onclick=()=>$('#pRestore').click();
 $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=async()=>{try{const x=JSON.parse(r.result);if(!x.cfg||!x.days)throw 0;
     if(!confirm(`Remplacer toutes les données par cette sauvegarde (${Object.keys(x.days).length} jours) ?`))return;
-    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);MSG=x.messages||{};for(const k in MSG)put('ms:'+k,MSG[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
+    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);MSG=x.messages||{};for(const k in MSG)put('ms:'+k,MSG[k]);FAC=x.factures||{};for(const k in FAC)put('fa:'+k,FAC[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
@@ -1995,7 +2055,7 @@ function deepMerge(a,b){if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Arra
 /* qui gagne quand les deux appareils ont modifié la même chose */
 function resolve(k,loc,o){const pre=kPre(k),rt=o.t||0,lt=MT[k]||0;
   if(loc==null)return{v:o.v,rw:1};if(o.v==null)return{v:loc,rw:0};
-  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
+  if(pre==='d'||pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms'||pre==='fa')return{v:mergeVals(k,loc,o.v,removedIds(k,loc)),rw:0};
   if(k==='cfg'||pre==='pl'){if(MAIN()&&o.f)return{v:loc,rw:0};if(FOLLOW()||rt>lt)return{v:o.v,rw:1};return{v:loc,rw:0}}
   if(pre==='w'||pre==='co')return rt>lt?{v:deepMerge(loc,o.v),rw:0}:{v:deepMerge(o.v,loc),rw:0};
   return rt>lt?{v:o.v,rw:1}:{v:loc,rw:0}}
@@ -2008,14 +2068,14 @@ function kick(){clearTimeout(kickT);kickT=setTimeout(syncOnce,300)}
 function cloudPut(k,v){if(!cloudOn())return;OUT.add(k);saveOut();kick()}
 function photoQueue(id,delOp){if(!cloudOn())return;OUTPH.add((delOp?'-':'')+id);saveOut();kick()}
 function setCloud(k,v){CLOUD[k]=v;localPut('cl:'+k,v==null?null:v)}
-function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,dv:DV}[pre];return m?m[key]:null}
-function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);for(const k in MSG)L.push('ms:'+k);return L}
+function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,dv:DV}[pre];return m?m[key]:null}
+function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);for(const k in MSG)L.push('ms:'+k);for(const k in FAC)L.push('fa:'+k);return L}
 function removedIds(k,v){const c=CLOUD[k];if(!c)return[];
   if(kPre(k)==='d'){const a=(c.tasks)||{},b=(v&&v.tasks)||{};return Object.keys(a).filter(x=>!(x in b))}
-  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'||kPre(k)==='ms'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
+  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'||kPre(k)==='ms'||kPre(k)==='fa'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
 function mergeVals(k,loc,rem,rm){const pre=kPre(k);rm=new Set(rm||[]);
   if(pre==='d'&&loc&&rem){const t={...(rem.tasks||{}),...(loc.tasks||{})};rm.forEach(i=>delete t[i]);const o={...rem,...loc,tasks:t};if(rem.temps||loc.temps)o.temps={...(rem.temps||{}),...(loc.temps||{})};return o}
-  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
+  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms'||pre==='fa')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
   return loc??rem}
 /* même personne créée sur deux appareils (ids différents) : on garde une seule fiche et on rattache ses pointages */
 function remapUsers(oldC,nv){if(!oldC||!oldC.users||!nv||!nv.users)return;const byName={},map={};for(const u of nv.users)byName[u.nom.trim().toLowerCase()]=u.id;
@@ -2028,7 +2088,7 @@ function applyRemote(k,v){
   if(k==='cfg'){if(!v)return;remapUsers(CFG,v);CFG=v;if(migrateCfg()){localPut(k,CFG);OUT.add('cfg');saveOut();kick()}else localPut(k,v);applyCfg();refreshSoon();
     if(faResolve&&CFG.users&&CFG.users.some(u=>u.role==='admin'&&u.hash)){$('#mAuth').classList.add('hidden');$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');$('#aJoin').classList.add('hidden');const r=faResolve;faResolve=null;r()}
     return}
-  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,dv:DV}[pre];if(!map)return;
+  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,dv:DV}[pre];if(!map)return;
   if(v==null){delete map[key];localDel(k)}else{map[key]=v;localPut(k,v)}}
 let rfT=null;function refreshSoon(){clearTimeout(rfT);rfT=setTimeout(()=>{if(VIEW!=='params'&&$('#mSign').classList.contains('hidden')&&$('#mCam').classList.contains('hidden'))refresh()},300)}
 
@@ -2272,7 +2332,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   const all=await idbAll();
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
-  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k];else if(k.startsWith('ms:'))MSG[k.slice(3)]=all[k]}
+  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k];else if(k.startsWith('ms:'))MSG[k.slice(3)]=all[k];else if(k.startsWith('fa:'))FAC[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   if(!localStorage.getItem('pn_chNotif')){chNotified=Date.now();localStorage.setItem('pn_chNotif',chNotified)}
