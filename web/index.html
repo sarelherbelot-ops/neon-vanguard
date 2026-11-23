@@ -743,7 +743,7 @@ const myLeft=(uid,d)=>{const u=(CFG.users||[]).find(x=>x.id===uid);return u&&u.l
 function mineCardHTML(s){const U=(CFG.users||[]).filter(u=>u.role!=='boss');let h='';
   for(const u of U){const L=myTasks(u.id,s);if(!L.length)continue;
     h+=`<div class="card" style="border:2px solid #7c3aed;margin-bottom:10px"><b style="font-size:17px">👤 Tâches de ${esc(u.nom)} aujourd'hui</b><div class="meta" style="margin:2px 0 6px">Placées automatiquement selon son planning. À faire avant son départ, avec photo.</div>
-    ${L.map(x=>`<div class="row" data-mt="${x.t.id}" style="align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;margin:5px 0;cursor:pointer;${x.done?'background:#f0fdf4':''}"><span style="font-size:20px">${x.done?'✅':'⬜'}</span><span class="grow"><b>${esc(x.t.nom)}</b>${x.n>1?` <b style="color:#7c3aed">(${x.k+1}/${x.n})</b>`:''} <span class="meta">${x.ty==='H'?(x.n>1?x.n+' fois par semaine':'hebdo'):'mensuel'}${x.pool&&!x.jour?' · à partir de 16h':''}${x.day<s?' · en retard (prévue le '+frD(x.day).slice(0,5)+')':''}</span></span>${x.done?`<span class="meta">fait par ${esc(x.done.r.emp||'')} à ${hhmm(x.done.r.ts)}</span>`:'<span class="meta" style="color:#b45309;font-weight:700">à faire</span>'}</div>`).join('')}</div>`}
+    ${L.map(x=>`<div class="row" data-mt="${x.t.id}" style="align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;margin:5px 0;cursor:pointer;${x.done?'background:#f0fdf4':''}"><span style="font-size:20px">${x.done?'✅':'⬜'}</span><span class="grow"><b>${esc(x.t.nom)}</b>${x.n>1?` <b style="color:#7c3aed">(${x.k+1}/${x.n})</b>`:''} <span class="meta">${x.ty==='H'?(x.n>1?x.n+' fois par semaine':'hebdo'):'mensuel'}${x.pool&&!x.jour?' · à partir de 16h':''}${x.day<s?' · en retard (prévue le '+frD(x.day).slice(0,5)+')':''}</span></span>${x.done?`<span class="meta">fait par ${esc(x.done.r.emp||'')} à ${hhmm(x.done.r.ts)}</span>`:'<button class="btn ok sm">📸 Fait</button>'}</div>`).join('')}</div>`}
   return h}
 /* au départ : bloquer tant que ses tâches du jour ne sont pas faites (photo), ou partir en laissant une alerte */
 async function myTasksBlock(u,d){if(u.libre)return{end:0};let end=0;
@@ -761,6 +761,16 @@ async function myTasksBlock(u,d){if(u.libre)return{end:0};let end=0;
     const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer.');if(!img)continue;
     const pid='pt'+Date.now().toString(36);await photoPut(pid,img);const ts=Date.now();
     dayObj(d).tasks[t.id]={emp:u.nom,uid:u.id,ts,photo:pid};saveDay(d);end=Math.max(end,ts);toast('✔ '+t.nom+' — fait à '+hhmm(ts))}}
+/* fenêtre « tes tâches du jour » : chaque tâche avec un bouton 📸 Fait */
+function myTasksPopup(u,d,arrive){const L=myTasks(u.id,d);if(!L.length)return;const left=L.filter(x=>!x.done).length;
+  info(`<h2>👤 ${esc(u.nom)}, ${arrive?'tes tâches de ménage aujourd\'hui':'tes tâches du jour'}</h2>
+    <p class="meta" style="margin-top:-4px">Placées selon ton planning. Quand c'est fini : <b>📸 Fait</b> et une photo.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0">${L.map(x=>`<div class="row" style="align-items:center;gap:10px;border:2px solid ${x.done?'#16a34a':'#7c3aed'};border-radius:12px;padding:10px 12px;${x.done?'background:#f0fdf4':''}">
+      <span style="font-size:26px">${x.done?'✅':'🧹'}</span><div class="grow"><b style="font-size:18px">${esc(x.t.nom)}</b>${x.n>1?` <b style="color:#7c3aed">(${x.k+1}/${x.n})</b>`:''}${x.pool&&!x.jour?' <span class="meta">· à partir de 16h</span>':''}
+      ${x.t.det?`<div class="meta">${esc(x.t.det)}</div>`:''}${x.day<d&&!x.done?'<div style="color:#b45309;font-size:13px;font-weight:700">en retard (prévue le '+frD(x.day).slice(0,5)+')</div>':''}</div>
+      ${x.done?`<span class="meta">fait à ${hhmm(x.done.r.ts)}</span>`:`<button class="btn ok" data-pf="${x.t.id}" style="font-size:17px;padding:10px 14px">📸 Fait</button>`}</div>`).join('')}</div>
+    <div class="row"><span class="meta grow">${left?left+' à faire avant ton départ':'✔ Tout est fait, merci !'}</span><button class="btn ${left?'ghost':'ok'}" id="iClose">${left?'Plus tard':'Fermer'}</button></div>`,
+  ()=>document.querySelectorAll('[data-pf]').forEach(b=>b.onclick=async()=>{closeInfo();await myTaskDo(u,d,b.dataset.pf);myTasksPopup(u,d,false)}))}
 async function myTaskDo(u,d,tid){const t=CFG.tasks.find(x=>x.id===tid);if(!t)return;
   const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer.');if(!img)return;
   const pid='pt'+Date.now().toString(36);await photoPut(pid,img);dayObj(d).tasks[t.id]={emp:u.nom,uid:u.id,ts:Date.now(),photo:pid};saveDay(d);refresh();toast('✔ '+t.nom+' — fait')}
@@ -1944,7 +1954,7 @@ async function punch(uid){const u=userById(uid),o=openShift(uid);
       if(!await checkPwd(u,$('#aPwd').value))return toast('Mot de passe incorrect');done(u)}});
   if(!who)return;
   if(!o){const d=todayS(),tIn=Date.now();let pIn=null;
-    const ne={id:'p'+tIn.toString(36),uid,nom:u.nom,in:tIn};if(pIn)ne.photoIn=pIn;(PTS[d]=PTS[d]||[]).push(ne);savePts(d);renderPoint();{const ML=myLeft(uid,d);if(ML.length)setTimeout(()=>info(`<h2>👤 ${esc(u.nom)}, tes tâches de ménage aujourd'hui</h2><p style="font-size:17px">Placées selon ton planning :</p><p style="font-size:18px">${ML.map(x=>'⬜ <b>'+esc(x.t.nom)+'</b>'+(x.pool&&!x.jour?' <span class="meta">(à partir de 16h)</span>':'')).join('<br>')}</p><p class="meta">À faire avant ton départ, avec une photo quand c'est fini.</p><div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`),900)}const li=lateInfo(d,PTS[d][PTS[d].length-1]);return toast('Arrivée pointée à '+hms(tIn)+(li&&li.late!=null?(li.late>0?' — RETARD '+mins(li.late):' — à l\'heure ✔'):' ✔'))}
+    const ne={id:'p'+tIn.toString(36),uid,nom:u.nom,in:tIn};if(pIn)ne.photoIn=pIn;(PTS[d]=PTS[d]||[]).push(ne);savePts(d);renderPoint();{if(myLeft(uid,d).length)setTimeout(()=>myTasksPopup(u,d,true),900)}const li=lateInfo(d,PTS[d][PTS[d].length-1]);return toast('Arrivée pointée à '+hms(tIn)+(li&&li.late!=null?(li.late>0?' — RETARD '+mins(li.late):' — à l\'heure ✔'):' ✔'))}
   let photo=null;
   const repas=await new Promise(res=>info(`<h2>🍽 Repas</h2><p style="font-size:18px">${esc(u.nom)}, as-tu <b>mangé</b> pendant ce service ?</p>
       <div class="row" style="margin-top:14px"><button class="btn ghost" id="rpX">Annuler</button><span class="grow"></span><button class="btn sec" id="rpNo" style="min-width:110px">Non</button><button class="btn ok" id="rpYes" style="min-width:150px">🍽 Oui, sur place</button><button class="btn ok" id="rpEmp" style="min-width:150px">🥡 Oui, à emporter</button></div>`,
