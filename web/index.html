@@ -89,6 +89,27 @@ h2{font-size:19px;margin:0}
 .days label{display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-size:16px;color:var(--ink)}
 .days input{width:auto;margin:0;transform:scale(1.4)}
 @media (max-width:760px){.wgrid{grid-template-columns:1fr}.visa{width:100px}}
+/* ---- petits écrans : téléphone, pliable fermé, iPhone ---- */
+@media (max-width:640px){
+  header{padding:8px 10px;gap:8px}
+  nav{flex-wrap:nowrap;overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+  nav::-webkit-scrollbar{display:none}
+  nav button{flex:none;padding:8px 12px;font-size:15px}
+  .modal{padding:6px;align-items:flex-start}
+  .modal>.card{max-height:calc(100vh - 12px);max-height:calc(100dvh - 12px);padding:12px}
+  .cal{grid-template-columns:28px repeat(7,minmax(0,1fr));gap:3px}
+  .cal .d{min-height:52px;padding:3px}
+  .cal .d .s{font-size:9px;left:3px;right:3px;bottom:3px}
+  .cal .h{font-size:11px}
+  .cal .wk{font-size:10px}
+  #pUsers .et{grid-template-columns:1fr 1fr!important}
+  .et{grid-template-columns:1fr 1fr}
+  input,select,textarea{font-size:16px}
+}
+@media (max-width:380px){nav button{padding:7px 10px;font-size:14px}.cal .d .n{font-size:13px}}
+img,svg,video,canvas{max-width:100%}
+.fh-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fh-row input{min-width:0!important;flex:1 1 70px!important}
 /* pointeuse */
 .clock{font-size:46px;font-weight:800;text-align:center;letter-spacing:.03em}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
@@ -697,7 +718,7 @@ window.addEventListener('resize',()=>{if(!$('#mSign').classList.contains('hidden
 /* ===================== NAVIGATION ===================== */
 let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFullYear(),calM=new Date().getMonth();
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
-function show(v){if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;if(v!=='point')plEdit=false;
+function show(v){if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ['jour','point','semaine','cal','resa','hotel','cmd','chat','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
   if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();
@@ -1323,11 +1344,11 @@ function findHt(id){for(const mo in HTL){const h=(HTL[mo]||[]).find(x=>x.id===id
 function htConflit(v,id){return htAll().filter(h=>actif(h)&&h.id!==id&&h.etat!=='parti'&&String(h.ch).trim().toLowerCase()===String(v.ch).trim().toLowerCase()&&h.arr<v.dep&&v.arr<h.dep)}
 function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr:htDay,dep:addD(htDay,1),heure:'',ch:'',nom:'',tel:'',nb:2,note:'',etat:''},pre||{});
   const TD='border:1.3px solid #333;padding:4px 8px;font-weight:700;font-size:15px',IN='border:none;border-radius:0;background:transparent;color:#1d4ed8;font-weight:700;font-size:17px;font-family:inherit;padding:2px 4px;margin:0;flex:1;min-width:60px;width:auto;box-shadow:none;outline:none';
-  const old=fichePrefill(h),ln=(lab,idx,val,type)=>`<tr><td style="${TD}"><div style="display:flex;align-items:center;gap:6px"><span style="white-space:nowrap">${lab} :</span><input id="${idx}" ${type?`type="${type}"`:''} value="${esc(val==null?'':String(val))}" autocomplete="off" style="${IN}"></div></td></tr>`;
+  const old=fichePrefill(h),ln=(lab,idx,val,type)=>`<tr><td style="${TD}"><div class="fh-row"><span>${lab} :</span><input id="${idx}" ${type?`type="${type}"`:''} value="${esc(val==null?'':String(val))}" autocomplete="off" style="${IN}"></div></td></tr>`;
   const ch=ficheCharte().split('\n\n').map(b=>`<div style="margin-top:8px">${b.split('\n').map(l=>`<div style="margin-bottom:3px">${esc(l)}</div>`).join('')}</div>`).join('');
   info(`<div style="background:#fff;color:#111;border:1px solid #ddd;border-radius:6px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-family:Calibri,Carlito,'Segoe UI',sans-serif">
     <div style="position:sticky;top:-14px;z-index:2;background:#fff;text-align:center;font-size:22px;font-weight:700;color:#333;padding:6px 0 8px;margin:-6px 0 4px;border-bottom:1px solid #eee">${esc(ficheNom())}</div>
-    <div style="display:flex;align-items:center;gap:8px;margin:0 6px 4px"><b style="font-size:19px">Fiche hôtel</b><button class="btn ok" id="hPrint" title="Enregistrer et imprimer" style="padding:4px 10px;font-size:18px">🖨</button><span class="grow"></span><b style="font-size:17px">Date :</b><input type="date" id="hArr" value="${esc(h.arr)}" style="${IN};flex:none;width:170px"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin:0 6px 4px;flex-wrap:wrap"><b style="font-size:19px;white-space:nowrap">Fiche hôtel</b><button class="btn ok" id="hPrint" title="Enregistrer et imprimer" style="padding:4px 10px;font-size:18px">🖨</button><span class="grow"></span><span style="display:flex;align-items:center;gap:6px"><b style="font-size:17px">Date :</b><input type="date" id="hArr" value="${esc(h.arr)}" style="${IN};flex:none;width:165px"></span></div>
     <table style="width:100%;border-collapse:collapse">
     ${ln('Nom','hNom',h.nom)}${ln('Contact','hTel',h.tel,'tel')}${ln('E-mail','hMail',h.mail||'','email')}${ln('Adresse','hAdr',h.adr||'')}
     <tr><td style="${TD}">Signature :</td></tr>
