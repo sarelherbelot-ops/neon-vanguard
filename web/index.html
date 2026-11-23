@@ -1724,14 +1724,16 @@ function renderResa(){const d=rsDay,L=resaOf(d),act=L.filter(r=>r.etat!=='annule
 function findResa(id){for(const mo in RSV){const r=(RSV[mo]||[]).find(x=>x.id===id);if(r)return{mo,r}}return null}
 function editResa(id){const f=id?findResa(id):null,r=f?f.r:{date:rsDay,heure:'',nom:'',tel:'',nb:2,note:'',etat:''};
   info(`<h2>${f?'Réservation':'➕ Nouvelle réservation'}</h2>
-    <div class="row"><label class="grow">Date<input type="date" id="rDate" value="${esc(r.date)}"></label><label class="grow">Heure<input type="time" id="rHeure" value="${esc(r.heure)}"></label><label style="width:110px">Personnes<input type="number" id="rNb" min="1" value="${esc(r.nb)}"></label></div>
-    <label>Nom du client<input id="rNom" value="${esc(r.nom)}" placeholder="ex : Mme Martin" autocomplete="off"></label>
-    <div class="row"><label class="grow">Téléphone<input id="rTel" type="tel" value="${esc(r.tel)}" placeholder="079 123 45 67" autocomplete="off"></label><label class="grow">E-mail<input id="rMail" type="email" value="${esc(r.mail||'')}" placeholder="client@exemple.ch" autocomplete="off"></label></div>
+    <div class="row"><label class="grow">Date<input type="date" id="rDate" value="${esc(r.date)}"></label><label class="grow">Heure <b style="color:#dc2626">*</b><input type="time" id="rHeure" value="${esc(r.heure)}"></label><label style="width:110px">Personnes <b style="color:#dc2626">*</b><input type="number" id="rNb" min="1" value="${esc(r.nb)}"></label></div>
+    <label>Nom du client <b style="color:#dc2626">*</b><input id="rNom" value="${esc(r.nom)}" placeholder="ex : Mme Martin" autocomplete="off"></label>
+    <div class="row"><label class="grow">Téléphone <b style="color:#dc2626">*</b><input id="rTel" type="tel" value="${esc(r.tel)}" placeholder="079 123 45 67" autocomplete="off"></label><label class="grow">E-mail<input id="rMail" type="email" value="${esc(r.mail||'')}" placeholder="client@exemple.ch" autocomplete="off"></label></div>
     <label>Remarque<input id="rNote" value="${esc(r.note||'')}" placeholder="ex : terrasse, anniversaire, chaise bébé…"></label>
     ${f?`<label>État<select id="rEtat">${Object.entries({'':'À venir','arrive':'✔ Arrivé','absent':'⚠ Pas venu','annule':'✖ Annulé'}).map(([k,v])=>`<option value="${k}" ${r.etat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}
     <div class="row" style="margin-top:12px">${f?'<button class="btn danger" id="rDel">Supprimer</button>':''}${f&&r.tel?'<button class="btn sec" id="rCall">📞 Appeler</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="rOk">Enregistrer</button></div>`,
   ()=>{$('#rOk').onclick=()=>{const v={date:$('#rDate').value,heure:$('#rHeure').value,nom:$('#rNom').value.trim(),tel:$('#rTel').value.trim(),mail:$('#rMail').value.trim(),nb:+$('#rNb').value||0,note:$('#rNote').value.trim()};
-      if(!v.date||!v.heure||!v.nom)return toast('Date, heure et nom obligatoires');
+      const miss=[];if(!v.date)miss.push(['#rDate','la date']);if(!v.heure)miss.push(['#rHeure','l\'heure']);if(!v.nom)miss.push(['#rNom','le nom']);if(!(v.nb>0))miss.push(['#rNb','le nombre de personnes']);if(v.tel.replace(/\D/g,'').length<9)miss.push(['#rTel','le numéro de téléphone']);
+      document.querySelectorAll('#rDate,#rHeure,#rNom,#rNb,#rTel').forEach(e=>e.style.borderColor='');
+      if(miss.length){miss.forEach(([q])=>{$(q).style.borderColor='#dc2626'});$(miss[0][0]).focus();return toast('Obligatoire : '+miss.map(m=>m[1]).join(', '))}
       if(f){const old=f.mo;Object.assign(r,v,{etat:$('#rEtat').value,ts:r.ts||Date.now(),mod:Date.now()});if(rsMo(v.date)!==old){RSV[old]=RSV[old].filter(x=>x.id!==r.id);saveRs(old);(RSV[rsMo(v.date)]=RSV[rsMo(v.date)]||[]).push(r)}saveRs(rsMo(v.date))}
       else{const n={id:'rs'+Date.now().toString(36),...v,etat:'',ts:Date.now()};(RSV[rsMo(v.date)]=RSV[rsMo(v.date)]||[]).push(n);saveRs(rsMo(v.date))}
       closeInfo();rsDay=v.date;refresh();toast('Réservation enregistrée ✔')};
