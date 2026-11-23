@@ -378,7 +378,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
       <label style="width:190px">Date<input type="date" id="cmDate"></label>
       <div class="grow"><b>Statut :</b> <label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt1" style="width:auto"> À commander</label><label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt2" style="width:auto"> Validé patron</label><label class="row" style="display:inline-flex;gap:6px"><input type="checkbox" id="cmSt3" style="width:auto"> Transmis à la direction</label></div>
     </div>
-    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="adm-only btn ghost" id="cmEdit">✏️ Modifier la liste</button><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
+    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="btn ghost" id="cmClear" style="color:#b45309;border-color:#f59e0b">☐ Tout décocher</button><button class="adm-only btn ghost" id="cmEdit">✏️ Modifier la liste</button><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
   </div>
   <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
   <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
@@ -1218,6 +1218,11 @@ function renderCmd(){document.querySelectorAll('#cmZones button').forEach(b=>b.c
   document.querySelectorAll('[data-cadd]').forEach(el=>el.onclick=()=>{const v=prompt('Nom du nouvel article :');if(!v||!v.trim())return;const c=CFG.cmdCat[cmZone].find(x=>x.id===el.dataset.cadd);c.items.push({id:c.id+'_n'+Date.now().toString(36),nom:v.trim()});put('cfg',CFG);renderCmd()})}
 document.querySelectorAll('#cmZones button').forEach(b=>b.onclick=()=>{cmZone=b.dataset.cz;renderCmd()});
 $('#cmEdit').onclick=()=>{cmEd=!cmEd;renderCmd()};
+$('#cmClear').onclick=()=>{const o=cmGet(),n=Object.values(o.items||{}).filter(x=>x.c||(x.q||'').trim()).length;if(!n)return toast('Aucune case cochée');
+  info(`<h2>☐ Tout décocher ?</h2><p style="font-size:18px">Êtes-vous sûr de vouloir <b>décocher toutes les cases</b> (${n} article${n>1?'s':''}) et effacer les quantités ?</p>
+    <p style="font-size:18px;background:#fef3c7;border-radius:10px;padding:10px 12px">⚠ Le patron a-t-il bien <b>reçu la commande</b> ?</p>
+    <div class="row" style="margin-top:12px"><span class="grow"></span><button class="btn ghost" id="iClose">Non, annuler</button><button class="btn danger" id="cmClrOk">Oui, le patron a la commande — tout décocher</button></div>`,
+  ()=>{$('#cmClrOk').onclick=()=>{const o=cmGet();for(const k in o.items||{}){o.items[k].c=false;o.items[k].q=''}o.st={};o.extra='';cmSave(o);clearTimeout(cmT);put('co:'+cmKey(),o);closeInfo();renderCmd();toast('Toutes les cases sont décochées ✔')}})};
 $('#cmDate').onchange=e=>{if(e.target.value){cmDay=e.target.value;renderCmd()}};
 [['#cmSt1','a'],['#cmSt2','v'],['#cmSt3','t']].forEach(([q,k])=>$(q).onchange=e=>{const o=cmGet();o.st=o.st||{};o.st[k]=e.target.checked;cmSave(o)});
 $('#cmExtra').oninput=e=>{const o=cmGet();o.extra=e.target.value;cmSave(o)};
