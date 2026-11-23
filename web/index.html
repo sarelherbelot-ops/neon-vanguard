@@ -2109,12 +2109,14 @@ async function closingTicket(u){
     try{R=await readTicket(img)}catch(e){err=e}finally{busy(null)}
     const T=todayS(),Y=addD(T,-1);let pb=[],ts=null,src='photo';
     if(err)pb.push('lecture impossible sur cet appareil ('+(err.message||err)+')');
-    /* seuls comptent : « Clôture de période » + l'heure. La date imprimée n'est pas vérifiée. */
+    /* « Clôture de période » + date du jour + heure : l'heure de la clôture = l'heure de fin (ex : clôture 21h50, photo 22h00 → fini à 21h50) */
     else{if(!R.clot)pb.push('ce n\'est pas un ticket « Clôture de période »');
-      if(R.time&&!pb.length){let t=parse(T).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;if(t>tPhoto+10*60000)t-=864e5;ts=t;src='ticket'}}
+      if(R.date&&R.date!==T&&R.date!==Y)pb.push('le ticket date du '+frD(R.date)+' : il faut la clôture du jour même');
+      if(R.time&&!pb.length){let t=parse(R.date||T).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;if(!R.date&&t>tPhoto+10*60000)t-=864e5;
+        if(t<=tPhoto+10*60000){ts=t;src='ticket'}}}
     if(!pb.length){ts=ts||tPhoto;
       const ok=await new Promise(res=>info(`<h2>✔ Clôture de période reconnue</h2>
-        <p>Fin de service : <b style="font-size:22px">${hms(ts)}</b><br><span class="meta">${src==='ticket'?'heure lue sur le ticket':'heure de la photo (l\'heure du ticket n\'a pas pu être lue avec certitude)'}</span></p>
+        <p>${R.date?'Date : <b>'+frD(R.date)+'</b><br>':''}Fin de service : <b style="font-size:22px">${hms(ts)}</b><br><span class="meta">${src==='ticket'?'heure lue sur le ticket':'heure de la photo (l\'heure du ticket n\'a pas pu être lue avec certitude)'}</span></p>
         <div class="row"><button class="btn ghost" id="ckRe">Reprendre la photo</button><span class="grow"></span><button class="btn ok" id="ckOk">✔ Valider le départ</button></div>`,
         ()=>{$('#ckOk').onclick=()=>{closeInfo();res(true)};$('#ckRe').onclick=()=>{closeInfo();res(false)}}));
       if(ok)return{img,ts,src};continue}
