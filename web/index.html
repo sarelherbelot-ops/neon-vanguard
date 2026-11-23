@@ -210,6 +210,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
       <div class="grow" style="text-align:center">
         <div class="big" id="dTitle"></div>
         <div class="meta" id="dSub"></div>
+        <div id="dMine" style="margin-top:8px"></div>
       </div>
       <button class="btn ghost icon" id="dNext">›</button>
     </div>
@@ -668,12 +669,56 @@ function dueZ(s,z){return due(s).filter(t=>tz(t)===z)}
 const perZ=(z,ty)=>CFG.tasks.filter(t=>tz(t)===z&&t.type===ty);
 function doneIn(tid,a,b){for(let s=b;s>=a;s=addD(s,-1)){const r=rec(s,tid);if(r)return{s,r}}return null}
 const monthBounds=s=>{const d=parse(s);return[ymd(new Date(d.getFullYear(),d.getMonth(),1)),ymd(new Date(d.getFullYear(),d.getMonth()+1,0))]};
+/* ===================== TÂCHES ATTRIBUÉES (hebdo / mensuel) — placées selon le planning ===================== */
+/* qui fait la tâche : choisi dans Réglages, sinon (cuisine) le seul employé au poste cuisine */
+function taskQui(t){if(t.qui)return t.qui==='*'?null:t.qui;if(tz(t)!=='cuisine')return null;const C=(CFG.users||[]).filter(u=>u.role!=='boss'&&u.poste==='cuisine');return C.length===1?C[0].id:null}
+function worksOn(uid,d){if(isClosed(d))return false;const p=PLAN[monday(d)]||{};return(parseShift((p[uid]||{})[wd(d)]||'')||[]).length>0}
+function workDays(uid,a,b){const D=[];for(let d=a;d<=b;d=addD(d,1))if(worksOn(uid,d))D.push(d);return D}
+/* jour prévu pour chaque tâche : réparties régulièrement sur ses jours de travail de la semaine (hebdo) ou du mois (mensuel) */
+function plannedTasks(uid,d){const out=[],st=CFG.mineStart||'2000-01-01';
+  const fix=(day,D)=>day>=st?day:(D.find(x=>x>=st)||null);
+  {const a=monday(d),b=addD(a,6),L=CFG.tasks.filter(t=>t.type==='H'&&taskQui(t)===uid),D=workDays(uid,a,b);
+    if(L.length&&D.length)L.forEach((t,i)=>{const day=fix(D[Math.min(D.length-1,Math.floor(i*D.length/L.length))],D);if(day)out.push({t,day,done:doneIn(t.id,a,b),ty:'H'})})}
+  {const[a,b]=monthBounds(d),L=CFG.tasks.filter(t=>t.type==='M'&&taskQui(t)===uid),D=workDays(uid,a,b);
+    const a2=a>st?a:st,D2=D.filter(x=>x>=a2);
+    if(L.length&&D2.length){const W=[];for(let m=monday(a2);m<=b;m=addD(m,7))W.push(m);const cnt={};
+      L.forEach((t,i)=>{let k=Math.floor(i*W.length/L.length),Dw=[];for(;k<W.length;k++){Dw=D2.filter(x=>x>=W[k]&&x<=addD(W[k],6));if(Dw.length)break}
+        let day;if(Dw.length){const j=cnt[k]=(cnt[k]||0);cnt[k]++;day=Dw[Math.min(j,Dw.length-1)]}else day=D2[D2.length-1];
+        out.push({t,day,done:doneIn(t.id,a,b),ty:'M'})})}}
+  return out}
+/* ce qu'il doit faire ce jour-là : les tâches prévues ce jour + celles des jours d'avant pas encore faites */
+function myTasks(uid,d){if(!worksOn(uid,d))return[];return plannedTasks(uid,d).filter(x=>x.day<=d&&(!x.done||x.done.s===d))}
+const myLeft=(uid,d)=>myTasks(uid,d).filter(x=>!x.done);
+function mineCardHTML(s){const U=(CFG.users||[]).filter(u=>u.role!=='boss');let h='';
+  for(const u of U){const L=myTasks(u.id,s);if(!L.length)continue;
+    h+=`<div class="card" style="border:2px solid #7c3aed;margin-bottom:10px"><b style="font-size:17px">👤 Tâches de ${esc(u.nom)} aujourd'hui</b><div class="meta" style="margin:2px 0 6px">Placées automatiquement selon son planning. À faire avant son départ, avec photo.</div>
+    ${L.map(x=>`<div class="row" data-mt="${x.t.id}" style="align-items:center;gap:8px;padding:8px;border:1px solid var(--line);border-radius:10px;margin:5px 0;cursor:pointer;${x.done?'background:#f0fdf4':''}"><span style="font-size:20px">${x.done?'✅':'⬜'}</span><span class="grow"><b>${esc(x.t.nom)}</b> <span class="meta">${x.ty==='H'?'hebdo':'mensuel'}${x.day<s?' · en retard (prévue le '+frD(x.day).slice(0,5)+')':''}</span></span>${x.done?`<span class="meta">fait par ${esc(x.done.r.emp||'')} à ${hhmm(x.done.r.ts)}</span>`:'<span class="meta" style="color:#b45309;font-weight:700">à faire</span>'}</div>`).join('')}</div>`}
+  return h}
+/* au départ : bloquer tant que ses tâches du jour ne sont pas faites (photo), ou partir en laissant une alerte */
+async function myTasksBlock(u,d){let end=0;
+  for(;;){const L=myLeft(u.id,d);if(!L.length)return{end};
+    const r=await new Promise(res=>info(`<h2>⛔ Tâche de ménage pas faite</h2><p style="font-size:17px">${esc(u.nom)}, aujourd'hui tu dois faire ${L.length>1?'ces tâches':'cette tâche'} avant de partir :</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0">${L.map(x=>`<div class="row" style="border:1px solid var(--line);border-radius:10px;padding:8px;align-items:center"><div class="grow"><b>${esc(x.t.nom)}</b>${x.t.det?`<div class="meta">${esc(x.t.det)}</div>`:''}</div><button class="btn ok" data-mf="${x.t.id}">📸 Fait</button></div>`).join('')}</div>
+      <p class="meta">Fais la tâche, appuie sur « Fait » et prends la photo de ce que tu as nettoyé.</p>
+      <div class="row"><button class="btn danger" id="mfNo">Partir sans la faire</button><span class="grow"></span><button class="btn sec" id="mfLater">Plus tard</button></div>`,
+      ()=>{document.querySelectorAll('[data-mf]').forEach(b=>b.onclick=()=>{closeInfo();res({t:b.dataset.mf})});$('#mfLater').onclick=()=>{closeInfo();res(null)};$('#mfNo').onclick=()=>{closeInfo();res({no:1})}}));
+    if(!r)return null;
+    if(r.no){const ok=await new Promise(res=>info(`<h2>Partir sans faire la tâche ?</h2><p style="color:#dc2626;font-weight:700">⚠ Ce sera marqué « tâche de ménage pas faite » et le responsable sera prévenu :</p><p>${L.map(x=>'• '+esc(x.t.nom)).join('<br>')}</p><p class="meta">La tâche reste à faire à son prochain jour de travail.</p>
+      <div class="row" style="margin-top:12px"><button class="btn ok" id="cnNo">Retour, je la fais</button><span class="grow"></span><button class="btn danger" id="cnYes">Partir quand même</button></div>`,()=>{$('#cnNo').onclick=()=>{closeInfo();res(false)};$('#cnYes').onclick=()=>{closeInfo();res(true)}}));
+      if(ok)return{end,left:L.map(x=>x.t.nom),zone:tz(L[0].t)};continue}
+    const t=CFG.tasks.find(x=>x.id===r.t);if(!t)continue;
+    const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer.');if(!img)continue;
+    const pid='pt'+Date.now().toString(36);await photoPut(pid,img);const ts=Date.now();
+    dayObj(d).tasks[t.id]={emp:u.nom,uid:u.id,ts,photo:pid};saveDay(d);end=Math.max(end,ts);toast('✔ '+t.nom+' — fait à '+hhmm(ts))}}
+async function myTaskDo(u,d,tid){const t=CFG.tasks.find(x=>x.id===tid);if(!t)return;
+  const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer.');if(!img)return;
+  const pid='pt'+Date.now().toString(36);await photoPut(pid,img);dayObj(d).tasks[t.id]={emp:u.nom,uid:u.id,ts:Date.now(),photo:pid};saveDay(d);refresh();toast('✔ '+t.nom+' — fait')}
 function periodicHTML(s,z,inter){let h='';
   for(const[ty,tit,rng]of[['H','Nettoyage hebdomadaire — à planifier dans la semaine',[monday(s),addD(monday(s),6)]],['M','Nettoyage mensuel (profond) — '+MOIS[parse(s).getMonth()],monthBounds(s)]]){
     const L=perZ(z,ty);if(!L.length)continue;
     h+=`<h3 style="margin:14px 0 4px;font-size:15px;color:var(--navy)">${tit}</h3>`+L.map(t=>{const d=doneIn(t.id,rng[0],rng[1]);
       return `<div class="task ${d?(d.r.na?'na':'done'):''}" ${inter?`data-pt="${t.id}" data-ps="${d?d.s:''}"`:''}><div class="chk">${d?(d.r.na?'N/A':'✓'):''}</div>
-      <div class="t"><span class="badge ${ty==='H'?'b-q':'b-j'}">${ty==='H'?'HEBDO':'MENSUEL'}</span>${esc(t.nom)}${t.det?`<div class="meta">${esc(t.det)}</div>`:''}
+      <div class="t"><span class="badge ${ty==='H'?'b-q':'b-j'}">${ty==='H'?'HEBDO':'MENSUEL'}</span>${esc(t.nom)}${(()=>{const q=taskQui(t),u=q&&(CFG.users||[]).find(x=>x.id===q);if(!u)return'';const x=plannedTasks(q,s).find(y=>y.t.id===t.id);return` <span class="meta" style="color:#7c3aed;font-weight:700">👤 ${esc(u.nom)}${x?' · prévu le '+frD(x.day).slice(0,5):' · ne travaille pas'}</span>`})()}${t.det?`<div class="meta">${esc(t.det)}</div>`:''}
       <div class="meta">${d?`${d.r.na?'Pas nécessaire':'Fait'} le ${frD(d.s)} — ${esc(d.r.emp)} à ${hhmm(d.r.ts)}`:'<b style="color:var(--yel)">À faire</b>'}</div></div>
       <div class="visa">${d?sigSVG(d.r.sig):'Visa'}</div></div>`}).join('')}
   return h}
@@ -758,6 +803,7 @@ function renderDay(){const s=curDay;$('#dPick').value=s;
   const L=['temp','recep'].includes(ZONE)?[]:dueZ(s,ZONE),n=L.filter(t=>rec(s,t.id)).length;
   $('#dSub').textContent=`Semaine ${isoWeek(s)} · `+(isClosed(s)&&ZONE!=='recep'?'Fermé':(ZONE==='temp'?tempSummary(s):ZONE==='recep'?`📦 ${(RCP[s.slice(0,7)]||[]).filter(x=>x.date===s).length} réception(s) aujourd'hui`:`${ZONES[ZONE]} : ${n} / ${L.length} tâche(s) faite(s)`));
   $('#dClose').textContent=isClosed(s)?'Marquer ouvert':'Marquer fermé';
+  $('#dMine').innerHTML=['temp','recep'].includes(ZONE)?'':mineCardHTML(s);document.querySelectorAll('#dMine [data-mt]').forEach(el=>el.onclick=async()=>{const tid=el.dataset.mt,r=rec(s,tid)||(()=>{const x=doneIn(tid,monday(s),addD(monday(s),6));return x&&x.r})();if(r)return clickTask(s,tid);const t=CFG.tasks.find(x=>x.id===tid),uid=taskQui(t),u=(CFG.users||[]).find(x=>x.id===uid);if(!u)return clickTask(s,tid);if(!await askAuth('🧹 '+t.nom,['admin','chef','emp']))return;myTaskDo(u,s,tid)});
   if(ZONE==='recep'){$('#dTasks').innerHTML=recepHTML(s.slice(0,7),true);$('#dCons').innerHTML='';bindRecep($('#dTasks'),s.slice(0,7));return}
   if(isClosed(s)){$('#dTasks').innerHTML='<div class="closedtag">🚫 Établissement fermé ce jour-là</div>';$('#dCons').innerHTML='';return}
   if(ZONE==='temp'){$('#dTasks').innerHTML=tempMonthHTML(s.slice(0,7),true);$('#dCons').innerHTML='';bindTempCells($('#dTasks'));const tr=$('#tToday');if(tr)setTimeout(()=>tr.scrollIntoView({block:'center'}),50);return}
@@ -1743,10 +1789,11 @@ function drawEU(){$('#pUsers').innerHTML=EU.map((u,i)=>`<div class="et" style="g
 function renderParams(){renderNavEd();renderArchives();renderUpd();$('#pNom').value=CFG.nom;$('#pStart').value=CFG.start||'';EU=CFG.users.map(u=>({...u}));drawEU();
   $('#pDays').innerHTML=[1,2,3,4,5,6,7].map(i=>`<label><input type="checkbox" value="${i}" ${CFG.open.includes(i)?'checked':''}>${JOURS[i]}</label>`).join('');
   ET=JSON.parse(JSON.stringify(CFG.tasks));EC=JSON.parse(JSON.stringify(CFG.cons));EF=JSON.parse(JSON.stringify(CFG.frigos||[]));$('#pSlots').value=(CFG.tslots||['Matin','Soir']).join(', ');drawET();drawEC();drawEF()}
-function drawET(){$('#pTasks').innerHTML=ET.map((t,i)=>`<div class="et" style="grid-template-columns:2.2fr 1fr 1fr 1fr auto">
+function drawET(){$('#pTasks').innerHTML=ET.map((t,i)=>`<div class="et" style="grid-template-columns:2.2fr 1fr 1fr 1.2fr 1fr auto">
   <input data-i="${i}" data-k="nom" value="${esc(t.nom)}">
   <select data-i="${i}" data-k="zone"><option value="salle" ${tz(t)==='salle'?'selected':''}>Salle</option><option value="cuisine" ${tz(t)==='cuisine'?'selected':''}>Cuisine</option></select>
   <select data-i="${i}" data-k="type"><option value="Q" ${t.type==='Q'?'selected':''}>Quotidien</option><option value="J" ${t.type==='J'?'selected':''}>Jour</option><option value="H" ${t.type==='H'?'selected':''}>Hebdo</option><option value="M" ${t.type==='M'?'selected':''}>Mensuel</option></select>
+  ${t.type==='H'||t.type==='M'?`<select data-i="${i}" data-k="qui" title="Qui fait cette tâche"><option value="" ${!t.qui?'selected':''}>👤 Auto</option><option value="*" ${t.qui==='*'?'selected':''}>Tout le monde</option>${(CFG.users||[]).filter(u=>u.role!=='boss').map(u=>`<option value="${u.id}" ${t.qui===u.id?'selected':''}>👤 ${esc(u.nom)}</option>`).join('')}</select>`:'<span></span>'}
   <select data-i="${i}" data-k="jour" ${t.type!=='J'?'disabled':''}>${[1,2,3,4,5,6,7].map(j=>`<option value="${j}" ${t.jour===j?'selected':''}>${JOURS[j]}</option>`).join('')}</select>
   <button class="btn danger sm" data-x="${i}">✕</button></div>`).join('');
   $('#pTasks').querySelectorAll('[data-k]').forEach(el=>el.onchange=el.oninput=()=>{const t=ET[el.dataset.i];
@@ -1806,7 +1853,7 @@ function renderNavEd(){const el=$('#navEd');if(!el)return;const o=navOrder();
   el.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>{const i=+b.dataset.nd,a=navOrder();[a[i+1],a[i]]=[a[i],a[i+1]];save(a)});
   el.querySelectorAll('[data-nh]').forEach(c=>c.onchange=()=>{const H=new Set(CFG.navHide||[]);if(c.checked)H.delete(c.dataset.nh);else H.add(c.dataset.nh);if(NAVDEF.every(x=>x.v==='params'||H.has(x.v))){c.checked=true;return toast('Garde au moins un onglet')}CFG.navHide=[...H];put('cfg',CFG);applyNav();renderNavEd()})}
 $('#navReset').onclick=()=>{delete CFG.navOrder;delete CFG.navHide;put('cfg',CFG);applyNav();renderNavEd();toast('Ordre d\'origine remis')};
-function applyCfg(){setTimeout(applyRestrict,0);applyNav();if(!RESTRICT()&&MAIN())pdjDefault();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
+function applyCfg(){setTimeout(applyRestrict,0);applyNav();if(!RESTRICT()&&!CFG.mineStart){CFG.mineStart=todayS();put('cfg',CFG)}if(!RESTRICT()&&MAIN())pdjDefault();setTimeout(oubliBadge,0);$('#titre').textContent='🧽 '+CFG.nom;$('#empList').innerHTML=CFG.users.map(u=>`<option value="${esc(u.nom)}">`).join('')}
 
 /* ===================== POINTEUSE ===================== */
 let PTS={}; // PTS[date] = [{id,uid,nom,in,out,photo}]
@@ -1835,12 +1882,13 @@ async function punch(uid){const u=userById(uid),o=openShift(uid);
       if(!await checkPwd(u,$('#aPwd').value))return toast('Mot de passe incorrect');done(u)}});
   if(!who)return;
   if(!o){const d=todayS(),tIn=Date.now();let pIn=null;
-    const ne={id:'p'+tIn.toString(36),uid,nom:u.nom,in:tIn};if(pIn)ne.photoIn=pIn;(PTS[d]=PTS[d]||[]).push(ne);savePts(d);renderPoint();const li=lateInfo(d,PTS[d][PTS[d].length-1]);return toast('Arrivée pointée à '+hms(tIn)+(li&&li.late!=null?(li.late>0?' — RETARD '+mins(li.late):' — à l\'heure ✔'):' ✔'))}
+    const ne={id:'p'+tIn.toString(36),uid,nom:u.nom,in:tIn};if(pIn)ne.photoIn=pIn;(PTS[d]=PTS[d]||[]).push(ne);savePts(d);renderPoint();{const ML=myLeft(uid,d);if(ML.length)setTimeout(()=>info(`<h2>👤 ${esc(u.nom)}, tes tâches de ménage aujourd'hui</h2><p style="font-size:17px">Placées selon ton planning :</p><p style="font-size:18px">${ML.map(x=>'⬜ <b>'+esc(x.t.nom)+'</b>').join('<br>')}</p><p class="meta">À faire avant ton départ, avec une photo quand c'est fini.</p><div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`),900)}const li=lateInfo(d,PTS[d][PTS[d].length-1]);return toast('Arrivée pointée à '+hms(tIn)+(li&&li.late!=null?(li.late>0?' — RETARD '+mins(li.late):' — à l\'heure ✔'):' ✔'))}
   let photo=null;
   const repas=await new Promise(res=>info(`<h2>🍽 Repas</h2><p style="font-size:18px">${esc(u.nom)}, as-tu <b>mangé</b> pendant ce service ?</p>
       <div class="row" style="margin-top:14px"><button class="btn ghost" id="rpX">Annuler</button><span class="grow"></span><button class="btn sec" id="rpNo" style="min-width:110px">Non</button><button class="btn ok" id="rpYes" style="min-width:150px">🍽 Oui, sur place</button><button class="btn ok" id="rpEmp" style="min-width:150px">🥡 Oui, à emporter</button></div>`,
     ()=>{$('#rpYes').onclick=()=>{closeInfo();res('place')};$('#rpEmp').onclick=()=>{closeInfo();res('emporter')};$('#rpNo').onclick=()=>{closeInfo();res(false)};$('#rpX').onclick=()=>{closeInfo();res(null)}}));
   if(repas===null)return toast('Départ non pointé');
+  const mt=await myTasksBlock(u,o.d);if(!mt)return toast('Départ non pointé : tâche de ménage à faire');
   let ferm=false;
   const zf=poste(u);
   if(zf==='cuisine')ferm=await new Promise(res=>info(`<h2>Départ de ${esc(u.nom)}</h2><p style="font-size:18px">Tu es le dernier en cuisine et tu fais la <b>fermeture de la cuisine</b> ?</p><p class="meta">Si oui, les tâches de nettoyage de la cuisine du jour doivent être faites (avec photo).</p>
@@ -1859,6 +1907,8 @@ async function punch(uid){const u=userById(uid),o=openShift(uid);
   o.e.out=ck?Math.max(ck.ts,tk.end||0):tk?Math.max(Date.now(),tk.end||0):Date.now();o.e.repas=!!repas;if(repas)o.e.repasType=repas;else delete o.e.repasType;if(photo)o.e.photo=photo;
   if(ferm&&zf==='cuisine'){o.e.fermCuis=true;if(tk.by){o.e.oubli=tk.left||[];o.e.ozone='cuisine';o.e.edit='fermé la cuisine sans faire les tâches'}}
   else if(ferm){o.e.ferm=true;o.e.outSrc=ck.src;o.e.clot=ck.ts;if(tk.end>ck.ts){o.e.outSrc='taches';o.e.choresEnd=tk.end}const notes=[];if(ck.by)notes.push('fermeture validée sans ticket par '+ck.by);if(tk.by){notes.push('fermé sans faire les tâches');o.e.oubli=tk.left||[]}if(notes.length)o.e.edit=notes.join(' · ')}
+  if(mt.left){o.e.oubli=(o.e.oubli||[]).concat(mt.left);o.e.ozone=o.e.ozone||mt.zone;o.e.edit=(o.e.edit?o.e.edit+' · ':'')+'parti sans faire sa tâche de ménage'}
+  if(mt.end&&!ck)o.e.out=Math.max(o.e.out,mt.end);
   savePts(o.d);renderPoint();if(o.e.oubli)setTimeout(()=>toastRed('⚠ '+u.nom+' n\'a pas fait : '+o.e.oubli.join(', ')),2500);
   toast(o.e.fermCuis?'Fermeture cuisine — départ à '+hms(o.e.out)+' — '+dur(countedDur(o.d,o.e))+' comptées ✔':(ferm?(o.e.choresEnd?'Clôture à '+hhmm(ck.ts)+' + tâches finies — fin de service à ':'Clôture — fin de service à '):'Départ pointé à ')+hms(o.e.out)+' — '+dur(countedDur(o.d,o.e))+' comptées ✔')}
 
