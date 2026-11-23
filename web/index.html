@@ -2367,11 +2367,22 @@ function openSyncModal(fromStart){if(cloudOn()&&RESTRICT()){info(`<h2>☁️ Syn
 
 /* ===================== MISE A JOUR AUTOMATIQUE ===================== */
 let APPV=0;
+const SHELL_MIN=92; // version minimale de la coque Android pour cette interface (à monter seulement si le code Java change)
+let updWait=0;
+/* recharge l'appli dès qu'on ne fait rien (pas de fenêtre ouverte, pas de saisie en cours) */
+function reloadWhenIdle(n){if(updWait)return;updWait=setInterval(()=>{const busy=!$('#mInfo').classList.contains('hidden')||($('#mAuth')&&!$('#mAuth').classList.contains('hidden'))||/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');
+  if(busy)return;clearInterval(updWait);localStorage.setItem('pn_updDone',String(n));location.reload()},15000)}
 const UPD='https://raw.githubusercontent.com/sarelherbelot-ops/neon-vanguard/plan-nettoyage-apk/';
 async function checkUpdate(manual){try{const r=await fetch(UPD+'version.txt?t='+Date.now(),{cache:'no-store'});
     if(!r.ok){if(manual)toast('Erreur '+r.status);return}
     const n=parseInt((await r.text()).trim())||0;
-    if(n>APPV&&native())showUpdate('n° '+n,'https://github.com/sarelherbelot-ops/neon-vanguard/raw/plan-nettoyage-apk/PlanNettoyage.apk');else if(manual)toast('Appli à jour (n° '+APPV+')')}
+    if(n>APPV){
+      if(!native()){if(manual)toast('Nouvelle version n° '+n+' : installation…');reloadWhenIdle(n);return}
+      if(window.Android&&Android.saveWeb&&Android.shellVer){
+        const h=await (await fetch(UPD+'web/index.html?t='+Date.now(),{cache:'no-store'})).text(),m=h.match(/const SHELL_MIN=(\d+)/),need=m?+m[1]:1e9;
+        if(Android.shellVer()>=need&&Android.saveWeb(h,n)){if(manual)toast('Mise à jour n° '+n+' téléchargée : elle s\'installe toute seule dans quelques secondes');reloadWhenIdle(n);return}}
+      showUpdate('n° '+n,'https://github.com/sarelherbelot-ops/neon-vanguard/raw/plan-nettoyage-apk/PlanNettoyage.apk')}
+    else if(manual)toast('Appli à jour (n° '+APPV+')')}
   catch(e){if(manual)toast('Pas de connexion internet')}}
 function showUpdate(tag,url){if(RESTRICT())return;let b=$('#updBar');if(!b){b=document.createElement('div');b.id='updBar';
     b.style.cssText='background:#1d4ed8;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';document.body.insertBefore(b,$('main'))}
@@ -2429,7 +2440,8 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   for(const k in all)if(k.startsWith('cl:')&&all[k]!=null)CLOUD[k.slice(3)]=all[k];
   CLOUD.__gh=all['gh:state']||null;
   startSync();
-  if(localStorage.getItem('pn_autoupd')!=='0'){setTimeout(()=>checkUpdate(false),5000);setInterval(()=>checkUpdate(false),6*3600e3)}
+  if(localStorage.getItem('pn_autoupd')!=='0'){setTimeout(()=>checkUpdate(false),5000);setInterval(()=>checkUpdate(false),30*60e3)}
+  {const u=localStorage.getItem('pn_updDone');if(u){localStorage.removeItem('pn_updDone');setTimeout(()=>toast('✔ Mise à jour n° '+u+' installée automatiquement'),1500)}}
   window.addEventListener('hashchange',()=>{if((location.hash||'').startsWith('#inscription'))location.reload()});
   /* lien d'inscription : …/web/#inscription=compte → appareil remis à zéro puis connexion au compte du restaurant */
   {const m=/^#inscription(?:=([A-Za-z0-9_.-]+))?/.exec(location.hash||'');if(m){const acc=(m[1]||'').toLowerCase();
