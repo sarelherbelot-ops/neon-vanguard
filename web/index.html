@@ -293,6 +293,7 @@ body.restricted .adm-only,body.restricted nav button[data-v=params],body.restric
 <!-- ================= POINTEUSE ================= -->
 <section id="v-point" class="hidden">
   <div class="card"><div class="clock" id="pClock"></div><div class="meta" style="text-align:center" id="pDate"></div></div>
+  <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : le pointage se fait uniquement sur la tablette du restaurant.</div>
   <div class="pgrid" id="pGrid"></div>
   <div class="card" style="margin-top:14px">
     <div class="row">
@@ -1936,7 +1937,7 @@ function savePts(d){if(PTS[d]&&PTS[d].length)put('pt:'+d,PTS[d]);else{delete PTS
 function tick(){const n=new Date();$('#pClock').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());$('#pDate').textContent=longD(todayS())}
 setInterval(()=>{if(VIEW==='point')tick()},1000);
 function renderPoint(){setTimeout(oubliBadge,0);tick();
-  $('#pGrid').innerHTML=staff().map(u=>{const o=openShift(u.id);
+  $('#pRemote')&&$('#pRemote').classList.toggle('hidden',!remoteNoPunch());$('#pGrid').innerHTML=staff().map(u=>{const o=openShift(u.id);
     return `<button class="pbtn ${o?'in':''}" data-u="${u.id}"><b>${esc(u.nom)}</b>
       <span class="meta">${o?'Présent depuis '+hhmm(o.e.in)+(o.d!==todayS()?' ('+frD(o.d)+')':''):'Absent'}${poste(u)==='salle'?' · 🍽 Salle':poste(u)==='chef'?' · 👨‍🍳 Chef':' · 👨‍🍳 Cuisine'}${u.libre?' · sans tâches':''}</span>
       ${cardPlan(u,o)}<br>
@@ -1945,7 +1946,10 @@ function renderPoint(){setTimeout(oubliBadge,0);tick();
   if(!$('#phFrom').value){$('#phFrom').value=monday(todayS());$('#phTo').value=addD(monday(todayS()),6)}
   $('#phUser').innerHTML='<option value="">Tous</option>'+staff().map(u=>`<option value="${u.id}" ${$('#phUser').value===u.id?'selected':''}>${esc(u.nom)}</option>`).join('');
   renderPlan();renderPH()}
-async function punch(uid){const u=userById(uid),o=openShift(uid);
+/* depuis un téléphone (accès à distance), on peut tout voir mais pas pointer : le pointage se fait sur la tablette du restaurant */
+const remoteNoPunch=()=>RESTRICT()&&((typeof CUR_U==='function'&&CUR_U())||{}).role!=='chef';
+/* le chef peut pointer depuis son téléphone (lui seulement), même sans horaire prévu */
+async function punch(uid){if(RESTRICT()&&!remoteNoPunch()&&uid!==(CUR_U()||{}).id)return toast('Depuis ton téléphone, tu peux pointer seulement pour toi');if(remoteNoPunch())return info(`<h2>⏱ Pointage sur la tablette uniquement</h2><p style="font-size:17px">Depuis ton téléphone, tu peux tout consulter, mais <b>le pointage (arrivée et départ) se fait seulement sur la tablette du restaurant</b>, sur place.</p><div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`);const u=userById(uid),o=openShift(uid);
   const who=await new Promise(res=>{ // demande le mot de passe du compte choisi uniquement
     $('#aTitle').textContent=(o?'Départ — ':'Arrivée — ')+u.nom;$('#aSub').textContent='Tape ton mot de passe pour pointer.';
     $('#aUser').innerHTML=`<option value="${u.id}">${esc(u.nom)}</option>`;$('#aPwd').value='';$('#aPwd2Lbl').classList.add('hidden');$('#mAuth').classList.remove('hidden');setTimeout(()=>$('#aPwd').focus(),50);
