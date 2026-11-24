@@ -1090,7 +1090,7 @@ function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false
 let roPrev=null;function applyRestrict(){const r=RESTRICT(),ro=RO();document.body.classList.toggle('restricted',r);document.body.classList.toggle('readonly',ro);
   {const b=document.getElementById('roBar');if(b&&ro){const u=CUR_U(),nx=nextDuty(u);b.textContent='📱 Accès à distance : consultation seulement.'+(u&&u.role!=='boss'?(nx!=null?' Tu pourras pointer et tout utiliser à partir de '+pad(Math.floor(nx/60))+'h'+pad(nx%60)+'.':' Tu pourras pointer et tout utiliser pendant tes heures prévues au planning.'):' Tout se fait sur la tablette du restaurant.')}}
   if(roPrev!==null&&roPrev!==ro){roPrev=ro;try{show(VIEW)}catch(e){}}roPrev=ro;if(r&&VIEW==='params')show('jour')}
-function refresh(){applyRestrict();chatCheck();try{ptCheck()}catch(e){}resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();if(VIEW==='stock'&&document.activeElement!==$('#ivQ'))renderStock();if(VIEW==='avis')renderAvis();try{avCheck()}catch(e){}oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
+function refresh(){applyRestrict();chatCheck();try{ptCheck()}catch(e){}resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();if(VIEW==='stock'&&document.activeElement!==$('#ivQ'))renderStock();if(VIEW==='avis')renderAvis();try{avCheck();avRingCheck()}catch(e){}oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -2503,8 +2503,18 @@ async function avPull(){if(avBusy||!CFG.avis||RESTRICT()||(typeof STOCKONLY==='f
       if(avAll().some(y=>y.id===id))continue;(AVS[mo]=AVS[mo]||[]).push({id,ts,note,txt:String(v.txt||'').slice(0,1500),nom:String(v.nom||'').slice(0,60)});ch.add(mo)}catch(e){}}
   for(const mo of ch)put('av:'+mo,AVS[mo]);
   if(mx)await fetch(AV_BOX+A.box+'/avis?upto='+mx,{method:'DELETE',headers:{'X-Tok':A.tok}});
-  if(ch.size&&VIEW==='avis')renderAvis()}catch(e){}finally{avBusy=false}}
+  if(ch.size){if(VIEW==='avis')renderAvis();avRingCheck();avCheck()}}catch(e){}finally{avBusy=false}}
 setInterval(avPull,60000);setTimeout(avPull,6000);
+/* son spécial « nouvel avis » sur la tablette (et le téléphone du responsable) */
+let AUC=null;const auInit=()=>{try{if(!AUC)AUC=new(window.AudioContext||window.webkitAudioContext)();if(AUC.state==='suspended')AUC.resume()}catch(e){}};
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,auInit,{passive:true}));
+function avRing(){try{auInit();if(!AUC)return;const t0=AUC.currentTime+0.05;
+  [[0,784],[0.16,988],[0.32,1175],[0.52,1568],[1.1,784],[1.26,988],[1.42,1175],[1.62,1568]].forEach(([dt,f])=>{const o=AUC.createOscillator(),g=AUC.createGain();o.type='sine';o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t0+dt);g.gain.exponentialRampToValueAtTime(0.5,t0+dt+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+dt+0.45);o.connect(g).connect(AUC.destination);o.start(t0+dt);o.stop(t0+dt+0.5)})}catch(e){}}
+let avSeenDev=+localStorage.getItem('pn_avSeenDev')||0;
+function avRingCheck(){if(RESTRICT()||(typeof STOCKONLY==='function'&&STOCKONLY()))return;const L=avAll();if(!avSeenDev){avSeenDev=Date.now();localStorage.setItem('pn_avSeenDev',avSeenDev);return}
+  const N=L.filter(x=>x.ts>avSeenDev);if(!N.length)return;avSeenDev=Math.max(...N.map(x=>x.ts));localStorage.setItem('pn_avSeenDev',avSeenDev);
+  avRing();if(!MAIN()){const x=N[0];toastRed('⭐ Nouvel avis client : '+x.note+'/5'+(x.txt?' — '+x.txt.slice(0,60):''));if(native()&&Android.notify)try{Android.notify('⭐ Nouvel avis : '+x.note+'/5',(x.txt||'').slice(0,150)||'(sans commentaire)')}catch(e){}}}
 /* notification d'un nouvel avis sur le téléphone du responsable */
 let avNotified=+localStorage.getItem('pn_avNotif')||0;
 function avCheck(){if(!MAIN())return;const L=avAll();if(!avNotified){avNotified=Date.now();localStorage.setItem('pn_avNotif',avNotified);return}
