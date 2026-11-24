@@ -395,10 +395,12 @@ body.readonly #roBar{display:block!important}
   </div>
 </section>
 <div id="mScan" class="modal hidden" style="background:#000"><div style="position:relative;width:100%;max-width:720px;margin:0 auto">
-  <video id="scVideo" playsinline muted autoplay style="width:100%;max-height:70vh;object-fit:cover;background:#000;border-radius:12px"></video>
-  <div style="position:absolute;left:8%;right:8%;top:35%;height:3px;background:#ef4444;box-shadow:0 0 10px #ef4444"></div>
+  <div style="position:relative"><video id="scVideo" playsinline muted autoplay style="width:100%;max-height:60vh;object-fit:contain;background:#000;border-radius:12px;display:block"></video>
+  <div style="position:absolute;left:8%;right:8%;top:50%;height:3px;background:#ef4444;box-shadow:0 0 10px #ef4444"></div></div>
   <div id="scMsg" style="color:#fff;text-align:center;font-size:17px;margin:10px 0">Mets le code-barre de la bouteille devant la caméra, bien droit, sur la ligne rouge.</div>
-  <div class="row" style="gap:8px;padding:0 10px"><input id="scCode" inputmode="numeric" placeholder="ou taper le code…" style="margin:0" class="grow"><button class="btn sec" id="scOk">OK</button><button class="btn ghost" id="scX" style="color:#fff">Annuler</button></div>
+  <div id="scSeen" style="text-align:center;margin:0 10px 10px;padding:10px;border-radius:12px;background:#1f2937;color:#9ca3af;font-size:17px">Aucun code lu pour l'instant</div>
+  <div style="padding:0 10px 10px"><button class="btn ok" id="scGo" disabled style="width:100%;font-size:20px;padding:14px">✔ Valider ce code</button></div>
+  <div class="row" style="gap:8px;padding:0 10px"><input id="scCode" inputmode="numeric" placeholder="ou taper le code…" style="margin:0" class="grow"><button class="btn sec" id="scOk">OK</button><button class="btn danger" id="scX">Annuler</button></div>
 </div></div>
 <section id="v-cmd" class="hidden">
   <div class="card">
@@ -2387,7 +2389,7 @@ $('#ivPrint').onclick=()=>{const Q=ivStock(),P=ivProds().sort((a,b)=>(a.cat||'~'
 /* --- lecteur de code-barre --- */
 let scStream=null,scRes=null,scTimer=null;
 function scStop(){clearInterval(scTimer);scTimer=null;if(scStream){scStream.getTracks().forEach(t=>t.stop());scStream=null}$('#mScan').classList.add('hidden')}
-function scanCode(){return new Promise(async res=>{scRes=v=>{scStop();scRes=null;res(v)};$('#scCode').value='';$('#mScan').classList.remove('hidden');$('#scMsg').textContent='Mets le code-barre de la bouteille devant la caméra, bien droit, sur la ligne rouge.';
+function scanCode(){return new Promise(async res=>{scRes=v=>{scStop();scRes=null;res(v)};$('#scCode').value='';scSeen=null;$('#scGo').disabled=true;$('#scSeen').textContent='Aucun code lu pour l\'instant';$('#mScan').classList.remove('hidden');$('#scMsg').textContent='Vise le code-barre avec la ligne rouge, vérifie le code affiché, puis appuie sur « ✔ Valider ce code ».';
   const v=$('#scVideo');const tries=[{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}},{facingMode:'environment',width:{ideal:1920}},{facingMode:'environment'},true];
   for(const c of tries){try{scStream=await navigator.mediaDevices.getUserMedia({video:c,audio:false});break}catch(e){scStream=null}}
   if(!scStream){$('#scMsg').textContent='Caméra indisponible : tape le code à la main.';return}
@@ -2395,10 +2397,14 @@ function scanCode(){return new Promise(async res=>{scRes=v=>{scStop();scRes=null
   try{const tr=scStream.getVideoTracks()[0],cap=tr.getCapabilities&&tr.getCapabilities();if(cap&&cap.focusMode&&cap.focusMode.includes('continuous'))tr.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
   let det=null;try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();if(f.includes('ean_13'))det=new BarcodeDetector({formats:f.filter(x=>['ean_13','ean_8','upc_a','upc_e','code_128'].includes(x))})}}catch(e){det=null}
   const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});let prev=null,busyF=false;
-  scTimer=setInterval(async()=>{if(busyF||!v.videoWidth||!scRes)return;busyF=true;try{let code=null;
-    if(det){const r=await det.detect(v);if(r&&r.length)code=r[0].rawValue}
+  scTimer=setInterval(async()=>{if(busyF||!v.videoWidth||!scRes)return;if(scSeen&&Date.now()-scSeenT>2500){scSeen=null;$('#scGo').disabled=true;$('#scSeen').textContent='Aucun code lu pour l\'instant'}busyF=true;try{let code=null;
+    if(det){const r=await det.detect(v);if(r&&r.length){const cx0=v.videoWidth/2,cy0=v.videoHeight/2,dd=x=>{const b=x.boundingBox;return b?Math.hypot(b.x+b.width/2-cx0,(b.y+b.height/2-cy0)*2):0};const on=r.filter(x=>{const b=x.boundingBox;return!b||(b.y<=cy0+v.videoHeight*.06&&b.y+b.height>=cy0-v.videoHeight*.06)}).sort((a,b)=>dd(a)-dd(b));if(on.length)code=on[0].rawValue}}
     if(!code){const W=Math.min(1600,v.videoWidth),H=Math.round(v.videoHeight*W/v.videoWidth);cv.width=W;cv.height=H;cx.drawImage(v,0,0,W,H);code=eanFromImage(cx.getImageData(0,0,W,H))}
-    if(code){if(det||code===prev){try{navigator.vibrate&&navigator.vibrate(120)}catch(e){}scRes&&scRes(code)}prev=code}}catch(e){}busyF=false},180)})}
+    if(code&&(det||code===prev)&&code!==scSeen){scSeen=code;scSeenT=Date.now();const p=ivFind(code);$('#scSeen').innerHTML=`Code lu : <b style="color:#fff;font-size:20px">${esc(code)}</b><br>${p?'<span style="color:#86efac">'+esc(p.nom)+'</span>':'<span style="color:#fde68a">nouveau produit</span>'}`;$('#scGo').disabled=false;try{navigator.vibrate&&navigator.vibrate(40)}catch(e){}}
+    else if(code&&code===scSeen)scSeenT=Date.now();prev=code}catch(e){}busyF=false},180)})}
+/* mode manuel : la caméra lit en continu, mais rien n'est pris tant qu'on n'appuie pas sur « Valider ce code » */
+let scSeen=null,scSeenT=0;
+$('#scGo').onclick=()=>{if(scSeen&&scRes)scRes(scSeen)};
 $('#scX').onclick=()=>scRes&&scRes(null);
 $('#scOk').onclick=()=>{const c=$('#scCode').value.replace(/\D/g,'');if(c.length<4)return toast('Code trop court');scRes&&scRes(c)};
 /* décodeur EAN-13 / EAN-8 / UPC-A (lignes de balayage horizontales et verticales, dans les deux sens) */
@@ -2439,8 +2445,8 @@ function eanDecodeRuns(R){for(const T of[59,43])for(let i=1;i+T<=R.length;i++){i
     const code=eanSolve(Lc,Rc,e13);if(code)return code}return null}
 function eanFromImage(img){const{width:W,height:H,data:D}=img;const g=(x,y)=>{const o=(y*W+x)*4;return(D[o]*3+D[o+1]*6+D[o+2])/10};
   const tryLine=line=>{for(const fn of[l=>eanRunsEdge(l,.08),l=>eanRunsEdge(l,.035),l=>eanRunsEdge(l,.16),eanRuns]){const R=fn(line);if(!R)continue;let c=eanDecodeRuns(R);if(c)return c;R.reverse();c=eanDecodeRuns(R);if(c)return c}return null};
-  for(const f of[.35,.5,.3,.4,.45,.55,.25,.6,.2,.65,.7,.33,.38,.43,.48,.53,.28,.23]){const y=Math.round(H*f),L=new Float32Array(W);for(let x=0;x<W;x++)L[x]=g(x,y);const c=tryLine(L);if(c)return c}
-  for(const f of[.5,.4,.6,.3,.7]){const x=Math.round(W*f),L=new Float32Array(H);for(let y=0;y<H;y++)L[y]=g(x,y);const c=tryLine(L);if(c)return c}return null}
+  for(const f of[.5,.48,.52,.46,.54,.44,.56]){const y=Math.round(H*f),L=new Float32Array(W);for(let x=0;x<W;x++)L[x]=g(x,y);const c=tryLine(L);if(c)return c}
+  for(const f of[]){const x=Math.round(W*f),L=new Float32Array(H);for(let y=0;y<H;y++)L[y]=g(x,y);const c=tryLine(L);if(c)return c}return null}
 /* ---- caméra ---- */
 let camStream=null,camData=null,camRes=null;
 function takePhoto(nom,titre,sub){return new Promise(async res=>{camRes=res;camData=null;
