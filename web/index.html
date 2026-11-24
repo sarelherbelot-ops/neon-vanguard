@@ -200,6 +200,7 @@ body.readonly #roBar{display:block!important}
     <button data-v="cmd">🛒 Commandes</button>
     <button data-v="stock">📦 Stock</button>
     <button data-v="avis">⭐ Avis</button>
+    <button data-v="tips" class="adm-only">💰 Pourboires</button>
     <button data-v="chat">💬 Messages</button>
     <button data-v="instr">📖 Instructions</button>
     <button data-v="params">⚙️ Réglages</button>
@@ -385,6 +386,12 @@ body.readonly #roBar{display:block!important}
   <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="adm-only btn sec" id="htTxBtn">Modifier</button></div></div>
   <div class="card"><div class="row"><div class="grow"><b>Nom en haut de la fiche hôtel</b><div class="meta" id="htNomTxt"></div></div><button class="adm-only btn sec" id="htNomBtn">Modifier</button></div></div>
   <div class="card"><div class="row"><div class="grow"><b>Heure minimale de fermeture de la caisse</b><div class="meta" id="fmTxt"></div></div><button class="adm-only btn sec" id="fmBtn">Modifier</button></div></div>
+</section>
+<section id="v-tips" class="hidden">
+  <div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><h2 class="grow" style="margin:0">💰 Pourboires</h2><button class="btn ghost sm" id="tpAnch">⚙ Début des périodes</button></div>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn ghost" id="tpPrev">◀</button><div class="grow" id="tpPer" style="text-align:center"></div><button class="btn ghost" id="tpNext">▶</button></div></div>
+  <div class="card"><div class="row"><h3 class="grow" style="margin:0">Pourboires de la période</h3><button class="btn ok" id="tpAdd">➕ Ajouter</button></div><div id="tpList" style="margin-top:8px"></div></div>
+  <div class="card"><div class="row"><h3 class="grow" style="margin:0">Partage selon les heures</h3><button class="btn sec" id="tpPrint">🖨 Imprimer / PDF</button></div><div id="tpTab" style="margin-top:8px;overflow-x:auto"></div></div>
 </section>
 <section id="v-avis" class="hidden">
   <div class="card"><h2 style="margin-top:0">⭐ Avis des clients</h2><div id="avSum" style="text-align:center"></div></div>
@@ -712,7 +719,7 @@ const dayObj=s=>DAYS[s]||(DAYS[s]={tasks:{}});
 function isClosed(s){const o=DAYS[s];if(o&&o.closed!==undefined)return o.closed;return !CFG.open.includes(wd(s))}
 function due(s){if(isClosed(s))return [];const w=wd(s);return CFG.tasks.filter(t=>t.type==='Q'||t.jour===w)}
 const ZONES={salle:'🍽 Nettoyage salle',cuisine:'👨‍🍳 Nettoyage cuisine',temp:'🌡 Températures',recep:'📦 Réception'};
-let RCP={},RSV={},HTL={},MEN={},CMD={},MSG={},FAC={},PJM={},TKR={},IVS={},AVS={};/* IVS['p']=produits, IVS['2026-11']=mouvements de stock */ // TKR['2026-11'] = tickets de clôture refusés
+let RCP={},RSV={},HTL={},MEN={},CMD={},MSG={},FAC={},PJM={},TKR={},IVS={},AVS={},TPS={};/* IVS['p']=produits, IVS['2026-11']=mouvements de stock */ // TKR['2026-11'] = tickets de clôture refusés
  // PJM['2026-11-23'] = photo du menu de la semaine (data URL)
  // FAC['2026'] = factures restaurant [{id,no,date,nom,nb,des,montant,pay,sig,ts,by}]
  // MSG['2026-11'] = [{id,ts,from,dev,txt}]
@@ -883,10 +890,10 @@ window.addEventListener('resize',()=>{if(!$('#mSign').classList.contains('hidden
 /* ===================== NAVIGATION ===================== */
 let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFullYear(),calM=new Date().getMonth();
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
-function show(v){if(typeof STOCKONLY==='function'&&STOCKONLY())v='stock';if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
+function show(v){if(typeof STOCKONLY==='function'&&STOCKONLY())v='stock';if(v==='tips'&&!(typeof MAIN==='function'&&MAIN()&&!RESTRICT())&&!(tpUnlock>Date.now())){if(RESTRICT())return;tpGate().then(ok=>{if(ok)show('tips')});return}if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ['jour','point','semaine','cal','resa','pdj','hotel','cmd','stock','avis','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
-  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='stock')renderStock();if(v==='avis')renderAvis();if(v==='chat')renderChat();if(v==='instr')renderInstr();if(v==='pdj')renderPdj();
+    ['jour','point','semaine','cal','resa','pdj','hotel','cmd','stock','avis','tips','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='stock')renderStock();if(v==='avis')renderAvis();if(v==='tips')renderTips();if(v==='chat')renderChat();if(v==='instr')renderInstr();if(v==='pdj')renderPdj();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
 
@@ -1232,7 +1239,7 @@ function recapCheck(){const last=addD(monday(todayS()),-7);if(!CFG.recapMail||lo
     ()=>{$('#rcSend').onclick=()=>{closeInfo();sendRecap(last)};$('#rcLater').onclick=()=>closeInfo()})}
 
 /* ===================== SAUVEGARDE AUTOMATIQUE (chaque soir) ===================== */
-function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM,stock:IVS,avis:AVS})}
+function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM,stock:IVS,avis:AVS,pourboires:TPS})}
 async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:addD(T,-30);
   const body=await dossierHTML(a,T,['salle','cuisine','temp','recep','plan','heures']);
   const rs=[];for(const mo of Object.keys(RSV).sort())for(const r of (RSV[mo]||[]).slice().sort((x,y)=>(x.date+x.heure).localeCompare(y.date+y.heure)))rs.push(r);
@@ -1952,12 +1959,12 @@ $('#pSave').onclick=async()=>{
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
-$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM,stock:IVS,avis:AVS}),'application/json');
+$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM,stock:IVS,avis:AVS,pourboires:TPS}),'application/json');
 $('#pRestoreBtn').onclick=()=>$('#pRestore').click();
 $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=async()=>{try{const x=JSON.parse(r.result);if(!x.cfg||!x.days)throw 0;
     if(!confirm(`Remplacer toutes les données par cette sauvegarde (${Object.keys(x.days).length} jours) ?`))return;
-    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);MSG=x.messages||{};for(const k in MSG)put('ms:'+k,MSG[k]);FAC=x.factures||{};for(const k in FAC)put('fa:'+k,FAC[k]);PJM=x.menus||{};for(const k in PJM)put('pj:'+k,PJM[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);IVS=x.stock||{};for(const k in IVS)put('iv:'+k,IVS[k]);AVS=x.avis||{};for(const k in AVS)put('av:'+k,AVS[k]);for(const k in PTS)put('pt:'+k,PTS[k]);
+    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);MSG=x.messages||{};for(const k in MSG)put('ms:'+k,MSG[k]);FAC=x.factures||{};for(const k in FAC)put('fa:'+k,FAC[k]);PJM=x.menus||{};for(const k in PJM)put('pj:'+k,PJM[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);IVS=x.stock||{};for(const k in IVS)put('iv:'+k,IVS[k]);AVS=x.avis||{};for(const k in AVS)put('av:'+k,AVS[k]);TPS=x.pourboires||{};for(const k in TPS)put('tp:'+k,TPS[k]);for(const k in PTS)put('pt:'+k,PTS[k]);
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
@@ -2456,6 +2463,46 @@ function eanFromImage(img){const{width:W,height:H,data:D}=img;const g=(x,y)=>{co
   const tryLine=line=>{for(const fn of[l=>eanRunsEdge(l,.08),l=>eanRunsEdge(l,.035),l=>eanRunsEdge(l,.16),eanRuns]){const R=fn(line);if(!R)continue;let c=eanDecodeRuns(R);if(c)return c;R.reverse();c=eanDecodeRuns(R);if(c)return c}return null};
   for(const f of[.5,.48,.52,.46,.54,.44,.56]){const y=Math.round(H*f),L=new Float32Array(W);for(let x=0;x<W;x++)L[x]=g(x,y);const c=tryLine(L);if(c)return c}
   for(const f of[]){const x=Math.round(W*f),L=new Float32Array(H);for(let y=0;y<H;y++)L[y]=g(x,y);const c=tryLine(L);if(c)return c}return null}
+/* ======== POURBOIRES : partage au prorata des heures pointées, par période de 2 semaines ======== */
+const tpAnchor=()=>CFG.tipAnchor||monday(todayS());
+function tpStart(d){const a=tpAnchor(),n=Math.round((parse(d)-parse(a))/864e5);return addD(a,Math.floor(n/14)*14)}
+let tpCur=null,tpUnlock=0;
+const tpObj=s=>TPS[s]||(TPS[s]={e:[],ex:null,paid:{}});
+const tpSave=s=>put('tp:'+s,TPS[s]);
+const r05=x=>Math.round(x*20)/20,chf=x=>x.toFixed(2);
+function tpHours(s){const H={},open={};for(let i=0;i<14;i++){const d=addD(s,i);for(const e of PTS[d]||[]){if(!e.out){open[e.uid]=1;continue}H[e.uid]=(H[e.uid]||0)+countedDur(d,e)/60000}}return{H,open}}
+function tpCalc(s){const o=tpObj(s),{H,open}=tpHours(s);const tot=o.e.reduce((a,x)=>a+x.amt,0);
+  const ex=o.ex||CFG.users.filter(u=>u.role==='admin'||u.role==='boss').map(u=>u.id);
+  const ids=[...new Set([...Object.keys(H),...CFG.users.filter(u=>!u.del&&u.role!=='boss').map(u=>u.id)])].filter(id=>userById(id));
+  const R=ids.map(id=>({u:userById(id),min:H[id]||0,inc:!ex.includes(id)&&(H[id]||0)>0,can:(H[id]||0)>0,open:!!open[id]}));
+  const HT=R.filter(r=>r.inc).reduce((a,r)=>a+r.min,0);R.forEach(r=>{r.pct=r.inc&&HT?r.min/HT:0;r.part=r.inc&&HT?r05(tot*r.pct):0});
+  R.sort((a,b)=>b.min-a.min);return{o,R,tot,HT,ex,rest:+(tot-R.reduce((a,r)=>a+r.part,0)).toFixed(2)}}
+function renderTips(){if(!CFG.tipAnchor&&!RESTRICT()){CFG.tipAnchor=monday(todayS());put('cfg',CFG)}if(!tpCur)tpCur=tpStart(todayS());const s=tpCur,e=addD(s,13),{o,R,tot,HT,rest}=tpCalc(s),fin=todayS()>e;
+  $('#tpPer').innerHTML=`<b>Du ${frD(s)} au ${frD(e)}</b>${fin?' <span class="meta">(terminée)</span>':' <span class="meta">(en cours)</span>'}`;
+  $('#tpList').innerHTML=(o.e.length?o.e.slice().sort((a,b)=>a.d<b.d?-1:1).map(x=>`<div class="row" style="border-bottom:1px solid var(--line);padding:6px 0"><span style="width:90px">${frD(x.d)}</span><span class="grow meta">${esc(x.note||'')}</span><b>${chf(x.amt)} CHF</b><button class="btn ghost sm" data-tpdel="${x.id}" style="margin-left:6px">✕</button></div>`).join(''):'<p class="meta">Aucun pourboire saisi pour cette période.</p>')
+    +`<div class="row" style="margin-top:8px;font-size:20px"><span class="grow"><b>Total à partager</b></span><b>${chf(tot)} CHF</b></div>`;
+  const TD='style="padding:6px 8px;border-bottom:1px solid var(--line);text-align:right"';
+  $('#tpTab').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:15px"><tr style="background:#f1f5f9"><th style="text-align:left;padding:6px 8px">Partage</th><th ${TD}>Heures</th><th ${TD}>%</th><th ${TD}>Part</th><th ${TD}>Payé</th></tr>
+    ${R.map(r=>`<tr style="${r.inc?'':'opacity:.5'}"><td style="padding:6px 8px;border-bottom:1px solid var(--line)"><label class="row" style="gap:6px;margin:0"><input type="checkbox" data-tpinc="${r.u.id}" ${r.inc?'checked':''} ${r.can?'':'disabled'} style="width:auto;margin:0"> <b>${esc(r.u.nom)}</b></label>${r.open?'<div class="meta" style="color:#dc2626">⚠ pointage encore ouvert</div>':''}</td>
+      <td ${TD}>${hTxt(r.min)}</td><td ${TD}>${r.inc?Math.round(r.pct*1000)/10+' %':'—'}</td><td ${TD}><b>${r.inc?chf(r.part)+' CHF':'—'}</b></td><td ${TD}>${r.inc&&r.part?`<input type="checkbox" data-tppaid="${r.u.id}" ${o.paid[r.u.id]?'checked':''} style="width:auto;margin:0">`:''}</td></tr>`).join('')}
+    <tr style="background:#f1f5f9;font-weight:700"><td style="padding:6px 8px">Total</td><td ${TD}>${hTxt(HT)}</td><td ${TD}>${HT?'100 %':''}</td><td ${TD}>${chf(tot-rest)} CHF</td><td ${TD}></td></tr></table>
+    <p class="meta">Partage selon les heures <b>pointées</b> de la période (pauses déduites, heures en plus non validées non comptées). Arrondi aux 5 centimes${Math.abs(rest)>=0.01?` : reste ${chf(rest)} CHF (à ajouter à la prochaine période ou à arrondir)`:''}. Décoche une personne pour l'exclure du partage.</p>`;
+  $('#tpList').querySelectorAll('[data-tpdel]').forEach(b=>b.onclick=()=>{o.e=o.e.filter(x=>x.id!==b.dataset.tpdel);tpSave(s);renderTips()});
+  $('#tpTab').querySelectorAll('[data-tpinc]').forEach(c=>c.onchange=()=>{const {ex}=tpCalc(s);let X=[...ex];if(c.checked)X=X.filter(x=>x!==c.dataset.tpinc);else X.push(c.dataset.tpinc);o.ex=X;tpSave(s);renderTips()});
+  $('#tpTab').querySelectorAll('[data-tppaid]').forEach(c=>c.onchange=()=>{if(c.checked)o.paid[c.dataset.tppaid]=Date.now();else delete o.paid[c.dataset.tppaid];tpSave(s)})}
+async function tpGate(){if(RESTRICT())return false;if(MAIN()||tpUnlock>Date.now())return true;const a=await askAuth('💰 Pourboires',['admin'],'Réservé au responsable');if(!a)return false;tpUnlock=Date.now()+10*60000;return true}
+$('#tpPrev').onclick=()=>{tpCur=addD(tpCur,-14);renderTips()};$('#tpNext').onclick=()=>{tpCur=addD(tpCur,14);renderTips()};
+$('#tpAdd').onclick=()=>{const s=tpCur,e=addD(s,13),t=todayS(),dd=t>=s&&t<=e?t:e;
+  info(`<h2>💰 Ajouter des pourboires</h2><label>Jour</label><input type="date" id="tpD" value="${dd}" min="${s}" max="${e}"><label>Montant (CHF)</label><input id="tpA" type="number" inputmode="decimal" step="0.05" min="0" placeholder="ex : 85.50" style="font-size:22px">
+    <label>Note (facultatif)</label><input id="tpN" placeholder="ex : carte, espèces, soirée…"><div class="row" style="margin-top:12px"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="tpOk">Ajouter</button></div>`,
+    ()=>{setTimeout(()=>$('#tpA').focus(),80);$('#tpOk').onclick=()=>{const a=+String($('#tpA').value).replace(',','.'),d=$('#tpD').value;if(!(a>0))return toast('Montant ?');if(!d)return toast('Jour ?');
+      const S=tpStart(d);tpObj(S).e.push({id:'t'+Date.now().toString(36),d,amt:Math.round(a*100)/100,note:$('#tpN').value.trim()});tpSave(S);tpCur=S;closeInfo();renderTips();toast('💰 +'+chf(a)+' CHF')}})};
+$('#tpPrint').onclick=()=>{const s=tpCur,{R,tot,rest}=tpCalc(s),T='style="border:1px solid #777;padding:6px 8px"',I=R.filter(r=>r.inc);
+  $('#printArea').innerHTML=`<style>@page{size:A4;margin:14mm}</style><div style="font-family:sans-serif"><h2 style="margin:0">${esc(CFG.nom||'')} — Partage des pourboires</h2><p>Période du <b>${frD(s)}</b> au <b>${frD(addD(s,13))}</b> · Total : <b>${chf(tot)} CHF</b></p>
+    <table style="border-collapse:collapse;width:100%;font-size:13px"><tr><th ${T}>Personne</th><th ${T}>Heures pointées</th><th ${T}>%</th><th ${T}>Part (CHF)</th><th ${T} style="width:38%">Signature (reçu)</th></tr>
+    ${I.map(r=>`<tr><td ${T}><b>${esc(r.u.nom)}</b></td><td ${T} align="right">${hTxt(r.min)}</td><td ${T} align="right">${Math.round(r.pct*1000)/10} %</td><td ${T} align="right"><b>${chf(r.part)}</b></td><td ${T} style="height:11mm"></td></tr>`).join('')}</table>
+    <p style="font-size:11px;color:#555">Partage au prorata des heures pointées. Arrondi aux 5 centimes${Math.abs(rest)>=0.01?' (reste '+chf(rest)+' CHF)':''}.</p></div>`;outDoc('Pourboires_'+s,0)};
+$('#tpAnch').onclick=async()=>{const v=prompt('Premier jour d\'une période de 2 semaines (AAAA-MM-JJ, un lundi) :',tpAnchor());if(!v)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||isNaN(parse(v)))return toast('Date invalide');CFG.tipAnchor=monday(v);put('cfg',CFG);tpCur=null;renderTips();toast('Périodes à partir du '+frD(CFG.tipAnchor))};
 /* ======== AVIS CLIENTS : QR code → page web publique → avis chiffrés (clé publique du restaurant) → boîte → appli ======== */
 const AV_BOX='https://explordinateur-plan-nettoyage-avis.hf.space/api/b/',AV_PAGE='https://explordinateur-avis-clients.static.hf.space/';
 const b64u=a=>btoa(String.fromCharCode(...new Uint8Array(a))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -2690,8 +2737,8 @@ function kick(){clearTimeout(kickT);kickT=setTimeout(syncOnce,300)}
 function cloudPut(k,v){if(!cloudOn())return;OUT.add(k);saveOut();kick()}
 function photoQueue(id,delOp){if(!cloudOn())return;OUTPH.add((delOp?'-':'')+id);saveOut();kick()}
 function setCloud(k,v){CLOUD[k]=v;localPut('cl:'+k,v==null?null:v)}
-function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,iv:IVS,av:AVS,dv:DV}[pre];return m?m[key]:null}
-function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);for(const k in MSG)L.push('ms:'+k);for(const k in FAC)L.push('fa:'+k);for(const k in PJM)L.push('pj:'+k);for(const k in TKR)L.push('tr:'+k);for(const k in IVS)L.push('iv:'+k);for(const k in AVS)L.push('av:'+k);return L}
+function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,iv:IVS,av:AVS,tp:TPS,dv:DV}[pre];return m?m[key]:null}
+function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);for(const k in MSG)L.push('ms:'+k);for(const k in FAC)L.push('fa:'+k);for(const k in PJM)L.push('pj:'+k);for(const k in TKR)L.push('tr:'+k);for(const k in IVS)L.push('iv:'+k);for(const k in AVS)L.push('av:'+k);for(const k in TPS)L.push('tp:'+k);return L}
 function removedIds(k,v){const c=CLOUD[k];if(!c)return[];
   if(kPre(k)==='d'){const a=(c.tasks)||{},b=(v&&v.tasks)||{};return Object.keys(a).filter(x=>!(x in b))}
   if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'||kPre(k)==='ms'||kPre(k)==='fa'||kPre(k)==='tr'||kPre(k)==='iv'||kPre(k)==='av'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
@@ -2710,7 +2757,7 @@ function applyRemote(k,v){
   if(k==='cfg'){if(!v)return;remapUsers(CFG,v);CFG=v;if(migrateCfg()){localPut(k,CFG);OUT.add('cfg');saveOut();kick()}else localPut(k,v);applyCfg();refreshSoon();
     if(faResolve&&CFG.users&&CFG.users.some(u=>u.role==='admin'&&u.hash)){$('#mAuth').classList.add('hidden');$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');$('#aJoin').classList.add('hidden');const r=faResolve;faResolve=null;r()}
     return}
-  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,iv:IVS,av:AVS,dv:DV}[pre];if(!map)return;
+  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,iv:IVS,av:AVS,tp:TPS,dv:DV}[pre];if(!map)return;
   if(v==null){delete map[key];localDel(k)}else{map[key]=v;localPut(k,v)}}
 let rfT=null;function refreshSoon(){clearTimeout(rfT);rfT=setTimeout(()=>{if(VIEW!=='params'&&$('#mSign').classList.contains('hidden')&&$('#mCam').classList.contains('hidden'))refresh()},300)}
 
@@ -2965,7 +3012,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   const all=await idbAll();
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
-  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k];else if(k.startsWith('ms:'))MSG[k.slice(3)]=all[k];else if(k.startsWith('fa:'))FAC[k.slice(3)]=all[k];else if(k.startsWith('pj:'))PJM[k.slice(3)]=all[k];else if(k.startsWith('tr:'))TKR[k.slice(3)]=all[k];else if(k.startsWith('iv:'))IVS[k.slice(3)]=all[k];else if(k.startsWith('av:'))AVS[k.slice(3)]=all[k]}
+  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k];else if(k.startsWith('ms:'))MSG[k.slice(3)]=all[k];else if(k.startsWith('fa:'))FAC[k.slice(3)]=all[k];else if(k.startsWith('pj:'))PJM[k.slice(3)]=all[k];else if(k.startsWith('tr:'))TKR[k.slice(3)]=all[k];else if(k.startsWith('iv:'))IVS[k.slice(3)]=all[k];else if(k.startsWith('av:'))AVS[k.slice(3)]=all[k];else if(k.startsWith('tp:'))TPS[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   if(!localStorage.getItem('pn_chNotif')){chNotified=Date.now();localStorage.setItem('pn_chNotif',chNotified)}
