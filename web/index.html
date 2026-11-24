@@ -145,6 +145,7 @@ body{padding-top:env(safe-area-inset-top,0px);padding-left:env(safe-area-inset-l
 .sheet td.tv{min-width:52px;text-align:center;cursor:pointer;font-weight:700}
 .sheet tr.today td{outline:2px solid var(--navy);outline-offset:-2px}
 .sheet td.tv.ko{background:var(--red2);color:var(--red);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body.stockonly nav button:not([data-v=stock]),body.stockonly section:not(#v-stock),body.stockonly #roBar{display:none!important}
 body.restricted .adm-only,body.restricted nav button[data-v=params],body.restricted #updBar{display:none!important}
 /* employés sur leur téléphone : lecture seule */
 body.readonly #ivScan,body.readonly #ivNew,body.readonly #htNew,body.readonly #htFicheV,body.readonly #rsNew,body.readonly #rsFac,body.readonly #pjPhoto,body.readonly #pjEdit,body.readonly #pjCopy,body.readonly #cmClear,body.readonly #inNew,body.readonly [data-htq],body.readonly [data-rsq],body.readonly [data-cadd],body.readonly #rcNew,body.readonly #dClose{display:none!important}
@@ -393,6 +394,7 @@ body.readonly #roBar{display:block!important}
     <p class="meta" id="ivSum"></p>
     <div id="ivList"></div>
   </div>
+  <div class="card hidden" id="soBar"><p class="meta">📦 Cet appareil est réservé au stock. Appuie sur la gâchette du lecteur devant un code-barre : le produit s'ouvre tout seul.</p><button class="btn ghost" id="soOff">🔓 Quitter le mode stock (responsable)</button></div>
 </section>
 <div id="mScan" class="modal hidden" style="background:#000"><div style="position:relative;width:100%;max-width:720px;margin:0 auto">
   <div style="position:relative"><video id="scVideo" playsinline muted autoplay style="width:100%;max-height:60vh;object-fit:contain;background:#000;border-radius:12px;display:block"></video>
@@ -443,6 +445,7 @@ body.readonly #roBar{display:block!important}
     <div class="row" style="margin-top:8px"><button class="btn" id="pinOk">🔒 Se connecter</button></div>
   </div>
   <div id="paramBox" class="hidden">
+    <div class="card"><div class="row"><div class="grow"><h2 style="margin:0">📦 Appareil stock seulement</h2><div class="meta">Pour un terminal scanner (lecteur de codes-barres intégré) : cet appareil ne montre que le Stock, sans pointage ni rien d'autre. <span id="soTxt"></span></div></div><button class="btn sec" id="soOn">Activer sur cet appareil</button></div></div>
     <div class="card"><h2>🔀 Onglets du menu</h2><p class="meta">Change l'ordre des onglets en haut de l'écran avec ▲ ▼, et décoche ceux que tu ne veux pas voir. C'est enregistré tout de suite, sur tous les appareils.</p><div id="navEd"></div><div class="row" style="margin-top:8px"><button class="btn ghost sm" id="navReset">↺ Ordre d'origine</button></div></div>
     <div class="card"><h2>🌐 Accès à distance (iPhone, autre appareil)</h2><p class="meta">Donne à un employé son propre accès en ligne : il voit et remplit tout depuis son téléphone, avec son mot de passe, sans accès aux Réglages.</p><div id="webAcc"></div></div>
     <div class="card"><h2>📧 Récapitulatif de la semaine par e-mail</h2><p class="meta">Le récapitulatif d'une semaine (heures, repas, retards, hygiène, réservations, hôtel, ménages) en PDF : choisis la semaine et appuie sur « Envoyer » quand tu veux. L'appli ne le demande jamais d'elle-même.</p>
@@ -874,7 +877,7 @@ window.addEventListener('resize',()=>{if(!$('#mSign').classList.contains('hidden
 /* ===================== NAVIGATION ===================== */
 let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFullYear(),calM=new Date().getMonth();
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
-function show(v){if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
+function show(v){if(typeof STOCKONLY==='function'&&STOCKONLY())v='stock';if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ['jour','point','semaine','cal','resa','pdj','hotel','cmd','stock','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
   if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='stock')renderStock();if(v==='chat')renderChat();if(v==='instr')renderInstr();if(v==='pdj')renderPdj();
@@ -2447,6 +2450,25 @@ function eanFromImage(img){const{width:W,height:H,data:D}=img;const g=(x,y)=>{co
   const tryLine=line=>{for(const fn of[l=>eanRunsEdge(l,.08),l=>eanRunsEdge(l,.035),l=>eanRunsEdge(l,.16),eanRuns]){const R=fn(line);if(!R)continue;let c=eanDecodeRuns(R);if(c)return c;R.reverse();c=eanDecodeRuns(R);if(c)return c}return null};
   for(const f of[.5,.48,.52,.46,.54,.44,.56]){const y=Math.round(H*f),L=new Float32Array(W);for(let x=0;x<W;x++)L[x]=g(x,y);const c=tryLine(L);if(c)return c}
   for(const f of[]){const x=Math.round(W*f),L=new Float32Array(H);for(let y=0;y<H;y++)L[y]=g(x,y);const c=tryLine(L);if(c)return c}return null}
+/* ======== APPAREIL « STOCK SEULEMENT » (terminal scanner) + lecteur laser en mode clavier ======== */
+const STOCKONLY=()=>localStorage.getItem('pn_stockOnly')==='1';
+function applyStockOnly(){const on=STOCKONLY();document.body.classList.toggle('stockonly',on);if(on&&VIEW!=='stock')show('stock');const b=$('#soBar');if(b)b.classList.toggle('hidden',!on);const t=$('#soTxt');if(t)t.textContent=on?'✔ Activé : cet appareil ne fait que le stock.':'Désactivé.'}
+$('#soOn').onclick=async()=>{if(STOCKONLY())return;
+  info(`<h2>📦 Appareil stock seulement</h2><p>Cet appareil ne montrera plus que l'onglet <b>Stock</b> : pas de pointage, pas de réservations, pas de réglages, rien d'autre.</p><p class="meta">Pour revenir en arrière : bouton « 🔓 Quitter le mode stock » en bas de l'onglet Stock, avec le mot de passe du responsable.</p><div class="row"><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="soGo">Activer sur cet appareil</button></div>`,
+    ()=>{$('#soGo').onclick=()=>{localStorage.setItem('pn_stockOnly','1');localStorage.setItem('pn_bg','0');closeInfo();applyStockOnly();toast('📦 Appareil stock seulement')}})};
+$('#soOff').onclick=async()=>{const a=await askAuth('Quitter le mode stock',['admin']);if(!a)return;localStorage.removeItem('pn_stockOnly');applyStockOnly();show('jour');toast('Mode stock désactivé')};
+/* lecteur intégré (sortie « clavier simulé ») : les chiffres arrivent très vite puis Entrée → on les prend comme un scan */
+let wbBuf='',wbT0=0,wbLast=0,wbEl=null,wbVal=null,wbTimer=null;
+function wbDone(){clearTimeout(wbTimer);const code=wbBuf.replace(/\D/g,'');const fast=wbBuf.length&&(wbLast-wbT0)/Math.max(1,wbBuf.length-1)<45;
+  if(code.length>=6&&fast){if(wbEl&&wbVal!=null&&wbEl.value!=null)try{wbEl.value=wbVal;if(wbEl.id==='ivQ')renderStock()}catch(e){}wbBuf='';wbScan(code);return true}wbBuf='';return false}
+function wbScan(code){if(!$('#mScan').classList.contains('hidden')){if(scRes)scRes(code);return}
+  if(VIEW!=='stock'&&!STOCKONLY())return;if(RO())return toast('📱 Consultation seulement');if(!$('#mAuth').classList.contains('hidden'))return;
+  try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}if(!$('#mInfo').classList.contains('hidden'))closeInfo();ivCode(code)}
+document.addEventListener('keydown',e=>{const now=Date.now();
+  if(e.key==='Enter'||e.key==='Tab'){if(wbBuf.length>=6&&now-wbLast<120){if(wbDone()){e.preventDefault();e.stopPropagation()}}else wbBuf='';return}
+  if(e.key&&e.key.length===1&&/[0-9A-Za-z]/.test(e.key)){if(now-wbLast>120||!wbBuf){wbBuf='';wbT0=now;wbEl=document.activeElement;wbVal=wbEl&&'value' in wbEl?wbEl.value:null}wbBuf+=e.key;wbLast=now;
+    clearTimeout(wbTimer);wbTimer=setTimeout(()=>{if(wbBuf.length>=8)wbDone();else wbBuf=''},160)}},true);
+setTimeout(applyStockOnly,0);
 /* ---- caméra ---- */
 let camStream=null,camData=null,camRes=null;
 function takePhoto(nom,titre,sub){return new Promise(async res=>{camRes=res;camData=null;
