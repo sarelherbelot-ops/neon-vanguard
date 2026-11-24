@@ -147,7 +147,7 @@ body{padding-top:env(safe-area-inset-top,0px);padding-left:env(safe-area-inset-l
 .sheet td.tv.ko{background:var(--red2);color:var(--red);-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body.restricted .adm-only,body.restricted nav button[data-v=params],body.restricted #updBar{display:none!important}
 /* employés sur leur téléphone : lecture seule */
-body.readonly #htNew,body.readonly #htFicheV,body.readonly #rsNew,body.readonly #rsFac,body.readonly #pjPhoto,body.readonly #pjEdit,body.readonly #pjCopy,body.readonly #cmClear,body.readonly #inNew,body.readonly [data-htq],body.readonly [data-rsq],body.readonly [data-cadd],body.readonly #rcNew,body.readonly #dClose{display:none!important}
+body.readonly #ivScan,body.readonly #ivNew,body.readonly #htNew,body.readonly #htFicheV,body.readonly #rsNew,body.readonly #rsFac,body.readonly #pjPhoto,body.readonly #pjEdit,body.readonly #pjCopy,body.readonly #cmClear,body.readonly #inNew,body.readonly [data-htq],body.readonly [data-rsq],body.readonly [data-cadd],body.readonly #rcNew,body.readonly #dClose{display:none!important}
 body.readonly #roBar{display:block!important}
 @media print{.sheet{font-size:9px}.sheet td.ck{height:20px;width:22px;font-size:11px}.sheet td.sg{height:22px;width:80px}.sheet td.sg svg{width:76px;height:20px}.sheet td,.sheet th{padding:2px 3px}}
 /* planning */
@@ -197,6 +197,7 @@ body.readonly #roBar{display:block!important}
     <button data-v="pdj">🍽 Plat du jour</button>
     <button data-v="hotel">🏨 Hôtel</button>
     <button data-v="cmd">🛒 Commandes</button>
+    <button data-v="stock">📦 Stock</button>
     <button data-v="chat">💬 Messages</button>
     <button data-v="instr">📖 Instructions</button>
     <button data-v="params">⚙️ Réglages</button>
@@ -383,6 +384,22 @@ body.readonly #roBar{display:block!important}
   <div class="card"><div class="row"><div class="grow"><b>Nom en haut de la fiche hôtel</b><div class="meta" id="htNomTxt"></div></div><button class="adm-only btn sec" id="htNomBtn">Modifier</button></div></div>
   <div class="card"><div class="row"><div class="grow"><b>Heure minimale de fermeture de la caisse</b><div class="meta" id="fmTxt"></div></div><button class="adm-only btn sec" id="fmBtn">Modifier</button></div></div>
 </section>
+<section id="v-stock" class="hidden">
+  <div class="card">
+    <div class="row" style="gap:8px;flex-wrap:wrap"><h2 class="grow" style="margin:0">📦 Stock / inventaire</h2>
+      <button class="btn ok" id="ivScan" style="font-size:17px">📷 Scanner un code-barre</button><button class="btn sec" id="ivNew">➕ Produit sans code</button>
+      <button class="btn ghost" id="ivHist">🕘 Mouvements</button><button class="btn ghost" id="ivPrint">🖨 Imprimer</button></div>
+    <input id="ivQ" placeholder="🔎 Chercher un produit ou un code…" style="margin-top:10px">
+    <p class="meta" id="ivSum"></p>
+    <div id="ivList"></div>
+  </div>
+</section>
+<div id="mScan" class="modal hidden" style="background:#000"><div style="position:relative;width:100%;max-width:720px;margin:0 auto">
+  <video id="scVideo" playsinline muted autoplay style="width:100%;max-height:70vh;object-fit:cover;background:#000;border-radius:12px"></video>
+  <div style="position:absolute;left:8%;right:8%;top:35%;height:3px;background:#ef4444;box-shadow:0 0 10px #ef4444"></div>
+  <div id="scMsg" style="color:#fff;text-align:center;font-size:17px;margin:10px 0">Mets le code-barre de la bouteille devant la caméra, bien droit, sur la ligne rouge.</div>
+  <div class="row" style="gap:8px;padding:0 10px"><input id="scCode" inputmode="numeric" placeholder="ou taper le code…" style="margin:0" class="grow"><button class="btn sec" id="scOk">OK</button><button class="btn ghost" id="scX" style="color:#fff">Annuler</button></div>
+</div></div>
 <section id="v-cmd" class="hidden">
   <div class="card">
     <div class="ztabs" id="cmZones"><button data-cz="cuisine">🍳 Commande cuisine</button><button data-cz="salle">🍽 Commande salle</button></div>
@@ -684,7 +701,7 @@ const dayObj=s=>DAYS[s]||(DAYS[s]={tasks:{}});
 function isClosed(s){const o=DAYS[s];if(o&&o.closed!==undefined)return o.closed;return !CFG.open.includes(wd(s))}
 function due(s){if(isClosed(s))return [];const w=wd(s);return CFG.tasks.filter(t=>t.type==='Q'||t.jour===w)}
 const ZONES={salle:'🍽 Nettoyage salle',cuisine:'👨‍🍳 Nettoyage cuisine',temp:'🌡 Températures',recep:'📦 Réception'};
-let RCP={},RSV={},HTL={},MEN={},CMD={},MSG={},FAC={},PJM={},TKR={}; // TKR['2026-11'] = tickets de clôture refusés
+let RCP={},RSV={},HTL={},MEN={},CMD={},MSG={},FAC={},PJM={},TKR={},IVS={};/* IVS['p']=produits, IVS['2026-11']=mouvements de stock */ // TKR['2026-11'] = tickets de clôture refusés
  // PJM['2026-11-23'] = photo du menu de la semaine (data URL)
  // FAC['2026'] = factures restaurant [{id,no,date,nom,nb,des,montant,pay,sig,ts,by}]
  // MSG['2026-11'] = [{id,ts,from,dev,txt}]
@@ -857,8 +874,8 @@ let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFull
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
 function show(v){if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ['jour','point','semaine','cal','resa','pdj','hotel','cmd','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
-  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='chat')renderChat();if(v==='instr')renderInstr();if(v==='pdj')renderPdj();
+    ['jour','point','semaine','cal','resa','pdj','hotel','cmd','stock','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
+  if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='stock')renderStock();if(v==='chat')renderChat();if(v==='instr')renderInstr();if(v==='pdj')renderPdj();
   if(v==='params'){$('#lockBox').classList.remove('hidden');$('#paramBox').classList.add('hidden')}
   scrollTo(0,0)}
 
@@ -1062,7 +1079,7 @@ function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false
 let roPrev=null;function applyRestrict(){const r=RESTRICT(),ro=RO();document.body.classList.toggle('restricted',r);document.body.classList.toggle('readonly',ro);
   {const b=document.getElementById('roBar');if(b&&ro){const u=CUR_U(),nx=nextDuty(u);b.textContent='📱 Accès à distance : consultation seulement.'+(u&&u.role!=='boss'?(nx!=null?' Tu pourras pointer et tout utiliser à partir de '+pad(Math.floor(nx/60))+'h'+pad(nx%60)+'.':' Tu pourras pointer et tout utiliser pendant tes heures prévues au planning.'):' Tout se fait sur la tablette du restaurant.')}}
   if(roPrev!==null&&roPrev!==ro){roPrev=ro;try{show(VIEW)}catch(e){}}roPrev=ro;if(r&&VIEW==='params')show('jour')}
-function refresh(){applyRestrict();chatCheck();try{ptCheck()}catch(e){}resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
+function refresh(){applyRestrict();chatCheck();try{ptCheck()}catch(e){}resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();if(VIEW==='stock'&&document.activeElement!==$('#ivQ'))renderStock();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -1204,7 +1221,7 @@ function recapCheck(){const last=addD(monday(todayS()),-7);if(!CFG.recapMail||lo
     ()=>{$('#rcSend').onclick=()=>{closeInfo();sendRecap(last)};$('#rcLater').onclick=()=>closeInfo()})}
 
 /* ===================== SAUVEGARDE AUTOMATIQUE (chaque soir) ===================== */
-function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM})}
+function backupJSON(){return JSON.stringify({v:3,date:new Date().toISOString(),cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM,stock:IVS})}
 async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:addD(T,-30);
   const body=await dossierHTML(a,T,['salle','cuisine','temp','recep','plan','heures']);
   const rs=[];for(const mo of Object.keys(RSV).sort())for(const r of (RSV[mo]||[]).slice().sort((x,y)=>(x.date+x.heure).localeCompare(y.date+y.heure)))rs.push(r);
@@ -1924,12 +1941,12 @@ $('#pSave').onclick=async()=>{
   CFG.cons=EC.filter(c=>c.titre.trim()||c.lignes.length);
   CFG.frigos=EF.filter(f=>(f.nom||'').trim()).map(f=>({...f,nom:f.nom.trim()}));CFG.tslots=$('#pSlots').value.split(',').map(x=>x.trim()).filter(Boolean);if(!CFG.tslots.length)CFG.tslots=['Matin','Soir'];
   put('cfg',CFG);applyCfg();renderParams();toast('Réglages enregistrés ✔')};
-$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM}),'application/json');
+$('#pBackup').onclick=()=>saveFile(`sauvegarde_nettoyage_${todayS()}.json`,JSON.stringify({v:3,cfg:CFG,days:DAYS,weeks:WEEKS,points:PTS,plans:PLAN,recep:RCP,resa:RSV,hotel:HTL,menage:MEN,commandes:CMD,messages:MSG,factures:FAC,menus:PJM,stock:IVS}),'application/json');
 $('#pRestoreBtn').onclick=()=>$('#pRestore').click();
 $('#pRestore').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=async()=>{try{const x=JSON.parse(r.result);if(!x.cfg||!x.days)throw 0;
     if(!confirm(`Remplacer toutes les données par cette sauvegarde (${Object.keys(x.days).length} jours) ?`))return;
-    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);MSG=x.messages||{};for(const k in MSG)put('ms:'+k,MSG[k]);FAC=x.factures||{};for(const k in FAC)put('fa:'+k,FAC[k]);PJM=x.menus||{};for(const k in PJM)put('pj:'+k,PJM[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);for(const k in PTS)put('pt:'+k,PTS[k]);
+    await clearAll();CFG=x.cfg;migrateCfg();DAYS=x.days;WEEKS=x.weeks||{};PTS=x.points||{};PLAN=x.plans||{};RCP=x.recep||{};for(const k in RCP)put('rc:'+k,RCP[k]);RSV=x.resa||{};for(const k in RSV)put('rs:'+k,RSV[k]);HTL=x.hotel||{};for(const k in HTL)put('ht:'+k,HTL[k]);MEN=x.menage||{};for(const k in MEN)put('mn:'+k,MEN[k]);CMD=x.commandes||{};for(const k in CMD)put('co:'+k,CMD[k]);MSG=x.messages||{};for(const k in MSG)put('ms:'+k,MSG[k]);FAC=x.factures||{};for(const k in FAC)put('fa:'+k,FAC[k]);PJM=x.menus||{};for(const k in PJM)put('pj:'+k,PJM[k]);for(const k in PLAN)put('pl:'+k,PLAN[k]);put('cfg',CFG);IVS=x.stock||{};for(const k in IVS)put('iv:'+k,IVS[k]);for(const k in PTS)put('pt:'+k,PTS[k]);
     for(const k in DAYS)put('d:'+k,DAYS[k]);for(const k in WEEKS)put('w:'+k,WEEKS[k]);
     applyCfg();renderParams();toast('Sauvegarde restaurée ✔')}catch(_){toast('Fichier invalide')}};
   r.readAsText(f);e.target.value=''};
@@ -2310,6 +2327,120 @@ $('#pAvBtn').onclick=async()=>{const d=todayS(),L=staff().filter(u=>u.role!=='bo
         put('pl:'+m,P);renderPoint();try{if(VIEW==='plan')renderPlan()}catch(e){}
         toast(del?'Planning normal remis pour '+u.nom:f?'➕ '+u.nom+' : '+t.replace(':','h')+'-'+f.replace(':','h')+' ajouté':'⏩ '+u.nom+' peut commencer à '+t.replace(':','h'))};
       $('#avOk').onclick=()=>go(false);$('#avDel').onclick=()=>go(true)})};
+/* ======== STOCK : produits + mouvements, lecture des codes-barres (EAN-13 / EAN-8 / UPC) ======== */
+const ivProds=()=>(IVS.p||[]).filter(x=>!x.del);
+const ivMoves=()=>{const L=[];for(const k in IVS)if(k!=='p')L.push(...(IVS[k]||[]));return L.sort((a,b)=>a.ts-b.ts)};
+function ivStock(){const q={};for(const m of ivMoves()){if(m.set!=null)q[m.pid]=m.set;else q[m.pid]=(q[m.pid]||0)+m.d}return q}
+const ivBy=()=>{const c=CUR_U();return c?c.nom:MAIN()?chMyName():'Tablette'};
+function ivSaveP(p){p.ts=Date.now();const L=IVS.p=IVS.p||[];const i=L.findIndex(x=>x.id===p.id);if(i<0)L.push(p);else L[i]=p;put('iv:p',L)}
+function ivMove(pid,o){const ts=Date.now(),mo=ymd(new Date(ts)).slice(0,7);const m=Object.assign({id:'m'+ts.toString(36)+Math.random().toString(36).slice(2,5),pid,ts,by:ivBy()},o);(IVS[mo]=IVS[mo]||[]).push(m);put('iv:'+mo,IVS[mo])}
+const ivFind=code=>ivProds().find(p=>p.code&&p.code===code);
+const ivHasMin=p=>p.min!==''&&p.min!=null;
+function renderStock(){const Q=ivStock(),q=($('#ivQ').value||'').trim().toLowerCase();
+  const P=ivProds().filter(p=>!q||p.nom.toLowerCase().includes(q)||(p.code||'').includes(q)||(p.cat||'').toLowerCase().includes(q)).sort((a,b)=>(a.cat||'~').localeCompare(b.cat||'~')||a.nom.localeCompare(b.nom));
+  const low=ivProds().filter(p=>ivHasMin(p)&&(Q[p.id]||0)<=+p.min);
+  $('#ivSum').innerHTML=`${ivProds().length} produit(s)`+(low.length?` · <b style="color:#dc2626">⚠ ${low.length} à commander</b>`:'');
+  let cat=null,h='';for(const p of P){if((p.cat||'')!==cat){cat=p.cat||'';h+=`<h3 style="margin:14px 0 4px">${esc(cat||'Sans catégorie')}</h3>`}const n=Q[p.id]||0,lo=ivHasMin(p)&&n<=+p.min;
+    h+=`<div class="row" data-ivp="${p.id}" style="border:1px solid var(--line);border-radius:12px;padding:10px;margin:6px 0;cursor:pointer;${lo?'border-color:#dc2626;background:#fef2f2':''}"><div class="grow"><b>${esc(p.nom)}</b><div class="meta">${p.code?'▮▯▮ '+esc(p.code):'sans code'}${ivHasMin(p)?' · minimum '+p.min:''}</div></div><b style="font-size:24px;${lo?'color:#dc2626':''}">${n}</b><span class="meta" style="margin-left:4px">${esc(p.unit||'')}</span></div>`}
+  $('#ivList').innerHTML=h||'<p class="meta">Aucun produit. Appuie sur « 📷 Scanner un code-barre » pour ajouter la première bouteille.</p>';
+  $('#ivList').querySelectorAll('[data-ivp]').forEach(el=>el.onclick=()=>ivOpen(el.dataset.ivp))}
+$('#ivQ').oninput=renderStock;
+$('#ivScan').onclick=async()=>{if(RO())return toast('📱 Consultation seulement');const c=await scanCode();if(c)ivCode(c)};
+$('#ivNew').onclick=()=>{if(RO())return toast('📱 Consultation seulement');ivEdit(null,'')};
+function ivCode(code){const p=ivFind(code);if(p)ivOpen(p.id,true);else ivEdit(null,code)}
+function ivEdit(id,code){const p=id?ivProds().find(x=>x.id===id):{id:'iv'+Date.now().toString(36),code:code||'',nom:'',cat:'',unit:'',min:''};const nw=!id;
+  const cats=[...new Set(ivProds().map(x=>x.cat).filter(Boolean))];
+  info(`<h2>${nw?(code?'🆕 Nouveau produit':'➕ Produit sans code'):'✏️ Modifier le produit'}</h2>${p.code?`<p class="meta">Code-barre : <b>${esc(p.code)}</b></p>`:''}
+    <label>Nom du produit</label><input id="ivN" value="${esc(p.nom)}" placeholder="ex : Rivella rouge 50 cl">
+    <div class="row" style="gap:8px;flex-wrap:wrap"><div class="grow"><label>Catégorie</label><input id="ivC" list="ivCats" value="${esc(p.cat||'')}" placeholder="ex : Boissons"><datalist id="ivCats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div style="width:120px"><label>Unité</label><input id="ivU" value="${esc(p.unit||'')}" placeholder="bouteilles"></div><div style="width:110px"><label>Minimum</label><input id="ivMin" type="number" inputmode="numeric" value="${p.min??''}" placeholder="—"></div></div>
+    ${nw?`<label>Quantité reçue maintenant</label><input id="ivQ0" type="number" inputmode="numeric" value="${code?1:0}">`:''}
+    ${!nw&&!p.code?`<button class="btn ghost sm" id="ivAddCode" style="margin-top:8px">📷 Ajouter un code-barre</button>`:''}
+    <div class="row" style="margin-top:12px">${!nw?'<button class="btn danger" id="ivDel">🗑 Supprimer</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="ivSave">Enregistrer</button></div>`,
+    ()=>{setTimeout(()=>{const n=$('#ivN');if(n&&!n.disabled)n.focus()},80);
+      $('#ivSave').onclick=()=>{const n=$('#ivN').value.trim();if(!n)return toast('Mets le nom du produit');Object.assign(p,{nom:n,cat:$('#ivC').value.trim(),unit:$('#ivU').value.trim(),min:$('#ivMin').value===''?'':+$('#ivMin').value});ivSaveP(p);
+        if(nw){const q0=+($('#ivQ0').value||0);if(q0)ivMove(p.id,{d:q0,t:'in'})}closeInfo();renderStock();toast('✔ '+n+(nw?' ajouté au stock':' enregistré'));if(!nw)ivOpen(p.id)};
+      const ac=$('#ivAddCode');if(ac)ac.onclick=async()=>{closeInfo();const c=await scanCode();if(!c)return ivEdit(id);const o=ivFind(c);if(o&&o.id!==p.id){toast('Ce code est déjà pour : '+o.nom);return ivEdit(id)}p.code=c;ivSaveP(p);ivEdit(id)};
+      const dl=$('#ivDel');if(dl)dl.onclick=async()=>{closeInfo();const a=MAIN()?{nom:chMyName()}:await askAuth('Supprimer '+p.nom,['admin']);if(!a)return;p.del=1;ivSaveP(p);renderStock();toast('🗑 '+p.nom+' supprimé')}})}
+function ivOpen(id,scanned){const p=ivProds().find(x=>x.id===id);if(!p)return;const n=ivStock()[p.id]||0;
+  const last=ivMoves().filter(m=>m.pid===id).slice(-6).reverse();
+  info(`<h2>${scanned?'✔ ':''}${esc(p.nom)}</h2><p class="meta">${p.code?'Code '+esc(p.code):'Sans code-barre'}${p.cat?' · '+esc(p.cat):''}</p>
+    <p style="font-size:20px;margin:6px 0">En stock : <b style="font-size:34px">${n}</b> ${esc(p.unit||'')}</p>
+    <label>Quantité</label><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn ghost" data-qq="-1" style="font-size:22px;min-width:52px">−</button><input id="ivQt" type="number" inputmode="numeric" value="1" style="text-align:center;font-size:22px;margin:0;width:100px"><button class="btn ghost" data-qq="1" style="font-size:22px;min-width:52px">+</button>${[6,12,24].map(k=>`<button class="btn ghost sm" data-qs="${k}">${k}</button>`).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+      <button class="btn ok" id="ivIn" style="font-size:18px">📥 Reçu (+)</button>
+      <button class="btn sec" id="ivOut" style="font-size:18px">📤 Sorti / utilisé (−)</button>
+      <button class="btn ghost" id="ivSet">📋 Inventaire : il y en a exactement ce nombre</button></div>
+    ${last.length?`<p class="meta" style="margin-top:10px">Derniers mouvements :<br>${last.map(m=>`${frD(ymd(new Date(m.ts)))} ${hhmm(m.ts)} — ${m.set!=null?'inventaire = '+m.set:(m.d>0?'+':'')+m.d} (${esc(m.by||'')})`).join('<br>')}</p>`:''}
+    <div class="row" style="margin-top:10px"><button class="btn ghost" id="ivEd">✏️ Modifier</button><span class="grow"></span><button class="btn ghost" id="ivRe">📷 Scanner un autre</button><button class="btn ghost" id="iClose">Fermer</button></div>`,
+    ()=>{const qv=()=>Math.max(0,Math.round(+$('#ivQt').value||0));document.querySelectorAll('[data-qq]').forEach(b=>b.onclick=()=>{$('#ivQt').value=Math.max(0,qv()+(+b.dataset.qq))});document.querySelectorAll('[data-qs]').forEach(b=>b.onclick=()=>{$('#ivQt').value=b.dataset.qs});
+      const go=(o,msg)=>{if(RO())return toast('📱 Consultation seulement');ivMove(p.id,o);closeInfo();renderStock();toast(msg+' — stock : '+(ivStock()[p.id]||0))};
+      $('#ivIn').onclick=()=>{const q=qv();if(!q)return toast('Quantité ?');go({d:q,t:'in'},'📥 +'+q+' '+p.nom)};
+      $('#ivOut').onclick=()=>{const q=qv();if(!q)return toast('Quantité ?');go({d:-q,t:'out'},'📤 −'+q+' '+p.nom)};
+      $('#ivSet').onclick=()=>{go({set:qv(),t:'inv'},'📋 '+p.nom+' compté')};
+      $('#ivEd').onclick=()=>{closeInfo();ivEdit(p.id)};$('#ivRe').onclick=async()=>{closeInfo();const c=await scanCode();if(c)ivCode(c)}})}
+$('#ivHist').onclick=()=>{const P={};for(const p of IVS.p||[])P[p.id]=p;const L=ivMoves().slice(-80).reverse();
+  info(`<h2>🕘 Mouvements de stock</h2>${L.length?L.map(m=>`<div class="meta" style="padding:4px 0;border-bottom:1px solid var(--line)">${frD(ymd(new Date(m.ts)))} ${hhmm(m.ts)} — <b>${esc((P[m.pid]||{}).nom||'?')}</b> : ${m.set!=null?'inventaire = '+m.set:(m.d>0?'📥 +':'📤 ')+m.d} · ${esc(m.by||'')}</div>`).join(''):'<p class="meta">Aucun mouvement.</p>'}<div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ghost" id="iClose">Fermer</button></div>`)};
+$('#ivPrint').onclick=()=>{const Q=ivStock(),P=ivProds().sort((a,b)=>(a.cat||'~').localeCompare(b.cat||'~')||a.nom.localeCompare(b.nom)),T='style="border:1px solid #777;padding:5px 7px"';
+  $('#printArea').innerHTML=`<style>@page{size:A4;margin:14mm}</style><h2 style="margin:0">${esc(CFG.nom||'')} — Inventaire du ${frD(todayS())}</h2><table style="border-collapse:collapse;width:100%;margin-top:10px;font-size:13px"><tr><th ${T}>Catégorie</th><th ${T}>Produit</th><th ${T}>Code</th><th ${T}>Stock</th><th ${T}>Minimum</th><th ${T}>Compté</th></tr>${P.map(p=>`<tr><td ${T}>${esc(p.cat||'')}</td><td ${T}><b>${esc(p.nom)}</b></td><td ${T}>${esc(p.code||'')}</td><td ${T} align="center"><b>${Q[p.id]||0}</b> ${esc(p.unit||'')}</td><td ${T} align="center">${p.min??''}</td><td ${T}></td></tr>`).join('')}</table>`;outDoc('Inventaire_'+todayS(),0)};
+
+/* --- lecteur de code-barre --- */
+let scStream=null,scRes=null,scTimer=null;
+function scStop(){clearInterval(scTimer);scTimer=null;if(scStream){scStream.getTracks().forEach(t=>t.stop());scStream=null}$('#mScan').classList.add('hidden')}
+function scanCode(){return new Promise(async res=>{scRes=v=>{scStop();scRes=null;res(v)};$('#scCode').value='';$('#mScan').classList.remove('hidden');$('#scMsg').textContent='Mets le code-barre de la bouteille devant la caméra, bien droit, sur la ligne rouge.';
+  const v=$('#scVideo');const tries=[{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}},{facingMode:'environment',width:{ideal:1920}},{facingMode:'environment'},true];
+  for(const c of tries){try{scStream=await navigator.mediaDevices.getUserMedia({video:c,audio:false});break}catch(e){scStream=null}}
+  if(!scStream){$('#scMsg').textContent='Caméra indisponible : tape le code à la main.';return}
+  v.srcObject=scStream;try{await v.play()}catch(e){}
+  try{const tr=scStream.getVideoTracks()[0],cap=tr.getCapabilities&&tr.getCapabilities();if(cap&&cap.focusMode&&cap.focusMode.includes('continuous'))tr.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+  let det=null;try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();if(f.includes('ean_13'))det=new BarcodeDetector({formats:f.filter(x=>['ean_13','ean_8','upc_a','upc_e','code_128'].includes(x))})}}catch(e){det=null}
+  const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});let prev=null,busyF=false;
+  scTimer=setInterval(async()=>{if(busyF||!v.videoWidth||!scRes)return;busyF=true;try{let code=null;
+    if(det){const r=await det.detect(v);if(r&&r.length)code=r[0].rawValue}
+    if(!code){const W=Math.min(1600,v.videoWidth),H=Math.round(v.videoHeight*W/v.videoWidth);cv.width=W;cv.height=H;cx.drawImage(v,0,0,W,H);code=eanFromImage(cx.getImageData(0,0,W,H))}
+    if(code){if(det||code===prev){try{navigator.vibrate&&navigator.vibrate(120)}catch(e){}scRes&&scRes(code)}prev=code}}catch(e){}busyF=false},180)})}
+$('#scX').onclick=()=>scRes&&scRes(null);
+$('#scOk').onclick=()=>{const c=$('#scCode').value.replace(/\D/g,'');if(c.length<4)return toast('Code trop court');scRes&&scRes(c)};
+/* décodeur EAN-13 / EAN-8 / UPC-A (lignes de balayage horizontales et verticales, dans les deux sens) */
+const EAN_L=['3211','2221','2122','1411','1132','1231','1114','1312','1213','3112'].map(x=>x.split('').map(Number)),EAN_G=EAN_L.map(a=>a.slice().reverse());
+const EAN_PAR=['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+/* distance bord-à-bord (barre+espace) : insensible au flou ; les largeurs seules servent à départager 1/7 et 2/8 */
+function eanDigit(w,tabs,lim){const s=w[0]+w[1]+w[2]+w[3],n=w.map(x=>x*7/s),P=[n[0]+n[1],n[1]+n[2],n[2]+n[3]];let best=null,be=9;for(const[tn,tab]of tabs)for(let d=0;d<10;d++){const t=tab[d];let e=Math.abs(P[0]-t[0]-t[1])+Math.abs(P[1]-t[1]-t[2])+Math.abs(P[2]-t[2]-t[3]);for(let i=0;i<4;i++)e+=0.35*Math.abs(n[i]-t[i]);if(e<be){be=e;best={d,tn}}}return be<(lim||2.2)?best:null}
+function eanCheck(c){const n=c.split('').map(Number),L=n.length;let s=0;for(let i=0;i<L-1;i++)s+=n[i]*((L-1-i)%2?3:1);return(10-s%10)%10===n[L-1]}
+function eanRuns(line){const n=line.length;if(n<60)return null;let mn=255,mx=0;for(const v of line){if(v<mn)mn=v;if(v>mx)mx=v}if(mx-mn<40)return null;
+  const win=Math.max(8,n>>5),pre=new Float32Array(n+1);for(let i=0;i<n;i++)pre[i+1]=pre[i]+line[i];
+  const out=[];let cur=null,len=0;for(let i=0;i<n;i++){const a=Math.max(0,i-win),b=Math.min(n,i+win+1),m=(pre[b]-pre[a])/(b-a);const dark=line[i]<m;if(dark===cur)len++;else{if(cur!==null)out.push([cur,len]);cur=dark;len=1}}out.push([cur,len]);return out}
+/* découpage par les extrema (résiste au flou) : les bords sont au milieu entre un clair et un foncé voisins */
+function eanRunsEdge(raw,hf){const n=raw.length,line=new Float32Array(n);for(let i=0;i<n;i++)line[i]=(raw[Math.max(0,i-1)]+2*raw[i]+raw[Math.min(n-1,i+1)])/4;let mn=255,mx=0;for(const v of line){if(v<mn)mn=v;if(v>mx)mx=v}if(mx-mn<40)return null;const h=(mx-mn)*(hf||0.12);
+  const ex=[];let dir=0,bi=0,bv=line[0];for(let i=1;i<n;i++){const v=line[i];
+    if(dir>=0){if(v>bv){bv=v;bi=i}else if(bv-v>h){if(dir===1||!ex.length)ex.push([bi,bv,1]);dir=-1;bv=v;bi=i}}
+    if(dir<0){if(v<bv){bv=v;bi=i}else if(v-bv>h){ex.push([bi,bv,0]);dir=1;bv=v;bi=i}}}
+  ex.push([bi,bv,dir<0?0:1]);if(ex.length<40)return null;
+  const E=[];for(let k=0;k+1<ex.length;k++){const[a,va]=ex[k],[b,vb]=ex[k+1],t=(va+vb)/2;let x=a;for(let i=a;i<b;i++){if((line[i]-t)*(line[i+1]-t)<=0){const d=line[i+1]-line[i];x=i+(d?(t-line[i])/d:0);break}}E.push(x)}
+  const R=[];let last=0;for(let k=0;k<E.length;k++){R.push([!ex[k][2],E[k]-last]);last=E[k]}R.push([!ex[ex.length-1][2],n-last]);
+  /* fusionner les morceaux de même couleur */const M=[];for(const r of R){if(M.length&&M[M.length-1][0]===r[0])M[M.length-1][1]+=r[1];else M.push(r.slice())}return M}
+function eanCands(w,tabs,lim){const s=w[0]+w[1]+w[2]+w[3],n=w.map(x=>x*7/s),P=[n[0]+n[1],n[1]+n[2],n[2]+n[3]];const C=[];
+  for(const[tn,tab]of tabs)for(let d=0;d<10;d++){const t=tab[d];let e=Math.abs(P[0]-t[0]-t[1])+Math.abs(P[1]-t[1]-t[2])+Math.abs(P[2]-t[2]-t[3]);for(let q=0;q<4;q++)e+=0.35*Math.abs(n[q]-t[q]);if(e<lim)C.push({d,tn,e})}
+  C.sort((a,b)=>a.e-b.e);return C.filter(c=>c.e<C[0].e+0.9).slice(0,4)}
+/* choix des chiffres : la combinaison la plus proche qui respecte la parité (EAN-13) et la clé de contrôle */
+function eanSolve(L,Rt,e13){const WL=e13?[3,1,3,1,3,1]:[3,1,3,1],WR=e13?[3,1,3,1,3,1]:[3,1,3,1];
+  let S=new Map([['|0',{e:0,c:''}]]);
+  L.forEach((cs,k)=>{const N=new Map();for(const[key,v]of S){const[par,m]=key.split('|');for(const c of cs){const k2=(par+(c.tn==='G'?'G':'L'))+'|'+((+m+c.d*WL[k])%10);const e=v.e+c.e;const o=N.get(k2);if(!o||o.e>e)N.set(k2,{e,c:v.c+c.d})}}S=N});
+  Rt.forEach((cs,k)=>{const N=new Map();for(const[key,v]of S){const[par,m]=key.split('|');for(const c of cs){const k2=par+'|'+((+m+c.d*WR[k])%10);const e=v.e+c.e;const o=N.get(k2);if(!o||o.e>e)N.set(k2,{e,c:v.c+c.d})}}S=N});
+  let best=null;for(const[key,v]of S){const[par,m]=key.split('|');if(e13){const f=EAN_PAR.indexOf(par);if(f<0||(+m+f)%10)continue;if(!best||v.e<best.e)best={e:v.e,c:f+v.c}}else{if(+m%10)continue;if(!best||v.e<best.e)best={e:v.e,c:v.c}}}
+  return best&&best.e<(e13?14:7)?best.c:null}
+function eanDecodeRuns(R){for(const T of[59,43])for(let i=1;i+T<=R.length;i++){if(!R[i][0])continue;
+    const w=R.slice(i,i+T).map(x=>x[1]);const tot=w.reduce((a,b)=>a+b,0),mod=tot/(T===59?95:67);
+    if(R[i-1][1]<mod*2.5)continue;if(i+T<R.length&&R[i+T][1]<mod*2.5)continue;const ok=k=>w[k]>mod*0.3&&w[k]<mod*1.9;if(!(ok(0)&&ok(1)&&ok(2)))continue;const nd=T===59?6:4,mid=3+nd*4;if(![0,1,2,3,4].every(k=>ok(mid+k)))continue;
+    if(!(ok(T-1)&&ok(T-2)&&ok(T-3)))continue;
+    const e13=T===59,lim=e13?2.6:1.6,Lc=[],Rc=[];let bad=false;
+    for(let k=0;k<nd;k++){const c=eanCands(w.slice(3+k*4,7+k*4),e13?[['L',EAN_L],['G',EAN_G]]:[['L',EAN_L]],lim);if(!c.length){bad=true;break}Lc.push(c)}if(bad)continue;
+    for(let k=0;k<nd;k++){const c=eanCands(w.slice(mid+5+k*4,mid+9+k*4),[['L',EAN_L]],lim);if(!c.length){bad=true;break}Rc.push(c)}if(bad)continue;
+    const code=eanSolve(Lc,Rc,e13);if(code)return code}return null}
+function eanFromImage(img){const{width:W,height:H,data:D}=img;const g=(x,y)=>{const o=(y*W+x)*4;return(D[o]*3+D[o+1]*6+D[o+2])/10};
+  const tryLine=line=>{for(const fn of[l=>eanRunsEdge(l,.08),l=>eanRunsEdge(l,.035),l=>eanRunsEdge(l,.16),eanRuns]){const R=fn(line);if(!R)continue;let c=eanDecodeRuns(R);if(c)return c;R.reverse();c=eanDecodeRuns(R);if(c)return c}return null};
+  for(const f of[.35,.5,.3,.4,.45,.55,.25,.6,.2,.65,.7,.33,.38,.43,.48,.53,.28,.23]){const y=Math.round(H*f),L=new Float32Array(W);for(let x=0;x<W;x++)L[x]=g(x,y);const c=tryLine(L);if(c)return c}
+  for(const f of[.5,.4,.6,.3,.7]){const x=Math.round(W*f),L=new Float32Array(H);for(let y=0;y<H;y++)L[y]=g(x,y);const c=tryLine(L);if(c)return c}return null}
 /* ---- caméra ---- */
 let camStream=null,camData=null,camRes=null;
 function takePhoto(nom,titre,sub){return new Promise(async res=>{camRes=res;camData=null;
@@ -2461,14 +2592,14 @@ function kick(){clearTimeout(kickT);kickT=setTimeout(syncOnce,300)}
 function cloudPut(k,v){if(!cloudOn())return;OUT.add(k);saveOut();kick()}
 function photoQueue(id,delOp){if(!cloudOn())return;OUTPH.add((delOp?'-':'')+id);saveOut();kick()}
 function setCloud(k,v){CLOUD[k]=v;localPut('cl:'+k,v==null?null:v)}
-function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,dv:DV}[pre];return m?m[key]:null}
-function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);for(const k in MSG)L.push('ms:'+k);for(const k in FAC)L.push('fa:'+k);for(const k in PJM)L.push('pj:'+k);for(const k in TKR)L.push('tr:'+k);return L}
+function localValue(k){if(k==='cfg')return CFG;const pre=kPre(k),key=k.slice(pre.length+1);const m={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,iv:IVS,dv:DV}[pre];return m?m[key]:null}
+function localKeys(){const L=['cfg'];for(const k in DAYS)L.push('d:'+k);for(const k in WEEKS)L.push('w:'+k);for(const k in PTS)L.push('pt:'+k);for(const k in PLAN)L.push('pl:'+k);for(const k in RCP)L.push('rc:'+k);for(const k in RSV)L.push('rs:'+k);for(const k in HTL)L.push('ht:'+k);for(const k in MEN)L.push('mn:'+k);for(const k in CMD)L.push('co:'+k);for(const k in MSG)L.push('ms:'+k);for(const k in FAC)L.push('fa:'+k);for(const k in PJM)L.push('pj:'+k);for(const k in TKR)L.push('tr:'+k);for(const k in IVS)L.push('iv:'+k);return L}
 function removedIds(k,v){const c=CLOUD[k];if(!c)return[];
   if(kPre(k)==='d'){const a=(c.tasks)||{},b=(v&&v.tasks)||{};return Object.keys(a).filter(x=>!(x in b))}
-  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'||kPre(k)==='ms'||kPre(k)==='fa'||kPre(k)==='tr'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
+  if(kPre(k)==='pt'||kPre(k)==='rc'||kPre(k)==='rs'||kPre(k)==='ht'||kPre(k)==='mn'||kPre(k)==='ms'||kPre(k)==='fa'||kPre(k)==='tr'||kPre(k)==='iv'){const ids=new Set((v||[]).map(e=>e.id));return(c||[]).map(e=>e.id).filter(x=>!ids.has(x))}return[]}
 function mergeVals(k,loc,rem,rm){const pre=kPre(k);rm=new Set(rm||[]);
   if(pre==='d'&&loc&&rem){const t={...(rem.tasks||{}),...(loc.tasks||{})};rm.forEach(i=>delete t[i]);const o={...rem,...loc,tasks:t};if(rem.temps||loc.temps)o.temps={...(rem.temps||{}),...(loc.temps||{})};return o}
-  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms'||pre==='fa'||pre==='tr')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
+  if((pre==='pt'||pre==='rc'||pre==='rs'||pre==='ht'||pre==='mn'||pre==='ms'||pre==='fa'||pre==='tr'||pre==='iv')&&loc&&rem){const by={};for(const e of rem)by[e.id]=e;for(const e of loc)by[e.id]=e;rm.forEach(i=>delete by[i]);return Object.values(by).sort((a,b)=>(a.in||a.ts)-(b.in||b.ts))}
   return loc??rem}
 /* même personne créée sur deux appareils (ids différents) : on garde une seule fiche et on rattache ses pointages */
 function remapUsers(oldC,nv){if(!oldC||!oldC.users||!nv||!nv.users)return;const byName={},map={};for(const u of nv.users)byName[u.nom.trim().toLowerCase()]=u.id;
@@ -2481,7 +2612,7 @@ function applyRemote(k,v){
   if(k==='cfg'){if(!v)return;remapUsers(CFG,v);CFG=v;if(migrateCfg()){localPut(k,CFG);OUT.add('cfg');saveOut();kick()}else localPut(k,v);applyCfg();refreshSoon();
     if(faResolve&&CFG.users&&CFG.users.some(u=>u.role==='admin'&&u.hash)){$('#mAuth').classList.add('hidden');$('#aNameL').classList.add('hidden');$('#aUser').parentElement.classList.remove('hidden');$('#aCancel').classList.remove('hidden');$('#aPwd2Lbl').classList.add('hidden');$('#aJoin').classList.add('hidden');const r=faResolve;faResolve=null;r()}
     return}
-  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,dv:DV}[pre];if(!map)return;
+  const pre=kPre(k),key=k.slice(pre.length+1),map={d:DAYS,w:WEEKS,pt:PTS,pl:PLAN,rc:RCP,rs:RSV,ht:HTL,mn:MEN,co:CMD,ms:MSG,fa:FAC,pj:PJM,tr:TKR,iv:IVS,dv:DV}[pre];if(!map)return;
   if(v==null){delete map[key];localDel(k)}else{map[key]=v;localPut(k,v)}}
 let rfT=null;function refreshSoon(){clearTimeout(rfT);rfT=setTimeout(()=>{if(VIEW!=='params'&&$('#mSign').classList.contains('hidden')&&$('#mCam').classList.contains('hidden'))refresh()},300)}
 
@@ -2736,7 +2867,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   const all=await idbAll();
   CFG=all.cfg||JSON.parse(JSON.stringify(DEFCFG));if(!CFG.start){CFG.start=todayS();put('cfg',CFG)}
-  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k];else if(k.startsWith('ms:'))MSG[k.slice(3)]=all[k];else if(k.startsWith('fa:'))FAC[k.slice(3)]=all[k];else if(k.startsWith('pj:'))PJM[k.slice(3)]=all[k];else if(k.startsWith('tr:'))TKR[k.slice(3)]=all[k]}
+  for(const k in all){if(k.startsWith('d:'))DAYS[k.slice(2)]=all[k];else if(k.startsWith('w:'))WEEKS[k.slice(2)]=all[k];else if(k.startsWith('pt:'))PTS[k.slice(3)]=all[k];else if(k.startsWith('pl:'))PLAN[k.slice(3)]=all[k];else if(k.startsWith('rc:'))RCP[k.slice(3)]=all[k];else if(k.startsWith('rs:'))RSV[k.slice(3)]=all[k];else if(k.startsWith('ht:'))HTL[k.slice(3)]=all[k];else if(k.startsWith('mn:'))MEN[k.slice(3)]=all[k];else if(k.startsWith('co:'))CMD[k.slice(3)]=all[k];else if(k.startsWith('ms:'))MSG[k.slice(3)]=all[k];else if(k.startsWith('fa:'))FAC[k.slice(3)]=all[k];else if(k.startsWith('pj:'))PJM[k.slice(3)]=all[k];else if(k.startsWith('tr:'))TKR[k.slice(3)]=all[k];else if(k.startsWith('iv:'))IVS[k.slice(3)]=all[k]}
   if(migrateCfg())put('cfg',CFG);
   if(todayS()<='2026-11-23'){const mo='2026-11',L=MEN[mo]=MEN[mo]||[];let c=0;for(const n of ['6','7','8']){const id='mp-1123-'+n;if(!L.some(x=>x.id===id)){L.push({id,ch:n,date:'2026-11-23',ts:1795392000000,prevu:1});c=1}}if(c)put('mn:'+mo,L)}
   if(!localStorage.getItem('pn_chNotif')){chNotified=Date.now();localStorage.setItem('pn_chNotif',chNotified)}
