@@ -300,6 +300,7 @@ body.readonly #roBar{display:block!important}
   <div id="myPlan" class="card hidden" style="border:2px solid #2563eb"></div>
   <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : pointage possible sur ton téléphone seulement pendant tes heures prévues au planning (ou sur la tablette).</div>
   <div class="pgrid" id="pGrid"></div>
+  <div class="adm-only row" style="margin-top:8px"><button class="btn sec" id="pAvBtn">⏩ Faire commencer plus tôt</button><span class="meta grow">Tu valides une heure de début plus tôt que le planning : il peut pointer dès cette heure (aussi sur son téléphone) et ses heures comptent à partir de là.</span></div>
   <div class="card" style="margin-top:14px">
     <div class="row">
       <h2 class="grow">📅 Planning — <span id="plWeekTxt"></span></h2>
@@ -651,8 +652,8 @@ async function checkPwd(u,pw){return !!u.hash&&(await sha(u.salt+':'+pw))===u.ha
 const userById=id=>CFG.users.find(u=>u.id===id);
 const can=(u,roles)=>roles.includes(u.role)||u.role==='admin'||(u.role==='boss'&&roles.includes('chef'));
 /* demande compte + mot de passe ; roles = rôles autorisés (l'admin l'est toujours) */
-function askAuth(titre,roles,sub){return new Promise(res=>{
-  const L=CFG.users.filter(u=>can(u,roles||['admin']));
+function askAuth(titre,roles,sub,filt){return new Promise(res=>{
+  const L=CFG.users.filter(u=>can(u,roles||['admin'])&&(!filt||filt(u)));
   $('#aTitle').textContent=titre;$('#aSub').textContent=sub||'';
   $('#aUser').innerHTML=L.map(u=>`<option value="${u.id}">${esc(u.nom)} — ${ROLES[u.role]}</option>`).join('');
   $('#aPwd').value='';$('#aPwd2Lbl').classList.add('hidden');$('#mAuth').classList.remove('hidden');setTimeout(()=>$('#aPwd').focus(),50);
@@ -1049,7 +1050,7 @@ function printRecep(list){const months=[...new Set(list.map(m=>m.slice(0,7)))];
   outDoc('Réception marchandises',1)}
 
 /* ===================== INFO MODALE ===================== */
-function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after();if(typeof RO==='function'&&RO())roModal()}
+function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.remove('hidden');const c=$('#iClose');if(c)c.onclick=closeInfo;after&&after();if((typeof RO==='function'&&RO())||VIEWONLY)roModal()}
 function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
 function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false;const u=(CFG.users||[]).find(x=>x.nom.trim().toLowerCase()===a.user);return!(u&&u.role==='admin')}
@@ -1970,6 +1971,20 @@ function onDuty(u){if(!u||!u.id||u.role==='boss')return false;if(openShift(u.id)
   for(const[d,off]of[[T,0],[addD(T,-1),1440]]){for(const g of planSegs(u.id,d)){const m=nm+off;if(m>=g[0]-DUTY_AV&&m<=g[1]+DUTY_AP)return true}}return false}
 function nextDuty(u){if(!u||!u.id)return null;const n=new Date(),T=todayS(),nm=n.getHours()*60+n.getMinutes();const S=planSegs(u.id,T).filter(g=>g[0]-DUTY_AV>nm);return S.length?S[0][0]-DUTY_AV:null}
 const RO=()=>{if(!RESTRICT())return false;const u=(typeof CUR_U==='function'&&CUR_U())||{};return u.role!=='chef'&&!onDuty(u)}; // enregistrer : seulement ton téléphone (admin), le téléphone du chef et la tablette
+/* réservations (tables) et hôtel : seulement la salle (+ responsable et boss). La cuisine peut tout voir mais rien modifier. */
+let VIEWONLY=false,SALLE_UNTIL=0,SALLE_BY=null;
+const salleU=u=>!!u&&(u.role==='admin'||u.role==='boss'||(u.role!=='chef'&&poste(u)==='salle'));
+const SALLE_FREE=new Set(['rsPrev','rsNext','rsToday','rsPrint','htPrev','htNext','htToday','htPrint','htFicheV','htTxBtn','htNomBtn','fmBtn']);
+function salleState(){if(RO())return'ro';if(!RESTRICT()&&MAIN())return'ok';const c=CUR_U();if(c)return salleU(c)?'ok':'no';return SALLE_UNTIL>Date.now()?'ok':'ask'}
+async function salleAuth(){const a=await askAuth('🍽 Réservations et hôtel — réservé à la salle',['admin','chef','emp','boss'],'Seule l\'équipe de salle (et le responsable) peut faire les réservations et gérer les chambres.',salleU);if(!a)return false;SALLE_UNTIL=Date.now()+10*60000;SALLE_BY=a.nom;toast('🍽 '+a.nom+' : réservations et hôtel ouverts 10 min');return true}
+document.addEventListener('click',async e=>{if(e.__salle)return;const sec=e.target.closest('#v-resa,#v-hotel');if(!sec||e.target.closest('#mInfo,#mAuth'))return;
+  let el=e.target,act=null;while(el&&el!==sec){if(el.onclick||el.tagName==='BUTTON'){act=el;break}el=el.parentElement}if(!act)return;
+  if(SALLE_FREE.has(act.id)||/^🖨/.test((act.textContent||'').trim())||act.closest('.adm-only'))return;
+  const st=salleState();if(st==='ok'||st==='ro')return;e.preventDefault();e.stopImmediatePropagation();
+  const v=act.closest('[data-ht]')||act.closest('[data-rs]')||act.closest('[data-room]');
+  if(st==='no'){if(v){VIEWONLY=true;try{if(v.dataset.ht)editHotel(v.dataset.ht);else if(v.dataset.rs)editResa(v.dataset.rs);else roomClick(v.dataset.room)}finally{setTimeout(()=>VIEWONLY=false,0)}}
+    toast('🍳 Cuisine : tu peux voir, mais les réservations et les chambres sont réservées à la salle');return}
+  if(await salleAuth()){const ev=new MouseEvent('click',{bubbles:true,cancelable:true});ev.__salle=true;act.dispatchEvent(ev)}},true);
 function roModal(){const b=$('#mInfoBody');if(!b)return;b.querySelectorAll('input,select,textarea').forEach(e=>e.disabled=true);b.querySelectorAll('button').forEach(x=>{if(x.id==='iClose'||/Fermer|Annuler|^OK$|Plus tard|🖨/.test(x.textContent.trim()))return;x.style.display='none'});if(!b.querySelector('#roNote'))b.insertAdjacentHTML('afterbegin','<div id="roNote" style="background:#fef3c7;color:#92400e;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-weight:700">📱 Consultation seulement depuis le téléphone</div>')}
 ['click','pointerdown'].forEach(ev=>document.addEventListener(ev,e=>{if(!RO())return;const t=e.target.closest('.task,.tcell,td.tv,[data-pt],[data-mt],[data-ci],[data-cq],[data-fre],[data-room],[data-ht],[data-rs],[data-mf],[data-pf]');if(t&&!t.closest('#mInfo')){e.preventDefault();e.stopPropagation();if(ev==='click'){const v=t.closest('[data-ht]')||t.closest('[data-rs]')||t.closest('[data-room]');if(v&&v.dataset.ht)editHotel(v.dataset.ht);else if(v&&v.dataset.rs)editResa(v.dataset.rs);else if(v&&v.dataset.room)roomClick(v.dataset.room);else toast('📱 Consultation seulement : à faire sur la tablette')}}},true));
 const remoteNoPunch=()=>RO();
@@ -2044,8 +2059,10 @@ function parseShift(str){if(!str||!str.trim())return [];const out=[];
     const a=parseTime(ab[0]),b=parseTime(ab[1]);if(a==null||b==null)return null;out.push([a,b<=a?b+1440:b])}
   return out}
 function planStr(uid,d){const p=PLAN[monday(d)];return p&&p[uid]&&p[uid][wd(d)]||''}
-function planSegs(uid,d){return parseShift(planStr(uid,d))||[]}
-function planTxt(uid,d){return planSegs(uid,d).map(([a,b])=>fmtM(a)+'-'+fmtM(b)).join(' / ')}
+function planAuth(uid,d){const p=PLAN[monday(d)];return p&&p[uid]&&p[uid]['a'+wd(d)]||''} /* début plus tôt validé par le responsable, ex '09:50' */
+function planSegs(uid,d){const S=(parseShift(planStr(uid,d))||[]).map(g=>[...g]);const a=planAuth(uid,d);
+  if(a&&S.length){const m=a.split(':');const v=+m[0]*60+(+m[1]||0);if(v<S[0][0])S[0][0]=v}return S}
+function planTxt(uid,d){const t=(parseShift(planStr(uid,d))||[]).map(([a,b])=>fmtM(a)+'-'+fmtM(b)).join(' / ');const a=planAuth(uid,d);return t&&a?t+' (⏩ '+a.replace(':','h')+')':t}
 function lateInfo(d,e){const S=planSegs(e.uid,d);if(!S.length)return null;const base=parse(d).getTime();
   const im=(e.in-base)/60000;const seg=S.reduce((x,y)=>Math.abs(y[0]-im)<Math.abs(x[0]-im)?y:x);
   const diff=Math.floor(im)-seg[0]; // à la minute près de l'horloge : 16h05 pour 16h00 = 5 min de retard
@@ -2069,7 +2086,7 @@ function lateCell(d,e){const li=lateInfo(d,e);if(!li)return '<span class="meta">
   let h=li.late>0?`<span class="late">+${mins(li.late)} RETARD</span>`:`<span class="ontime">à l'heure</span>`+(li.avance>0?(e.avOk?`<br><span class="meta" style="color:#2563eb">⏩ avance de ${mins(li.avance)} comptée (demandée)</span>`:`<br><span class="meta">arrivé ${mins(li.avance)} avant — compté à ${fmtM(li.seg[0])}</span>`):'');
   if(li.early>0)h+=`<br><span class="late" style="font-weight:500">parti ${mins(li.early)} avant</span>`;return h}
 function cardPlan(u,o){const d=todayS(),S=planSegs(u.id,d);if(!S.length)return '<br><span class="meta">Pas prévu aujourd\'hui</span>';
-  let h=`<br><span class="meta">Prévu : ${planTxt(u.id,d)}</span>`;
+  let h=`<br><span class="meta">Prévu : ${(parseShift(planStr(u.id,d))||[]).map(([a,b])=>fmtM(a)+'-'+fmtM(b)).join(' / ')}</span>`+(planAuth(u.id,d)?`<br><span class="meta" style="color:#2563eb">⏩ Début validé à ${planAuth(u.id,d).replace(':','h')}</span>`:'');
   const todayIn=(PTS[d]||[]).some(e=>e.uid===u.id);
   if(!o&&!todayIn){const now=new Date(),nm=now.getHours()*60+now.getMinutes(),st=S[0][0];if(nm>st)h+=`<br><span class="late">⚠ En retard de ${mins(nm-st)}</span>`}
   return h}
@@ -2118,7 +2135,7 @@ $('#plPrint').onclick=async()=>{const w=await new Promise(res=>info(`<h2>📅 Pl
   if(!w)return;const L=[];for(let i=0;i<w;i++)L.push(addD(plWeek,7*i));outPlan(L)};
 $('#plCopy').onclick=()=>{const prev=PLAN[addD(plWeek,-7)];if(!prev)return toast('Pas de planning la semaine précédente');
   if(PLAN[plWeek]&&Object.keys(PLAN[plWeek]).length&&!confirm('Remplacer le planning de cette semaine ?'))return;
-  PLAN[plWeek]=JSON.parse(JSON.stringify(prev));put('pl:'+plWeek,PLAN[plWeek]);renderPlan();toast('Planning copié')};
+  PLAN[plWeek]=JSON.parse(JSON.stringify(prev));for(const k in PLAN[plWeek])for(const j in PLAN[plWeek][k])if(j[0]==='a')delete PLAN[plWeek][k][j];put('pl:'+plWeek,PLAN[plWeek]);renderPlan();toast('Planning copié')};
 /* ---- import planning / heures (fichier préparé à partir des photos) ---- */
 const JKEY={lun:1,lundi:1,mar:2,mardi:2,mer:3,mercredi:3,jeu:4,jeudi:4,ven:5,vendredi:5,sam:6,samedi:6,dim:7,dimanche:7};
 const nrm=x=>String(x||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -2229,6 +2246,17 @@ async function closingTicket(u){
     return{img,ts:tPhoto,src:'admin',by:a.nom}}}
 
 setInterval(()=>{try{applyRestrict()}catch(e){}},60000);
+$('#pAvBtn').onclick=async()=>{const d=todayS(),L=staff().filter(u=>(parseShift(planStr(u.id,d))||[]).length);
+  if(!L.length)return toast('Personne n\'est prévu aujourd\'hui au planning');
+  info(`<h2>⏩ Faire commencer plus tôt</h2><p class="meta">Aujourd'hui, ${longD(d)}</p>
+    <label>Personne</label><select id="avU">${L.map(u=>`<option value="${u.id}">${esc(u.nom)} — prévu ${esc(planTxt(u.id,d))}</option>`).join('')}</select>
+    <label>Il commence à</label><input type="time" id="avT" value="${pad(Math.max(0,new Date().getHours()))}:${pad(new Date().getMinutes())}">
+    <p class="meta">Il pourra pointer 15 min avant cette heure, et ses heures compteront à partir de cette heure. S'il est déjà pointé, ses heures sont recalculées.</p>
+    <div class="row"><button class="btn ghost" id="avDel">Enlever</button><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="avOk">Valider</button></div>`,
+    ()=>{const go=async del=>{const uid=$('#avU').value,t=$('#avT').value;if(!del&&!/^\d{2}:\d{2}$/.test(t))return toast('Heure invalide');closeInfo();
+      const a=await askAuth('Valider un début plus tôt',['admin']);if(!a)return;const m=monday(d),P=PLAN[m]=PLAN[m]||{},U=P[uid]=P[uid]||{};
+      if(del)delete U['a'+wd(d)];else U['a'+wd(d)]=t;put('pl:'+m,P);renderPoint();const u=userById(uid);toast(del?'Début normal remis pour '+u.nom:'⏩ '+u.nom+' peut commencer à '+t.replace(':','h'))};
+      $('#avOk').onclick=()=>go(false);$('#avDel').onclick=()=>go(true)})};
 /* ---- caméra ---- */
 let camStream=null,camData=null,camRes=null;
 function takePhoto(nom,titre,sub){return new Promise(async res=>{camRes=res;camData=null;
