@@ -379,6 +379,7 @@ body.readonly #roBar{display:block!important}
   <div class="card"><h2>📅 Arrivées des 7 prochains jours</h2><div id="htNext7"></div></div>
   <div class="card"><div class="row"><div class="grow"><b>Taxe de séjour</b><div class="meta" id="htTxTxt"></div></div><button class="adm-only btn sec" id="htTxBtn">Modifier</button></div></div>
   <div class="card"><div class="row"><div class="grow"><b>Nom en haut de la fiche hôtel</b><div class="meta" id="htNomTxt"></div></div><button class="adm-only btn sec" id="htNomBtn">Modifier</button></div></div>
+  <div class="card"><div class="row"><div class="grow"><b>Heure minimale de fermeture de la caisse</b><div class="meta" id="fmTxt"></div></div><button class="adm-only btn sec" id="fmBtn">Modifier</button></div></div>
 </section>
 <section id="v-cmd" class="hidden">
   <div class="card">
@@ -1634,7 +1635,7 @@ function renderHotel(){const d=htDay,A=htAll().filter(actif);
   $('#htDep').innerHTML=dep.length?dep.map(h=>htRow(h,'dep')).join(''):'<p class="meta">Aucun départ ce jour-là.</p>';
   $('#htIn').innerHTML=pres.length?pres.map(h=>htRow(h,'in')).join(''):'<p class="meta">Aucun client cette nuit.</p>';
   let x='';for(let i=1;i<=7;i++){const j=addD(d,i),l=A.filter(h=>h.arr===j);if(l.length)x+=`<h3 style="margin:10px 0 2px">${longD(j)} — ${l.length} arrivée(s)</h3>`+l.map(h=>htRow(h,'arr')).join('')}
-  $('#htTxTxt').textContent=eur(taxeTaux())+' par personne et par nuit ';$('#htNomTxt').textContent=ficheNom();
+  $('#htTxTxt').textContent=eur(taxeTaux())+' par personne et par nuit ';$('#htNomTxt').textContent=ficheNom();fmShow();
   $('#htNext7').innerHTML=x||'<p class="meta">Aucune arrivée prévue les 7 prochains jours.</p>';
   document.querySelectorAll('#v-hotel [data-ht]').forEach(el=>el.onclick=()=>editHotel(el.dataset.ht));document.querySelectorAll('#v-hotel [data-htq]').forEach(b=>b.onclick=e=>{e.stopPropagation();const[id,k]=b.dataset.htq.split('|'),x=findHt(id);if(!x)return;x.h.etat=x.h.etat===k?'':k;x.h.mod=Date.now();saveHt(x.mo);refresh();toast(x.h.etat==='arrive'?'✔ '+x.h.nom+' est arrivé — chambre '+x.h.ch+' occupée':x.h.etat==='absent'?'✖ '+x.h.nom+' pas venu — chambre '+x.h.ch+' libre':x.h.nom+' : à venir')});document.querySelectorAll('#v-hotel [data-htp]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=findHt(b.dataset.htp);if(x)printFiche(x.h)});bindTel($('#v-hotel'))}
 function payMonth(h){const m=todayS().slice(0,7);
@@ -1691,6 +1692,8 @@ function editHotel(id,pre){const f=id?findHt(id):null,h=f?f.h:Object.assign({arr
     if(f){$('#hDel').onclick=()=>{if(!confirm('Supprimer ce client ?'))return;HTL[f.mo]=HTL[f.mo].filter(x=>x.id!==h.id);saveHt(f.mo);closeInfo();refresh()};if($('#hCall'))$('#hCall').onclick=()=>callTel(h.tel)}})}
 $('#htNew').onclick=()=>editHotel(null);
 $('#htNomBtn').onclick=async()=>{const a=await askAuth('Nom de la fiche hôtel',['admin']);if(!a)return;const v=prompt('Nom de l\'établissement, écrit en haut de la fiche hôtel :',ficheNom());if(v==null||!v.trim())return;CFG.hotelNom=v.trim();put('cfg',CFG);renderHotel();toast('Fiche hôtel : '+CFG.hotelNom)};
+$('#fmBtn').onclick=async()=>{const a=await askAuth('Heure minimale de fermeture',['admin']);if(!a)return;const v=prompt('Fermeture de la caisse interdite avant (HH:MM) :',CFG.fermMin||'21:00');if(v==null)return;const m=v.trim().replace('h',':').match(/^(\d{1,2}):?(\d{2})?$/);if(!m||+m[1]>23){toast('Heure invalide');return}CFG.fermMin=pad(+m[1])+':'+(m[2]||'00');put('cfg',CFG);fmShow();toast('Fermeture caisse à partir de '+CFG.fermMin.replace(':','h'))};
+function fmShow(){const t=$('#fmTxt');if(t)t.textContent='Avant '+(CFG.fermMin||'21:00').replace(':','h')+', le ticket de clôture est refusé'}
 const ficheNom=()=>CFG.hotelNom||CFG.nom||'Hôtel';
 $('#htTxBtn').onclick=async()=>{const a=await askAuth('Modifier la taxe de séjour',['admin']);if(!a)return;const v=prompt('Taxe de séjour en CHF par personne et par nuit :',String(taxeTaux()).replace('.',','));if(v==null)return;const n=parseFloat(v.replace(',','.'));if(isNaN(n)||n<0)return toast('Montant invalide');CFG.taxe=n;put('cfg',CFG);renderHotel();toast('Taxe de séjour : '+eur(n))};
 $('#htPrev').onclick=()=>{htDay=addD(htDay,-1);renderHotel()};$('#htNext').onclick=()=>{htDay=addD(htDay,1);renderHotel()};
@@ -2040,7 +2043,7 @@ function lateInfo(d,e){const S=planSegs(e.uid,d);if(!S.length)return null;const 
   const im=(e.in-base)/60000;const seg=S.reduce((x,y)=>Math.abs(y[0]-im)<Math.abs(x[0]-im)?y:x);
   const diff=Math.floor(im)-seg[0]; // à la minute près de l'horloge : 16h05 pour 16h00 = 5 min de retard
   const r={late:diff>0?diff:0,avance:diff<0?Math.floor(-diff):0,seg,startTs:base+seg[0]*60000};
-  if(e.out){const om=(e.out-base)/60000;const so=S.reduce((x,y)=>Math.abs(y[1]-om)<Math.abs(x[1]-om)?y:x);r.early=Math.floor(so[1]-om)}
+  if(e.out&&!e.ferm&&!e.fermCuis){const om=(e.out-base)/60000;const so=S.reduce((x,y)=>Math.abs(y[1]-om)<Math.abs(x[1]-om)?y:x);r.early=Math.floor(so[1]-om)}
   return r}
 /* heures comptées : on commence à l'heure prévue (pas avant), ou à l'heure réelle si retard */
 function countedIn(d,e){const li=lateInfo(d,e);return li&&!e.avOk?Math.max(e.in,li.startTs):e.in}
@@ -2201,6 +2204,9 @@ async function closingTicket(u){
       if(R.date&&R.date!==T&&R.date!==Y)pb.push('le ticket date du '+frD(R.date)+' : il faut la clôture du jour même');
       if(R.time&&!pb.length){let t=parse(R.date||T).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;if(!R.date&&t>tPhoto+10*60000)t-=864e5;
         if(t<=tPhoto+10*60000){ts=t;src='ticket'}}}
+    /* fermeture de la caisse interdite avant l'heure minimale (21h00 par défaut) ; après minuit c'est permis */
+    if(!pb.length){const fm=(CFG.fermMin||'21:00').split(':').map(Number),mn=fm[0]*60+(fm[1]||0),x=new Date(ts||tPhoto),xm=x.getHours()*60+x.getMinutes();
+      if(xm>=6*60&&xm<mn)pb.push('fermeture de la caisse interdite avant '+(CFG.fermMin||'21:00').replace(':','h')+' (ticket à '+hhmm(x.getTime())+')')}
     if(!pb.length){ts=ts||tPhoto;
       const ok=await new Promise(res=>info(`<h2>✔ Clôture de période reconnue</h2>
         <p>${R.date?'Date : <b>'+frD(R.date)+'</b><br>':''}Fin de service : <b style="font-size:22px">${hms(ts)}</b><br><span class="meta">${src==='ticket'?'heure lue sur le ticket':'heure de la photo (l\'heure du ticket n\'a pas pu être lue avec certitude)'}</span></p>
@@ -2208,7 +2214,7 @@ async function closingTicket(u){
         ()=>{$('#ckOk').onclick=()=>{closeInfo();res(true)};$('#ckRe').onclick=()=>{closeInfo();res(false)}}));
       if(ok)return{img,ts,src};continue}
     {const pid='tk'+Date.now().toString(36);photoPut(pid,img);const mo=T.slice(0,7);(TKR[mo]=TKR[mo]||[]).push({id:pid,ts:tPhoto,nom:u.nom,why:pb,photo:pid,lu:R?{clot:R.clot,date:R.date,time:R.time,txt:(R.txt||'').slice(0,600)}:null});put('tr:'+mo,TKR[mo])}
-    const ch=await new Promise(res=>info(`<h2>⚠ Ticket non reconnu</h2><p>${pb.map(esc).join('<br>')}</p><p class="meta">Imprime la « Clôture de période » et reprends la photo bien à plat, sans reflet, avec le titre, la date et l'heure visibles.</p>
+    const ch=await new Promise(res=>info(`${pb.some(x=>/interdite avant/.test(x))?`<h2>⛔ Trop tôt pour fermer la caisse</h2><p>${pb.map(esc).join('<br>')}</p><p class="meta">La caisse ne peut pas être fermée avant ${esc((CFG.fermMin||'21:00').replace(':','h'))}. Refais la clôture à partir de cette heure.</p>`:`<h2>⚠ Ticket non reconnu</h2><p>${pb.map(esc).join('<br>')}</p><p class="meta">Imprime la « Clôture de période » et reprends la photo bien à plat, sans reflet, avec le titre, la date et l'heure visibles.</p>`}
       <div class="row"><button class="btn ghost" id="ckX">Annuler</button><button class="btn sec" id="ckAdm">Valider quand même (admin)</button><span class="grow"></span><button class="btn ok" id="ckRe">📸 Reprendre la photo</button></div>`,
       ()=>{$('#ckRe').onclick=()=>{closeInfo();res('re')};$('#ckX').onclick=()=>{closeInfo();res(null)};$('#ckAdm').onclick=()=>{closeInfo();res('adm')}}));
     if(ch==='re')continue;if(!ch)return null;
