@@ -298,7 +298,7 @@ body.readonly #roBar{display:block!important}
 <section id="v-point" class="hidden">
   <div class="card"><div class="clock" id="pClock"></div><div class="meta" style="text-align:center" id="pDate"></div></div>
   <div id="myPlan" class="card hidden" style="border:2px solid #2563eb"></div>
-  <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : le pointage se fait uniquement sur la tablette du restaurant.</div>
+  <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : pointage possible sur ton téléphone seulement pendant tes heures prévues au planning (ou sur la tablette).</div>
   <div class="pgrid" id="pGrid"></div>
   <div class="card" style="margin-top:14px">
     <div class="row">
@@ -1053,7 +1053,9 @@ function info(html,after){$('#mInfoBody').innerHTML=html;$('#mInfo').classList.r
 function closeInfo(){$('#mInfo').classList.add('hidden')}
 $('#mInfo').onclick=e=>{if(e.target.id==='mInfo')closeInfo()};
 function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false;const u=(CFG.users||[]).find(x=>x.nom.trim().toLowerCase()===a.user);return!(u&&u.role==='admin')}
-function applyRestrict(){const r=RESTRICT();document.body.classList.toggle('restricted',r);document.body.classList.toggle('readonly',RO());if(r&&VIEW==='params')show('jour')}
+let roPrev=null;function applyRestrict(){const r=RESTRICT(),ro=RO();document.body.classList.toggle('restricted',r);document.body.classList.toggle('readonly',ro);
+  {const b=document.getElementById('roBar');if(b&&ro){const u=CUR_U(),nx=nextDuty(u);b.textContent='📱 Accès à distance : consultation seulement.'+(u&&u.role!=='boss'?(nx!=null?' Tu pourras pointer et tout utiliser à partir de '+pad(Math.floor(nx/60))+'h'+pad(nx%60)+'.':' Tu pourras pointer et tout utiliser pendant tes heures prévues au planning.'):' Tout se fait sur la tablette du restaurant.')}}
+  if(roPrev!==null&&roPrev!==ro){roPrev=ro;try{show(VIEW)}catch(e){}}roPrev=ro;if(r&&VIEW==='params')show('jour')}
 function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
@@ -1962,12 +1964,17 @@ function renderPoint(){setTimeout(oubliBadge,0);tick();renderMyPlan();
   renderPlan();renderPH()}
 /* depuis un téléphone (accès à distance), on peut tout voir mais pas pointer : le pointage se fait sur la tablette du restaurant */
 /* lecture seule : toute personne connectée à distance, sauf le chef */
-const RO=()=>{if(!RESTRICT())return false;const u=(typeof CUR_U==='function'&&CUR_U())||{};return u.role!=='chef'}; // enregistrer : seulement ton téléphone (admin), le téléphone du chef et la tablette
+/* téléphone d'un employé : tout est utilisable pendant ses heures prévues au planning (15 min avant le début → 1 h après la fin) ou tant qu'il est pointé */
+const DUTY_AV=15,DUTY_AP=60;
+function onDuty(u){if(!u||!u.id||u.role==='boss')return false;if(openShift(u.id))return true;const n=new Date(),T=todayS(),nm=n.getHours()*60+n.getMinutes();
+  for(const[d,off]of[[T,0],[addD(T,-1),1440]]){for(const g of planSegs(u.id,d)){const m=nm+off;if(m>=g[0]-DUTY_AV&&m<=g[1]+DUTY_AP)return true}}return false}
+function nextDuty(u){if(!u||!u.id)return null;const n=new Date(),T=todayS(),nm=n.getHours()*60+n.getMinutes();const S=planSegs(u.id,T).filter(g=>g[0]-DUTY_AV>nm);return S.length?S[0][0]-DUTY_AV:null}
+const RO=()=>{if(!RESTRICT())return false;const u=(typeof CUR_U==='function'&&CUR_U())||{};return u.role!=='chef'&&!onDuty(u)}; // enregistrer : seulement ton téléphone (admin), le téléphone du chef et la tablette
 function roModal(){const b=$('#mInfoBody');if(!b)return;b.querySelectorAll('input,select,textarea').forEach(e=>e.disabled=true);b.querySelectorAll('button').forEach(x=>{if(x.id==='iClose'||/Fermer|Annuler|^OK$|Plus tard|🖨/.test(x.textContent.trim()))return;x.style.display='none'});if(!b.querySelector('#roNote'))b.insertAdjacentHTML('afterbegin','<div id="roNote" style="background:#fef3c7;color:#92400e;border-radius:8px;padding:6px 10px;margin-bottom:8px;font-weight:700">📱 Consultation seulement depuis le téléphone</div>')}
 ['click','pointerdown'].forEach(ev=>document.addEventListener(ev,e=>{if(!RO())return;const t=e.target.closest('.task,.tcell,td.tv,[data-pt],[data-mt],[data-ci],[data-cq],[data-fre],[data-room],[data-ht],[data-rs],[data-mf],[data-pf]');if(t&&!t.closest('#mInfo')){e.preventDefault();e.stopPropagation();if(ev==='click'){const v=t.closest('[data-ht]')||t.closest('[data-rs]')||t.closest('[data-room]');if(v&&v.dataset.ht)editHotel(v.dataset.ht);else if(v&&v.dataset.rs)editResa(v.dataset.rs);else if(v&&v.dataset.room)roomClick(v.dataset.room);else toast('📱 Consultation seulement : à faire sur la tablette')}}},true));
-const remoteNoPunch=()=>RESTRICT()&&((typeof CUR_U==='function'&&CUR_U())||{}).role!=='chef';
+const remoteNoPunch=()=>RO();
 /* le chef peut pointer depuis son téléphone (lui seulement), même sans horaire prévu */
-async function punch(uid){if(RESTRICT()&&!remoteNoPunch()&&uid!==(CUR_U()||{}).id)return toast('Depuis ton téléphone, tu peux pointer seulement pour toi');if(remoteNoPunch())return info(`<h2>⏱ Pointage sur la tablette uniquement</h2><p style="font-size:17px">Depuis ton téléphone, tu peux tout consulter, mais <b>le pointage (arrivée et départ) se fait seulement sur la tablette du restaurant</b>, sur place.</p><div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`);const u=userById(uid),o=openShift(uid);
+async function punch(uid){if(RESTRICT()&&!remoteNoPunch()&&uid!==(CUR_U()||{}).id)return toast('Depuis ton téléphone, tu peux pointer seulement pour toi');if(remoteNoPunch())return info(`<h2>⏱ Pointage sur la tablette uniquement</h2><p style="font-size:17px">Depuis ton téléphone, tu peux tout consulter, mais <b>le pointage se fait sur la tablette du restaurant</b>, ou sur ton téléphone pendant tes heures prévues au planning (à partir de 15 min avant le début).</p><div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ok" id="iClose">OK</button></div>`);const u=userById(uid),o=openShift(uid);
   const who=await new Promise(res=>{ // demande le mot de passe du compte choisi uniquement
     $('#aTitle').textContent=(o?'Départ — ':'Arrivée — ')+u.nom;$('#aSub').textContent='Tape ton mot de passe pour pointer.';
     $('#aUser').innerHTML=`<option value="${u.id}">${esc(u.nom)}</option>`;$('#aPwd').value='';$('#aPwd2Lbl').classList.add('hidden');$('#mAuth').classList.remove('hidden');setTimeout(()=>$('#aPwd').focus(),50);
@@ -2221,6 +2228,7 @@ async function closingTicket(u){
     const a=await askAuth('Valider la fermeture sans ticket reconnu',['admin']);if(!a)continue;
     return{img,ts:tPhoto,src:'admin',by:a.nom}}}
 
+setInterval(()=>{try{applyRestrict()}catch(e){}},60000);
 /* ---- caméra ---- */
 let camStream=null,camData=null,camRes=null;
 function takePhoto(nom,titre,sub){return new Promise(async res=>{camRes=res;camData=null;
