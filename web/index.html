@@ -2018,7 +2018,7 @@ async function punch(uid){if(RESTRICT()&&!remoteNoPunch()&&uid!==(CUR_U()||{}).i
   const mt=await myTasksBlock(u,o.d);if(!mt)return toast('Départ non pointé : tâche de ménage à faire');
   let ferm=false;
   const zf=poste(u);
-  if(zf==='cuisine'&&!u.libre)ferm=await new Promise(res=>info(`<h2>Départ de ${esc(u.nom)}</h2><p style="font-size:18px">Tu es le dernier en cuisine et tu fais la <b>fermeture de la cuisine</b> ?</p><p class="meta">${isMidi()?'Fermeture du midi : seulement '+esc(CFG.tasks.filter(t=>tz(t)==='cuisine'&&t.midi).map(t=>t.nom).join(', ')||'aucune tâche')+' (avec photo).':'Si oui, les tâches de nettoyage de la cuisine du jour doivent être faites (avec photo).'}</p>
+  if(zf==='cuisine'&&!u.libre)ferm=await new Promise(res=>info(`<h2>Départ de ${esc(u.nom)}</h2><p style="font-size:18px">Tu es le dernier en cuisine et tu fais la <b>fermeture de la cuisine</b> ?</p><p class="meta">${isMidi()?'Fermeture du midi : seulement '+esc(CFG.tasks.filter(t=>tz(t)==='cuisine'&&t.midi).map(t=>t.nom).join(', ')||'aucune tâche')+' (sans photo).':'Si oui, les tâches de nettoyage de la cuisine du jour doivent être faites (avec photo).'}</p>
       <div class="row" style="margin-top:14px"><button class="btn ghost" id="fNo" style="flex:1">Non, je pars seulement</button><button class="btn ok" id="fYes" style="flex:1">Oui, fermeture cuisine</button></div>`,
     ()=>{$('#fNo').onclick=()=>{closeInfo();res(false)};$('#fYes').onclick=()=>{closeInfo();res(true)}}));
   else if(zf==='salle')ferm=await new Promise(res=>info(`<h2>Départ de ${esc(u.nom)}</h2><p style="font-size:18px">Tu fais la <b>fermeture de la caisse</b> ?</p><p class="meta">Si oui, la photo du rapport de caisse est obligatoire.</p>
@@ -2048,8 +2048,8 @@ const isMidi=()=>new Date().getHours()<MIDI_H;
 async function closingChores(u,d,z){if(u.libre)return{end:0};z=z||'salle';const midi=z==='cuisine'&&isMidi(),KS=midi?'~m':'';const ZN=z==='cuisine'?(midi?'de la cuisine du midi':'de la cuisine'):'de la salle';let end=0;
   for(;;){const L=midi?due(d).filter(t=>tz(t)==='cuisine'&&t.midi&&!rec(d,t.id+KS)):choresLeft(d,z);if(!L.length)return{end};
     const r=await new Promise(res=>info(`<h2>⛔ Fermeture bloquée</h2><p style="font-size:17px">Tu ne peux pas fermer tant que les tâches de nettoyage ${ZN} ne sont pas terminées.</p>
-      <p class="meta">Il reste <b>${L.length}</b> tâche(s). Fais-la, puis appuie sur « Fait » et prends la photo de ce que tu as nettoyé. L'heure de départ sera l'heure de la dernière tâche finie.</p>
-      <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0">${L.map(t=>`<div class="row" style="border:1px solid var(--line);border-radius:10px;padding:8px"><div class="grow"><b>${esc(t.nom)}</b>${t.det?`<div class="meta">${esc(t.det)}</div>`:''}</div><button class="btn ok" data-ch="${t.id}">📸 Fait</button></div>`).join('')}</div>
+      <p class="meta">Il reste <b>${L.length}</b> tâche(s). ${midi?'Fais-la, puis appuie sur « ✔ Fait » (sans photo à midi).':'Fais-la, puis appuie sur « Fait » et prends la photo de ce que tu as nettoyé.'} L'heure de départ sera l'heure de la dernière tâche finie.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0">${L.map(t=>`<div class="row" style="border:1px solid var(--line);border-radius:10px;padding:8px"><div class="grow"><b>${esc(t.nom)}</b>${t.det?`<div class="meta">${esc(t.det)}</div>`:''}</div><button class="btn ok" data-ch="${t.id}">${midi?'✔ Fait':'📸 Fait'}</button></div>`).join('')}</div>
       <div class="row"><button class="btn danger" id="chAdm">Fermer sans faire les tâches</button><span class="grow"></span><button class="btn sec" id="chLater">Plus tard</button></div>`,
       ()=>{document.querySelectorAll('[data-ch]').forEach(b=>b.onclick=()=>{closeInfo();res({t:b.dataset.ch})});$('#chLater').onclick=()=>{closeInfo();res(null)};$('#chAdm').onclick=()=>{closeInfo();res({adm:1})}}));
     if(!r)return null;
@@ -2057,9 +2057,9 @@ async function closingChores(u,d,z){if(u.libre)return{end:0};z=z||'salle';const 
       <div class="row" style="margin-top:12px"><button class="btn ok" id="cnNo">Retour, je les fais</button><span class="grow"></span><button class="btn danger" id="cnYes">Fermer quand même</button></div>`,()=>{$('#cnNo').onclick=()=>{closeInfo();res(false)};$('#cnYes').onclick=()=>{closeInfo();res(true)}}));
       if(ok)return{end,by:u.nom,left:L.map(t=>t.nom)};continue}
     const t=CFG.tasks.find(x=>x.id===r.t);if(!t)continue;
-    const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer.');if(!img)continue;
-    const pid='pt'+Date.now().toString(36);await photoPut(pid,img);const ts=Date.now();
-    dayObj(d).tasks[t.id+KS]={emp:u.nom,uid:u.id,ts,photo:pid,ferm:1};saveDay(d);end=Math.max(end,ts);toast('✔ '+t.nom+' — fait à '+hhmm(ts))}}
+    let pid=null;if(!midi){const img=await takePhoto(u.nom,'🧹 '+t.nom,u.nom+' — prends en photo ce que tu viens de nettoyer.');if(!img)continue;
+      pid='pt'+Date.now().toString(36);await photoPut(pid,img)}const ts=Date.now();
+    dayObj(d).tasks[t.id+KS]=Object.assign({emp:u.nom,uid:u.id,ts,ferm:1},pid?{photo:pid}:{});saveDay(d);end=Math.max(end,ts);toast('✔ '+t.nom+' — fait à '+hhmm(ts))}}
 
 /* ---- planning & retards ---- */
 let PLAN={},plWeek=monday(todayS()),plEdit=false; // PLAN[lundi][uid][1..7]="9h-15h"
