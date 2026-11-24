@@ -890,7 +890,7 @@ window.addEventListener('resize',()=>{if(!$('#mSign').classList.contains('hidden
 /* ===================== NAVIGATION ===================== */
 let VIEW='jour',curDay=todayS(),curWeek=monday(todayS()),calY=new Date().getFullYear(),calM=new Date().getMonth();
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='jour'){curDay=todayS();TMO=null}show(b.dataset.v)});
-function show(v){if(typeof STOCKONLY==='function'&&STOCKONLY())v='stock';if(v==='tips'&&!(typeof MAIN==='function'&&MAIN()&&!RESTRICT())&&!(tpUnlock>Date.now())){if(RESTRICT())return;tpGate().then(ok=>{if(ok)show('tips')});return}if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
+function show(v){if(typeof STOCKONLY==='function'&&STOCKONLY())v='stock';if(v==='tips'&&!(tpUnlock>Date.now())){if(RESTRICT())return;tpGate().then(ok=>{if(ok)show('tips')});return}if(v!=='tips')tpUnlock=0;if(v==='params'&&RESTRICT()){toast('Réglages réservés au responsable');v='jour'}VIEW=v;setTimeout(()=>{const b=document.querySelector('nav button.on');if(b&&b.scrollIntoView)try{b.scrollIntoView({inline:'center',block:'nearest'})}catch(e){}},0);if(v!=='point')plEdit=false;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ['jour','point','semaine','cal','resa','pdj','hotel','cmd','stock','avis','tips','chat','instr','params'].forEach(x=>$('#v-'+x).classList.toggle('hidden',x!==v));
   if(v==='jour')renderDay();if(v==='point')renderPoint();if(v==='semaine')renderWeek();if(v==='cal')renderCal();if(v==='resa')renderResa();if(v==='hotel')renderHotel();if(v==='cmd')renderCmd();if(v==='stock')renderStock();if(v==='avis')renderAvis();if(v==='tips')renderTips();if(v==='chat')renderChat();if(v==='instr')renderInstr();if(v==='pdj')renderPdj();
@@ -2472,7 +2472,7 @@ const tpSave=s=>put('tp:'+s,TPS[s]);
 const r05=x=>Math.round(x*20)/20,chf=x=>x.toFixed(2);
 function tpHours(s){const H={},open={};for(let i=0;i<14;i++){const d=addD(s,i);for(const e of PTS[d]||[]){if(!e.out){open[e.uid]=1;continue}H[e.uid]=(H[e.uid]||0)+countedDur(d,e)/60000}}return{H,open}}
 function tpCalc(s){const o=tpObj(s),{H,open}=tpHours(s);const tot=o.e.reduce((a,x)=>a+x.amt,0);
-  const ex=o.ex||CFG.users.filter(u=>u.role==='admin'||u.role==='boss').map(u=>u.id);
+  const ex=o.ex||CFG.users.filter(u=>u.role==='boss').map(u=>u.id);
   const ids=[...new Set([...Object.keys(H),...CFG.users.filter(u=>!u.del&&u.role!=='boss').map(u=>u.id)])].filter(id=>userById(id));
   const R=ids.map(id=>({u:userById(id),min:H[id]||0,inc:!ex.includes(id)&&(H[id]||0)>0,can:(H[id]||0)>0,open:!!open[id]}));
   const HT=R.filter(r=>r.inc).reduce((a,r)=>a+r.min,0);R.forEach(r=>{r.pct=r.inc&&HT?r.min/HT:0;r.part=r.inc&&HT?r05(tot*r.pct):0});
@@ -2490,7 +2490,7 @@ function renderTips(){if(!CFG.tipAnchor&&!RESTRICT()){CFG.tipAnchor=monday(today
   $('#tpList').querySelectorAll('[data-tpdel]').forEach(b=>b.onclick=()=>{o.e=o.e.filter(x=>x.id!==b.dataset.tpdel);tpSave(s);renderTips()});
   $('#tpTab').querySelectorAll('[data-tpinc]').forEach(c=>c.onchange=()=>{const {ex}=tpCalc(s);let X=[...ex];if(c.checked)X=X.filter(x=>x!==c.dataset.tpinc);else X.push(c.dataset.tpinc);o.ex=X;tpSave(s);renderTips()});
   $('#tpTab').querySelectorAll('[data-tppaid]').forEach(c=>c.onchange=()=>{if(c.checked)o.paid[c.dataset.tppaid]=Date.now();else delete o.paid[c.dataset.tppaid];tpSave(s)})}
-async function tpGate(){if(RESTRICT())return false;if(MAIN()||tpUnlock>Date.now())return true;const a=await askAuth('💰 Pourboires',['admin'],'Réservé au responsable');if(!a)return false;tpUnlock=Date.now()+10*60000;return true}
+async function tpGate(){if(RESTRICT())return false;if(tpUnlock>Date.now())return true;const a=await askAuth('💰 Pourboires',['admin'],'Réservé au responsable');if(!a)return false;tpUnlock=Date.now()+10*60000;return true}
 $('#tpPrev').onclick=()=>{tpCur=addD(tpCur,-14);renderTips()};$('#tpNext').onclick=()=>{tpCur=addD(tpCur,14);renderTips()};
 $('#tpAdd').onclick=()=>{const s=tpCur,e=addD(s,13),t=todayS(),dd=t>=s&&t<=e?t:e;
   info(`<h2>💰 Ajouter des pourboires</h2><label>Jour</label><input type="date" id="tpD" value="${dd}" min="${s}" max="${e}"><label>Montant (CHF)</label><input id="tpA" type="number" inputmode="decimal" step="0.05" min="0" placeholder="ex : 85.50" style="font-size:22px">
