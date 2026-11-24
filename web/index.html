@@ -200,7 +200,6 @@ body.readonly #roBar{display:block!important}
     <button data-v="cmd">🛒 Commandes</button>
     <button data-v="stock">📦 Stock</button>
     <button data-v="avis">⭐ Avis</button>
-    <button data-v="tips" class="adm-only">💰 Pourboires</button>
     <button data-v="chat">💬 Messages</button>
     <button data-v="instr">📖 Instructions</button>
     <button data-v="params">⚙️ Réglages</button>
@@ -458,6 +457,7 @@ body.readonly #roBar{display:block!important}
     <div class="row" style="margin-top:8px"><button class="btn" id="pinOk">🔒 Se connecter</button></div>
   </div>
   <div id="paramBox" class="hidden">
+  <div class="card"><div class="row"><div class="grow"><b>💰 Pourboires</b><div class="meta">Partage au prorata des heures · visible uniquement ici</div></div><button class="btn sec" id="tpOpen">Ouvrir</button></div></div>
     <div class="card"><div class="row"><div class="grow"><h2 style="margin:0">📦 Appareil stock seulement</h2><div class="meta">Pour un terminal scanner (lecteur de codes-barres intégré) : cet appareil ne montre que le Stock, sans pointage ni rien d'autre. <span id="soTxt"></span></div></div><button class="btn sec" id="soOn">Activer sur cet appareil</button></div></div>
     <div class="card"><h2>🔀 Onglets du menu</h2><p class="meta">Change l'ordre des onglets en haut de l'écran avec ▲ ▼, et décoche ceux que tu ne veux pas voir. C'est enregistré tout de suite, sur tous les appareils.</p><div id="navEd"></div><div class="row" style="margin-top:8px"><button class="btn ghost sm" id="navReset">↺ Ordre d'origine</button></div></div>
     <div class="card"><h2>🌐 Accès à distance (iPhone, autre appareil)</h2><p class="meta">Donne à un employé son propre accès en ligne : il voit et remplit tout depuis son téléphone, avec son mot de passe, sans accès aux Réglages.</p><div id="webAcc"></div></div>
@@ -1877,6 +1877,7 @@ function saveFile(name,content,mime){if(native()){Android.saveFile(name,content,
 window.onNativeSaved=(ok,where)=>toast(ok?'Enregistré dans '+where:'Erreur d\'enregistrement');
 
 /* ===================== REGLAGES ===================== */
+$('#tpOpen').onclick=()=>{tpUnlock=Date.now()+10*60000;show('tips')};
 $('#pinOk').onclick=async()=>{if(!await askAuth('Accès administrateur',['admin']))return;$('#lockBox').classList.add('hidden');$('#paramBox').classList.remove('hidden');renderParams();renderBk();renderWebAcc();$('#rcMail').value=CFG.recapMail||'';$('#rcWeek').value=addD(monday(todayS()),-7);$('#oList').innerHTML=oubliHTML()};
 $('#rcSave').onclick=()=>{const v=$('#rcMail').value.trim();if(v&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return toast('Adresse e-mail invalide');CFG.recapMail=v;put('cfg',CFG);toast(v?'Adresse enregistrée : '+v:'Adresse effacée')};
 $('#rcSee').onclick=()=>{const m=monday($('#rcWeek').value||todayS());$('#printArea').innerHTML='<style>@page{size:A4;margin:8mm}</style>'+recapHTML(m);outDoc('Récap semaine '+isoWeek(m),0)};
