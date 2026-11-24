@@ -35,9 +35,9 @@ button.go:disabled{opacity:.5}
     <div class="st" id="st"></div>
     <div class="lab" id="lab">Touchez les étoiles pour donner une note</div>
     <label for="txt">Votre commentaire</label>
-    <textarea id="txt" maxlength="1500" placeholder="Qu'avez-vous aimé ? Que pouvons-nous améliorer ?"></textarea>
-    <label for="who">Votre prénom <span style="font-weight:400;color:#9ca3af">(facultatif)</span></label>
-    <input id="who" maxlength="60" autocomplete="given-name">
+    <textarea id="txt" autocomplete="off" maxlength="1500" placeholder="Qu'avez-vous aimé ? Que pouvons-nous améliorer ?"></textarea>
+    <label for="who">Signature <span style="font-weight:400;color:#9ca3af">(facultatif)</span></label>
+    <input id="who" name="sig_x" maxlength="60" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" placeholder="Laisser vide pour rester anonyme">
     <button class="go" id="go" disabled>Envoyer mon avis</button>
     <div class="err" id="err"></div>
   </div>
@@ -66,6 +66,7 @@ document.getElementById('go').onclick=async()=>{const g=document.getElementById(
     document.getElementById('form').style.display='none';document.getElementById('merci').style.display='block'}
   catch(x){e.textContent=x.message||'Envoi impossible, vérifiez la connexion.';g.disabled=false;g.textContent='Envoyer mon avis'}};
 draw();
+setTimeout(()=>{const w=document.getElementById('who');if(w&&!w.matches(':focus'))w.value=''},300);setTimeout(()=>{const w=document.getElementById('who');if(w&&!w.matches(':focus'))w.value=''},1200);
 </script>
 </body>
 </html>
