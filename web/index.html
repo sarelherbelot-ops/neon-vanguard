@@ -301,7 +301,7 @@ body.readonly #roBar{display:block!important}
   <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : pointage possible sur ton téléphone seulement pendant tes heures prévues au planning (ou sur la tablette).</div>
   <div id="pSupp" class="adm-only"></div>
   <div class="pgrid" id="pGrid"></div>
-  <div class="adm-only row" style="margin-top:8px"><button class="btn sec" id="pAvBtn">⏩ Faire commencer plus tôt</button><span class="meta grow">Tu valides une heure de début plus tôt que le planning : il peut pointer dès cette heure (aussi sur son téléphone) et ses heures comptent à partir de là.</span></div>
+  <div class="adm-only row" style="margin-top:8px"><button class="btn sec" id="pAvBtn">⏩ Plus tôt / ➕ Ajouter des heures</button><span class="meta grow">Faire commencer quelqu'un plus tôt, ou faire venir quelqu'un qui n'est pas au planning (ex : besoin d'une personne en plus ce soir).</span></div>
   <div class="card" style="margin-top:14px">
     <div class="row">
       <h2 class="grow">📅 Planning — <span id="plWeekTxt"></span></h2>
@@ -2170,7 +2170,7 @@ $('#plPrint').onclick=async()=>{const w=await new Promise(res=>info(`<h2>📅 Pl
   if(!w)return;const L=[];for(let i=0;i<w;i++)L.push(addD(plWeek,7*i));outPlan(L)};
 $('#plCopy').onclick=()=>{const prev=PLAN[addD(plWeek,-7)];if(!prev)return toast('Pas de planning la semaine précédente');
   if(PLAN[plWeek]&&Object.keys(PLAN[plWeek]).length&&!confirm('Remplacer le planning de cette semaine ?'))return;
-  PLAN[plWeek]=JSON.parse(JSON.stringify(prev));for(const k in PLAN[plWeek])for(const j in PLAN[plWeek][k])if(j[0]==='a')delete PLAN[plWeek][k][j];put('pl:'+plWeek,PLAN[plWeek]);renderPlan();toast('Planning copié')};
+  PLAN[plWeek]=JSON.parse(JSON.stringify(prev));for(const k in PLAN[plWeek]){const U=PLAN[plWeek][k];for(const j in U){if(j[0]==='o'){const n=j.slice(1);if(U[j])U[n]=U[j];else delete U[n]}}for(const j in U)if(j[0]==='a'||j[0]==='o')delete U[j]}put('pl:'+plWeek,PLAN[plWeek]);renderPlan();toast('Planning copié')};
 /* ---- import planning / heures (fichier préparé à partir des photos) ---- */
 const JKEY={lun:1,lundi:1,mar:2,mardi:2,mer:3,mercredi:3,jeu:4,jeudi:4,ven:5,vendredi:5,sam:6,samedi:6,dim:7,dimanche:7};
 const nrm=x=>String(x||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -2281,16 +2281,25 @@ async function closingTicket(u){
     return{img,ts:tPhoto,src:'admin',by:a.nom}}}
 
 setInterval(()=>{try{applyRestrict()}catch(e){}},60000);
-$('#pAvBtn').onclick=async()=>{const d=todayS(),L=staff().filter(u=>(parseShift(planStr(u.id,d))||[]).length);
-  if(!L.length)return toast('Personne n\'est prévu aujourd\'hui au planning');
-  info(`<h2>⏩ Faire commencer plus tôt</h2><p class="meta">Aujourd'hui, ${longD(d)}</p>
-    <label>Personne</label><select id="avU">${L.map(u=>`<option value="${u.id}">${esc(u.nom)} — prévu ${esc(planTxt(u.id,d))}</option>`).join('')}</select>
-    <label>Il commence à</label><input type="time" id="avT" value="${pad(Math.max(0,new Date().getHours()))}:${pad(new Date().getMinutes())}">
-    <p class="meta">Il pourra pointer 15 min avant cette heure, et ses heures compteront à partir de cette heure. S'il est déjà pointé, ses heures sont recalculées.</p>
+$('#pAvBtn').onclick=async()=>{const d=todayS(),L=staff().filter(u=>u.role!=='boss');if(!L.length)return toast('Aucun employé');
+  const raw=u=>(parseShift(planStr(u.id,d))||[]).map(([a,b])=>fmtM(a)+'-'+fmtM(b)).join(' / ');
+  info(`<h2>⏩ Commencer plus tôt / ➕ Ajouter des heures</h2><p class="meta">Aujourd'hui, ${longD(d)}</p>
+    <label>Personne</label><select id="avU">${L.map(u=>`<option value="${u.id}">${esc(u.nom)} — ${raw(u)?'prévu '+esc(planTxt(u.id,d)):'pas prévu aujourd\'hui'}</option>`).join('')}</select>
+    <div class="row" style="gap:10px"><div class="grow"><label>Début</label><input type="time" id="avT" value="${pad(new Date().getHours())}:${pad(new Date().getMinutes())}"></div><div class="grow"><label>Fin <span class="meta" id="avFinH"></span></label><input type="time" id="avF"></div></div>
+    <p class="meta" id="avHelp"></p>
     <div class="row"><button class="btn ghost" id="avDel">Enlever</button><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="avOk">Valider</button></div>`,
-    ()=>{const go=async del=>{const uid=$('#avU').value,t=$('#avT').value;if(!del&&!/^\d{2}:\d{2}$/.test(t))return toast('Heure invalide');closeInfo();
-      const a=await askAuth('Valider un début plus tôt',['admin']);if(!a)return;const m=monday(d),P=PLAN[m]=PLAN[m]||{},U=P[uid]=P[uid]||{};
-      if(del)delete U['a'+wd(d)];else U['a'+wd(d)]=t;put('pl:'+m,P);renderPoint();const u=userById(uid);toast(del?'Début normal remis pour '+u.nom:'⏩ '+u.nom+' peut commencer à '+t.replace(':','h'))};
+    ()=>{const upd=()=>{const u=userById($('#avU').value),pl=!!raw(u);$('#avFinH').textContent=pl?'(vide = il commence juste plus tôt)':'(obligatoire)';
+        $('#avHelp').textContent=pl?'Sans heure de fin : il commence plus tôt et ses heures comptent dès le début. Avec une heure de fin : un service en plus est ajouté à son planning d\'aujourd\'hui (ex : ce soir).':'Il n\'était pas prévu : ce service est ajouté à son planning d\'aujourd\'hui. Il peut pointer 15 min avant le début, aussi sur son téléphone.'};
+      $('#avU').onchange=upd;upd();
+      const go=async del=>{const uid=$('#avU').value,u=userById(uid),t=$('#avT').value,f=$('#avF').value,pl=!!raw(u),k=wd(d);
+        if(!del){if(!/^\d{2}:\d{2}$/.test(t))return toast('Heure de début invalide');if(!pl&&!f)return toast('Mets l\'heure de fin');if(f&&f===t)return toast('Début et fin identiques')}
+        closeInfo();const a=await askAuth(del?'Enlever le changement de '+u.nom:'Valider les heures de '+u.nom,['admin']);if(!a)return;
+        const m=monday(d),P=PLAN[m]=PLAN[m]||{},U=P[uid]=P[uid]||{};const hm=x=>{const z=x.split(':');return(+z[0])+'h'+(z[1]!=='00'?z[1]:'')};
+        if(del){delete U['a'+k];if('o'+k in U){if(U['o'+k])U[k]=U['o'+k];else delete U[k];delete U['o'+k]}}
+        else if(!f)U['a'+k]=t;
+        else{if(!('o'+k in U))U['o'+k]=U[k]||'';const seg=hm(t)+'-'+hm(f);U[k]=U[k]?U[k]+' / '+seg:seg}
+        put('pl:'+m,P);renderPoint();try{if(VIEW==='plan')renderPlan()}catch(e){}
+        toast(del?'Planning normal remis pour '+u.nom:f?'➕ '+u.nom+' : '+t.replace(':','h')+'-'+f.replace(':','h')+' ajouté':'⏩ '+u.nom+' peut commencer à '+t.replace(':','h'))};
       $('#avOk').onclick=()=>go(false);$('#avDel').onclick=()=>go(true)})};
 /* ---- caméra ---- */
 let camStream=null,camData=null,camRes=null;
