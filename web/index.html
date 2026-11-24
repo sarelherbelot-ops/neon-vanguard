@@ -1971,7 +1971,9 @@ function renderPoint(){setTimeout(oubliBadge,0);tick();renderMyPlan();renderSupp
 /* téléphone d'un employé : tout est utilisable pendant ses heures prévues au planning (15 min avant le début → 1 h après la fin) ou tant qu'il est pointé */
 const DUTY_AV=15,DUTY_AP=60;
 function onDuty(u){if(!u||!u.id||u.role==='boss')return false;if(openShift(u.id))return true;const n=new Date(),T=todayS(),nm=n.getHours()*60+n.getMinutes();
-  for(const[d,off]of[[T,0],[addD(T,-1),1440]]){for(const g of planSegs(u.id,d)){const m=nm+off;if(m>=g[0]-DUTY_AV&&m<=g[1]+DUTY_AP)return true}}return false}
+  for(const[d,off]of[[T,0],[addD(T,-1),1440]]){for(const g of planSegs(u.id,d)){const m=nm+off;if(m>=g[0]-DUTY_AV&&m<=g[1]+DUTY_AP){
+      /* départ déjà pointé pour ce service : plus d'accès jusqu'au prochain service */
+      const ws=parse(d).getTime()+(g[0]-DUTY_AV)*60000;const done=[d,addD(d,1)].some(x=>(PTS[x]||[]).some(e=>e.uid===u.id&&e.out&&e.out>=ws));if(!done)return true}}}return false}
 function nextDuty(u){if(!u||!u.id)return null;const n=new Date(),T=todayS(),nm=n.getHours()*60+n.getMinutes();const S=planSegs(u.id,T).filter(g=>g[0]-DUTY_AV>nm);return S.length?S[0][0]-DUTY_AV:null}
 const RO=()=>{if(!RESTRICT())return false;const u=(typeof CUR_U==='function'&&CUR_U())||{};return u.role!=='chef'&&!onDuty(u)}; // enregistrer : seulement ton téléphone (admin), le téléphone du chef et la tablette
 /* réservations (tables) et hôtel : seulement la salle (+ responsable et boss). La cuisine peut tout voir mais rien modifier. */
