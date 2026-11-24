@@ -2457,7 +2457,7 @@ function eanFromImage(img){const{width:W,height:H,data:D}=img;const g=(x,y)=>{co
   for(const f of[.5,.48,.52,.46,.54,.44,.56]){const y=Math.round(H*f),L=new Float32Array(W);for(let x=0;x<W;x++)L[x]=g(x,y);const c=tryLine(L);if(c)return c}
   for(const f of[]){const x=Math.round(W*f),L=new Float32Array(H);for(let y=0;y<H;y++)L[y]=g(x,y);const c=tryLine(L);if(c)return c}return null}
 /* ======== AVIS CLIENTS : QR code → page web publique → avis chiffrés (clé publique du restaurant) → boîte → appli ======== */
-const AV_BOX='https://explordinateur-plan-nettoyage-avis.hf.space/api/b/',AV_PAGE='https://sarelherbelot-ops.github.io/neon-vanguard/web/avis.html';
+const AV_BOX='https://explordinateur-plan-nettoyage-avis.hf.space/api/b/',AV_PAGE='https://explordinateur-avis-clients.static.hf.space/';
 const b64u=a=>btoa(String.fromCharCode(...new Uint8Array(a))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const ub64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'==='.slice((s.length+3)%4)),c=>c.charCodeAt(0));
 const avAll=()=>{const L=[];for(const k in AVS)L.push(...(AVS[k]||[]));return L.sort((a,b)=>b.ts-a.ts)};
