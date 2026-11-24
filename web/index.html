@@ -299,6 +299,7 @@ body.readonly #roBar{display:block!important}
   <div class="card"><div class="clock" id="pClock"></div><div class="meta" style="text-align:center" id="pDate"></div></div>
   <div id="myPlan" class="card hidden" style="border:2px solid #2563eb"></div>
   <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : pointage possible sur ton téléphone seulement pendant tes heures prévues au planning (ou sur la tablette).</div>
+  <div id="pSupp" class="adm-only"></div>
   <div class="pgrid" id="pGrid"></div>
   <div class="adm-only row" style="margin-top:8px"><button class="btn sec" id="pAvBtn">⏩ Faire commencer plus tôt</button><span class="meta grow">Tu valides une heure de début plus tôt que le planning : il peut pointer dès cette heure (aussi sur son téléphone) et ses heures comptent à partir de là.</span></div>
   <div class="card" style="margin-top:14px">
@@ -1057,7 +1058,7 @@ function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false
 let roPrev=null;function applyRestrict(){const r=RESTRICT(),ro=RO();document.body.classList.toggle('restricted',r);document.body.classList.toggle('readonly',ro);
   {const b=document.getElementById('roBar');if(b&&ro){const u=CUR_U(),nx=nextDuty(u);b.textContent='📱 Accès à distance : consultation seulement.'+(u&&u.role!=='boss'?(nx!=null?' Tu pourras pointer et tout utiliser à partir de '+pad(Math.floor(nx/60))+'h'+pad(nx%60)+'.':' Tu pourras pointer et tout utiliser pendant tes heures prévues au planning.'):' Tout se fait sur la tablette du restaurant.')}}
   if(roPrev!==null&&roPrev!==ro){roPrev=ro;try{show(VIEW)}catch(e){}}roPrev=ro;if(r&&VIEW==='params')show('jour')}
-function refresh(){applyRestrict();chatCheck();resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
+function refresh(){applyRestrict();chatCheck();try{ptCheck()}catch(e){}resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -1953,7 +1954,9 @@ setInterval(()=>{if(VIEW==='point')tick()},1000);
 function renderMyPlan(){const el=$('#myPlan');if(!el)return;const me=RO()&&CUR_U();el.classList.toggle('hidden',!me);if(!me)return;const T=todayS();
   const wk=m=>[...Array(7).keys()].map(i=>{const d=addD(m,i),h=planStr(me.id,d);return`<tr style="${d===T?'background:#eff6ff;font-weight:700':''}"><td style="padding:6px 8px;border-bottom:1px solid var(--line)">${JOURS[wd(d)]} ${frD(d).slice(0,5)}${d===T?' · aujourd\'hui':''}</td><td style="padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-size:17px">${h?esc(h):'<span class="meta">repos</span>'}</td></tr>`}).join('');
   const m=monday(T);el.innerHTML=`<h2 style="margin:0 0 6px">📅 Mon planning — ${esc(me.nom)}</h2><table style="width:100%;border-collapse:collapse"><tr><th colspan="2" style="text-align:left;padding:4px 8px;background:#f1f5f9">Cette semaine</th></tr>${wk(m)}<tr><th colspan="2" style="text-align:left;padding:4px 8px;background:#f1f5f9">Semaine prochaine</th></tr>${wk(addD(m,7))}</table><p class="meta" style="margin-top:6px">Le planning de toute l'équipe est plus bas.</p>`}
-function renderPoint(){setTimeout(oubliBadge,0);tick();renderMyPlan();
+function renderSupp(){const b=$('#pSupp');if(!b)return;const L=suppList();b.innerHTML=L.length?`<div class="card" style="border-left:5px solid #f59e0b;margin-bottom:8px"><b>⏳ Heures de fin à valider (${L.length})</b>${L.map(({d,e})=>`<div class="row" style="margin-top:6px"><span class="grow">${esc(e.nom)} — ${frD(d)} : fini à <b>${hhmm(e.out)}</b>, prévu ${hhmm(e.supp.fin)} (+${mins(e.supp.min)})</span><button class="btn ok sm" data-sp="${d}|${e.id}">Valider</button></div>`).join('')}</div>`:'';
+  b.querySelectorAll('[data-sp]').forEach(x=>x.onclick=()=>{const[d,id]=x.dataset.sp.split('|');suppDecide(d,id)})}
+function renderPoint(){setTimeout(oubliBadge,0);tick();renderMyPlan();renderSupp();
   $('#pRemote')&&$('#pRemote').classList.toggle('hidden',!remoteNoPunch());$('#pGrid').innerHTML=staff().map(u=>{const o=openShift(u.id);
     return `<button class="pbtn ${o?'in':''}" data-u="${u.id}"><b>${esc(u.nom)}</b>
       <span class="meta">${o?'Présent depuis '+hhmm(o.e.in)+(o.d!==todayS()?' ('+frD(o.d)+')':''):'Absent'}${poste(u)==='salle'?' · 🍽 Salle':poste(u)==='chef'?' · 👨‍🍳 Chef':' · 👨‍🍳 Cuisine'}${u.libre?' · sans tâches':''}</span>
@@ -2026,6 +2029,7 @@ async function punch(uid){if(RESTRICT()&&!remoteNoPunch()&&uid!==(CUR_U()||{}).i
   else if(ferm){o.e.ferm=true;o.e.outSrc=ck.src;o.e.clot=ck.ts;if(tk.end>ck.ts){o.e.outSrc='taches';o.e.choresEnd=tk.end}const notes=[];if(ck.by)notes.push('fermeture validée sans ticket par '+ck.by);if(tk.by){notes.push('fermé sans faire les tâches');o.e.oubli=tk.left||[]}if(notes.length)o.e.edit=notes.join(' · ')}
   if(mt.left){o.e.oubli=(o.e.oubli||[]).concat(mt.left);o.e.ozone=o.e.ozone||mt.zone;o.e.edit=(o.e.edit?o.e.edit+' · ':'')+'parti sans faire sa tâche de ménage'}
   if(mt.end&&!ck)o.e.out=Math.max(o.e.out,mt.end);
+  suppMark(o.d,o.e);
   savePts(o.d);renderPoint();if(o.e.oubli)setTimeout(()=>toastRed('⚠ '+u.nom+' n\'a pas fait : '+o.e.oubli.join(', ')),2500);
   toast(o.e.fermCuis?'Fermeture cuisine — départ à '+hms(o.e.out)+' — '+dur(countedDur(o.d,o.e))+' comptées ✔':(ferm?(o.e.choresEnd?'Clôture à '+hhmm(ck.ts)+' + tâches finies — fin de service à ':'Clôture — fin de service à '):'Départ pointé à ')+hms(o.e.out)+' — '+dur(countedDur(o.d,o.e))+' comptées ✔')}
 
@@ -2081,7 +2085,38 @@ function pauseRule(d,e){const u=userById(e.uid);if(!u||(u.pmode||'aucune')!=='re
 const surPlace=e=>e.repas&&e.repasType!=='emporter',rpTxt=e=>e.repas?(e.repasType==='emporter'?'à emporter':'sur place'):e.repas===false?'non':'';
 function pTxt(d,e){const t=Math.round(pauseFor(d,e)/60000);return t+' min'+(surPlace(e)&&t?' (dont 15 repas)':'')}
 function pauseFor(d,e){if(!e.out)return 0;const tot=Math.max(0,e.out-countedIn(d,e));return Math.min(pauseRule(d,e)+(surPlace(e)?15*60000:0),tot)}
-function countedDur(d,e){return e.out?Math.max(0,e.out-countedIn(d,e)-pauseFor(d,e)):0}
+/* fin plus tard que le planning : à valider par le responsable ; tant que ce n'est pas autorisé, les heures comptent jusqu'à la fin prévue */
+const SUPP_TOL=10;
+function planEndTs(d,e,ts){const S=planSegs(e.uid,d);if(!S.length)return null;const base=parse(d).getTime(),om=(ts-base)/60000;const so=S.reduce((x,y)=>Math.abs(y[1]-om)<Math.abs(x[1]-om)?y:x);return base+so[1]*60000}
+function suppMark(d,e){if(!e.out||e.autoFin)return;const pe=planEndTs(d,e,e.out);if(pe==null){delete e.supp;return}const m=Math.round((e.out-pe)/60000);
+  if(m>SUPP_TOL){if(!e.supp||e.supp.out!==e.out)e.supp={st:'att',fin:pe,out:e.out,min:m}}else delete e.supp}
+function countedOut(d,e){if(!e.out)return 0;const s=e.supp;if(!s||s.st==='ok')return e.out;if(s.st==='part'&&s.jusq)return Math.min(e.out,s.jusq);return Math.min(e.out,s.fin)}
+function suppList(){const L=[];for(const d in PTS)for(const e of PTS[d]||[])if(e.supp&&e.supp.st==='att')L.push({d,e});return L.sort((a,b)=>a.e.out-b.e.out)}
+function suppTxt(e){const s=e.supp;if(!s)return'';if(s.st==='att')return`<div style="color:#b45309;font-weight:700">⏳ fini à ${hhmm(e.out)} au lieu de ${hhmm(s.fin)} (+${mins(s.min)}) : à valider</div>`;
+  if(s.st==='ok')return`<div style="color:#15803d">✔ fin à ${hhmm(e.out)} autorisée${s.by?' par '+esc(s.by):''}</div>`;if(s.st==='part')return`<div style="color:#2563eb">✔ fin autorisée jusqu'à ${hhmm(s.jusq)}${s.by?' par '+esc(s.by):''} (parti à ${hhmm(e.out)})</div>`;
+  return`<div style="color:#dc2626">✖ heures après ${hhmm(s.fin)} refusées${s.by?' par '+esc(s.by):''}</div>`}
+async function suppDecide(d,id){const e=(PTS[d]||[]).find(x=>x.id===id);if(!e||!e.supp)return;const s=e.supp;
+  info(`<h2>⏳ ${esc(e.nom)} a fini plus tard</h2><p>${longD(d)}<br>Fin prévue au planning : <b>${hhmm(s.fin)}</b><br>Départ pointé : <b>${hhmm(e.out)}</b> (+${mins(s.min)})</p>
+    <label>Heure de fin que tu autorises</label><input type="time" id="spT" value="${pad(new Date(e.out).getHours())}:${pad(new Date(e.out).getMinutes())}">
+    <div class="row" style="margin-top:10px"><button class="btn danger" id="spNo">✖ Refuser (fin à ${hhmm(s.fin)})</button><span class="grow"></span><button class="btn ghost" id="iClose">Plus tard</button><button class="btn ok" id="spOk">✔ Autoriser</button></div>`,
+    ()=>{const go=async ok=>{const t=$('#spT').value;closeInfo();let by='';if(!MAIN()){const a=await askAuth('Valider l\'heure de fin de '+e.nom,['admin']);if(!a)return;by=a.nom}else by=chMyName();
+      if(!ok){s.st='non'}else{const m=t.split(':');let j=parse(d).getTime()+(+m[0]*60+(+m[1]||0))*60000;if(j<s.fin-6*3600e3)j+=864e5;if(j>=e.out)s.st='ok';else if(j<=s.fin)s.st='non';else{s.st='part';s.jusq=j}}
+      s.by=by;s.at=Date.now();savePts(d);renderPoint();toast(s.st==='non'?'✖ Heures en plus refusées':'✔ Fin autorisée pour '+e.nom)};
+      $('#spOk').onclick=()=>go(true);$('#spNo').onclick=()=>go(false)})}
+/* pointage oublié (pointage resté ouvert) : départ mis automatiquement à l'heure de fin du planning, 3 h après */
+const AUTO_FIN_H=3;
+function autoFin(){if(RESTRICT())return;const now=Date.now();for(let i=0;i<8;i++){const d=addD(todayS(),-i);let ch=false;for(const e of PTS[d]||[]){if(e.out)continue;const S=planSegs(e.uid,d);if(!S.length)continue;
+  const base=parse(d).getTime();let g=S.find(x=>base+x[1]*60000>e.in)||S[S.length-1];const fin=base+g[1]*60000;if(now<fin+AUTO_FIN_H*3600e3||fin<=e.in)continue;
+  e.out=fin;e.autoFin=true;e.outSrc='auto';e.edit=(e.edit?e.edit+' · ':'')+'pointage de départ oublié : départ mis à l\'heure de fin du planning';ch=true}if(ch)savePts(d)}}
+setInterval(()=>{try{autoFin()}catch(e){}},60000);setTimeout(()=>{try{autoFin()}catch(e){}},8000);
+/* notifications de tous les pointages sur le téléphone du responsable */
+let ptNotified=+localStorage.getItem('pn_ptNotif')||0;
+function ptCheck(){if(!MAIN())return;if(!ptNotified){ptNotified=Date.now();localStorage.setItem('pn_ptNotif',ptNotified);return}const N=[];
+  for(let i=0;i<3;i++){const d=addD(todayS(),-i);for(const e of PTS[d]||[]){if(e.in>ptNotified)N.push({ts:e.in,t:'🟢 '+e.nom+' est arrivé à '+hhmm(e.in),b:'Prévu : '+(planTxt(e.uid,d)||'pas prévu')});
+    if(e.out&&e.out>ptNotified)N.push({ts:e.out,t:(e.autoFin?'⚠ '+e.nom+' a oublié de pointer son départ':'🔴 '+e.nom+' est parti à '+hhmm(e.out)),b:e.autoFin?'Départ mis à '+hhmm(e.out)+' (fin du planning)':(e.supp&&e.supp.st==='att'?'⏳ +'+mins(e.supp.min)+' après la fin prévue ('+hhmm(e.supp.fin)+') : à valider':'Prévu : '+(planTxt(e.uid,d)||'pas prévu'))})}}
+  if(!N.length)return;N.sort((a,b)=>a.ts-b.ts);ptNotified=Math.max(...N.map(x=>x.ts));localStorage.setItem('pn_ptNotif',ptNotified);
+  for(const x of N.slice(-5)){toast(x.t);if(native()&&Android.notify)try{Android.notify(x.t,x.b)}catch(e){}}}
+function countedDur(d,e){return e.out?Math.max(0,countedOut(d,e)-countedIn(d,e)-pauseFor(d,e)):0}
 function lateCell(d,e){const li=lateInfo(d,e);if(!li)return '<span class="meta">pas prévu</span>';
   let h=li.late>0?`<span class="late">+${mins(li.late)} RETARD</span>`:`<span class="ontime">à l'heure</span>`+(li.avance>0?(e.avOk?`<br><span class="meta" style="color:#2563eb">⏩ avance de ${mins(li.avance)} comptée (demandée)</span>`:`<br><span class="meta">arrivé ${mins(li.avance)} avant — compté à ${fmtM(li.seg[0])}</span>`):'');
   if(li.early>0)h+=`<br><span class="late" style="font-weight:500">parti ${mins(li.early)} avant</span>`;return h}
@@ -2306,7 +2341,7 @@ function renderPH(){const R=phRows(),tot={};
   $('#phTotals').innerHTML=Object.keys(tot).length?'<b>Total sur la période :</b> '+Object.entries(tot).map(([n,t])=>`${esc(n)} <b>${dur(t)}</b> · 🍽 ${rp[n]||0} repas${lt[n]?` <span class="late">(${lt[n].n} retard${lt[n].n>1?'s':''}, ${mins(lt[n].m)})</span>`:''}`).join(' · '):'';
   $('#phList').innerHTML=R.length?`<table class="ptab"><tr><th>Date</th><th>Compte</th><th>Prévu</th><th>Arrivée</th><th>Retard</th><th>Départ</th><th>Pause</th><th>Heures comptées</th><th>Repas</th><th>Rapport de caisse</th></tr>`+
     R.slice().reverse().map(({d,e})=>`<tr class="click" data-d="${d}" data-id="${e.id}"><td>${JOURS[wd(d)].slice(0,3)} ${frD(d)}</td><td>${esc(e.nom)}${e.imp?' <span class="meta" title="importé d\'une feuille">📄</span>':''}</td><td class="meta">${planTxt(e.uid,d)||'—'}</td><td>${hms(e.in)}</td><td>${lateCell(d,e)}</td>
-    <td>${e.out?hms(e.out)+(ymd(new Date(e.out))!==d?' (+1j)':'')+(e.oubli?`<div style="color:#dc2626;font-weight:700">⚠ tâches non faites : ${esc(e.oubli.join(', '))}</div>`:'')+(e.ferm?`<div class="meta">🧾 clôture${e.choresEnd?' à '+hhmm(e.clot)+' + 🧹 tâches finies':e.outSrc==='ticket'?' (heure du ticket)':e.outSrc==='admin'?' (validée admin)':''}</div>`:''):'<span style="color:var(--grn)">en cours</span>'}</td><td class="meta">${pauseFor(d,e)?pTxt(d,e):''}</td><td>${e.out?dur(countedDur(d,e)):''}</td><td>${e.repas?(e.repasType==='emporter'?'🥡 à emporter':'🍽 sur place'):e.repas===false?'<span class="meta">non</span>':''}</td>
+    <td>${e.out?hms(e.out)+(ymd(new Date(e.out))!==d?' (+1j)':'')+suppTxt(e)+(e.autoFin?'<div style="color:#dc2626;font-weight:700">⚠ départ oublié : mis à l\'heure de fin du planning</div>':'')+(e.oubli?`<div style="color:#dc2626;font-weight:700">⚠ tâches non faites : ${esc(e.oubli.join(', '))}</div>`:'')+(e.ferm?`<div class="meta">🧾 clôture${e.choresEnd?' à '+hhmm(e.clot)+' + 🧹 tâches finies':e.outSrc==='ticket'?' (heure du ticket)':e.outSrc==='admin'?' (validée admin)':''}</div>`:''):'<span style="color:var(--grn)">en cours</span>'}</td><td class="meta">${pauseFor(d,e)?pTxt(d,e):''}</td><td>${e.out?dur(countedDur(d,e)):''}</td><td>${e.repas?(e.repasType==='emporter'?'🥡 à emporter':'🍽 sur place'):e.repas===false?'<span class="meta">non</span>':''}</td>
     <td>${e.photoIn?`<img class="thumb" title="Flash Info" data-ph="${e.photoIn}"> `:''}${e.photo?`<img class="thumb" title="Caisse" data-ph="${e.photo}">`:''}</td></tr>`).join('')+'</table>':'<p class="meta">Aucun pointage sur cette période.</p>';
   $('#phList').querySelectorAll('img[data-ph]').forEach(async im=>{im.src=await photoGet(im.dataset.ph)||''});
   $('#phList').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>showPunch(tr.dataset.d,tr.dataset.id))}
@@ -2330,7 +2365,7 @@ async function showPunch(d,id){const e=(PTS[d]||[]).find(x=>x.id===id);if(!e)ret
         <label>Repas<select id="eRep"><option value="">Non</option><option value="place" ${e.repas&&e.repasType!=='emporter'?'selected':''}>Sur place (+15 min de pause)</option><option value="emporter" ${e.repas&&e.repasType==='emporter'?'selected':''}>À emporter</option></select></label>
         <div class="row" style="margin-top:12px"><button class="btn danger" id="eDel">Supprimer</button><span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="eOk">Enregistrer</button></div>`,
       ()=>{$('#eOk').onclick=()=>{const i=new Date($('#eIn').value).getTime(),o=$('#eOut').value?new Date($('#eOut').value).getTime():null;
-          if(!i||(o&&o<=i))return toast('Heures incohérentes');e.in=i;if(o)e.out=o;else delete e.out;{const r=$('#eRep').value;e.repas=!!r;if(r)e.repasType=r;else delete e.repasType}if($('#eAv')){if($('#eAv').checked)e.avOk=1;else delete e.avOk}e.edit=a.nom+' le '+frD(todayS());savePts(d);closeInfo();renderPoint();toast('Pointage corrigé')};
+          if(!i||(o&&o<=i))return toast('Heures incohérentes');{const oo=e.out;e.in=i;if(o)e.out=o;else delete e.out;if(e.out!==oo){delete e.supp;delete e.autoFin}}{const r=$('#eRep').value;e.repas=!!r;if(r)e.repasType=r;else delete e.repasType}if($('#eAv')){if($('#eAv').checked)e.avOk=1;else delete e.avOk}e.edit=a.nom+' le '+frD(todayS());savePts(d);closeInfo();renderPoint();toast('Pointage corrigé')};
         $('#eDel').onclick=()=>{if(!confirm('Supprimer ce pointage ?'))return;PTS[d]=PTS[d].filter(x=>x.id!==e.id);if(e.photo)photoDel(e.photo);if(e.photoIn)photoDel(e.photoIn);savePts(d);closeInfo();renderPoint();toast('Pointage supprimé')}})}})}
 function savePhoto(name,dataUrl){const b64=dataUrl.split(',')[1];
   if(native()&&Android.saveBase64){Android.saveBase64(name,b64,'image/jpeg');return}
