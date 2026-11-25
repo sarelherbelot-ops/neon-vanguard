@@ -423,7 +423,7 @@ body.readonly #roBar{display:block!important}
       <label style="width:190px">Date<input type="date" id="cmDate"></label>
       <div class="grow"><b>Statut :</b> <label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt1" style="width:auto"> À commander</label><label class="row" style="display:inline-flex;gap:6px;margin-right:14px"><input type="checkbox" id="cmSt2" style="width:auto"> Validé patron</label><label class="row" style="display:inline-flex;gap:6px"><input type="checkbox" id="cmSt3" style="width:auto"> Transmis à la direction</label></div>
     </div>
-    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="btn ghost" id="cmClear" style="color:#b45309;border-color:#f59e0b">☐ Tout décocher</button><button class="adm-only btn ghost" id="cmEdit">✏️ Modifier la liste</button><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
+    <div class="row" style="margin-top:8px"><span class="meta grow" id="cmSum"></span><button class="btn ghost" id="cmClear" style="color:#b45309;border-color:#f59e0b">☐ Tout décocher</button><button class="adm-only btn ghost" id="cmEdit">✏️ Modifier la liste</button><button class="btn ghost" id="cmCopy">↺ Reprendre la dernière commande</button><button class="btn ok" id="cmWa" style="background:#16a34a">💬 Envoyer sur WhatsApp</button><button class="adm-only btn ghost" id="cmWaNum">📞 N° WhatsApp</button><button class="btn ok" id="cmPrint">📤 Imprimer / envoyer au patron</button></div>
   </div>
   <div id="cmCats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-items:start"></div>
   <div class="card"><b>Articles supplémentaires / notes patron</b><textarea id="cmExtra" rows="4" placeholder="ex : 2 kg de champignons, nouvelle marque de crème…"></textarea></div>
@@ -1389,6 +1389,18 @@ $('#cmClear').onclick=()=>{const o=cmGet(),n=Object.values(o.items||{}).filter(x
     <p style="font-size:18px;background:#fef3c7;border-radius:10px;padding:10px 12px">⚠ Le patron a-t-il bien <b>reçu la commande</b> ?</p>
     <div class="row" style="margin-top:12px"><span class="grow"></span><button class="btn ghost" id="iClose">Non, annuler</button><button class="btn danger" id="cmClrOk">Oui, le patron a la commande — tout décocher</button></div>`,
   ()=>{$('#cmClrOk').onclick=()=>{const o=cmGet();for(const k in o.items||{}){o.items[k].c=false;o.items[k].q=''}o.st={};o.extra='';cmSave(o);clearTimeout(cmT);put('co:'+cmKey(),o);closeInfo();renderCmd();toast('Toutes les cases sont décochées ✔')}})};
+/* Envoi de la commande sur WhatsApp : message déjà rédigé, il ne reste qu'à appuyer sur Envoyer */
+function cmWaText(){const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[],L=[];
+  for(const c of cats)for(const it of c.items){const x=(o.items||{})[it.id];if(x&&x.c)L.push('- '+it.nom+((x.q||'').trim()?' : '+x.q.trim():''))}
+  if(!L.length)return '';
+  return 'Bonjour,\nVoici notre commande du '+frD(cmDay)+' :\n\n'+L.join('\n')+((o.extra||'').trim()?'\n\n'+o.extra.trim():'')+'\n\nMerci et bonne journée.\n'+(CFG.nom||'')}
+$('#cmWa').onclick=()=>{const t=cmWaText();if(!t)return toast('Aucun article coché dans cette commande');
+  const n=String(CFG.waNum||'').replace(/\D/g,''),url='https://wa.me/'+n+'?text='+encodeURIComponent(t);
+  if(!n)toast('Choisis le contact dans WhatsApp (ou enregistre son numéro avec « 📞 N° WhatsApp »)');
+  if(native()&&window.Android&&Android.openUrl)Android.openUrl(url);else open(url,'_blank')};
+$('#cmWaNum').onclick=async()=>{const a=await askAuth('Numéro WhatsApp du fournisseur',['admin']);if(!a)return;
+  const v=prompt('Numéro WhatsApp du fournisseur (Feld), avec l\'indicatif, ex : +41 79 123 45 67\n(laisser vide pour choisir le contact à chaque fois)',CFG.waNum||'');if(v==null)return;
+  CFG.waNum=v.trim();put('cfg',CFG);toast(CFG.waNum?'✔ Numéro enregistré':'Numéro effacé')};
 $('#cmDate').onchange=e=>{if(e.target.value){cmDay=e.target.value;renderCmd()}};
 [['#cmSt1','a'],['#cmSt2','v'],['#cmSt3','t']].forEach(([q,k])=>$(q).onchange=e=>{const o=cmGet();o.st=o.st||{};o.st[k]=e.target.checked;cmSave(o)});
 $('#cmExtra').oninput=e=>{const o=cmGet();o.extra=e.target.value;cmSave(o)};
