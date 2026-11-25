@@ -1097,7 +1097,7 @@ function RESTRICT(){let a=null;try{a=ACC()}catch(e){}if(!a||!a.user)return false
 let roPrev=null;function applyRestrict(){const r=RESTRICT(),ro=RO();document.body.classList.toggle('restricted',r);document.body.classList.toggle('readonly',ro);
   {const b=document.getElementById('roBar');if(b&&ro){const u=CUR_U(),nx=nextDuty(u);b.textContent='📱 Accès à distance : consultation seulement.'+(u&&u.role!=='boss'?(nx!=null?' Tu pourras pointer et tout utiliser à partir de '+pad(Math.floor(nx/60))+'h'+pad(nx%60)+'.':' Tu pourras pointer et tout utiliser pendant tes heures prévues au planning.'):' Tout se fait sur la tablette du restaurant.')}}
   if(roPrev!==null&&roPrev!==ro){roPrev=ro;try{show(VIEW)}catch(e){}}roPrev=ro;if(r&&VIEW==='params')show('jour')}
-function refresh(){applyRestrict();chatCheck();try{ptCheck()}catch(e){}resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();if(VIEW==='stock'&&document.activeElement!==$('#ivQ'))renderStock();if(VIEW==='avis')renderAvis();try{avCheck();avRingCheck()}catch(e){}oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
+function refresh(){try{ivAlertCheck()}catch(e){}applyRestrict();chatCheck();try{ptCheck()}catch(e){}resaBanner();if(VIEW==='resa')renderResa();if(VIEW==='hotel')renderHotel();if(VIEW==='cmd'&&!cmTyping())renderCmd();if(VIEW==='stock'&&document.activeElement!==$('#ivQ'))renderStock();if(VIEW==='avis')renderAvis();try{avCheck();avRingCheck()}catch(e){}oubliBadge();if(VIEW==='jour')renderDay();if(VIEW==='point')renderPoint();if(VIEW==='semaine')renderWeek();if(VIEW==='cal')renderCal();if(VIEW==='pdj')renderPdj();if(VIEW==='instr'&&!$('#mInfo').classList.contains('show'))renderInstr()}
 
 /* ===================== VUE SEMAINE ===================== */
 function weekDays(m){const out=[];for(let i=0;i<7;i++){const s=addD(m,i);if(i<6||!isClosed(s))out.push(s)}return out}
@@ -2360,19 +2360,24 @@ $('#pAvBtn').onclick=async()=>{const d=todayS(),L=staff().filter(u=>u.role!=='bo
       $('#avOk').onclick=()=>go(false);$('#avDel').onclick=()=>go(true)})};
 /* ======== STOCK : produits + mouvements, lecture des codes-barres (EAN-13 / EAN-8 / UPC) ======== */
 const ivProds=()=>(IVS.p||[]).filter(x=>!x.del);
-const ivMoves=()=>{const L=[];for(const k in IVS)if(k!=='p')L.push(...(IVS[k]||[]));return L.sort((a,b)=>a.ts-b.ts)};
+const ivMoves=()=>{const L=[];for(const k in IVS)if(k!=='p'&&!k.startsWith('al_'))L.push(...(IVS[k]||[]));return L.sort((a,b)=>a.ts-b.ts)};
 function ivStock(){const q={};for(const m of ivMoves()){if(m.set!=null)q[m.pid]=m.set;else q[m.pid]=(q[m.pid]||0)+m.d}return q}
 const ivBy=()=>{const c=CUR_U();return c?c.nom:MAIN()?chMyName():'Tablette'};
 function ivSaveP(p){p.ts=Date.now();const L=IVS.p=IVS.p||[];const i=L.findIndex(x=>x.id===p.id);if(i<0)L.push(p);else L[i]=p;put('iv:p',L)}
 function ivMove(pid,o){const ts=Date.now(),mo=ymd(new Date(ts)).slice(0,7);const m=Object.assign({id:'m'+ts.toString(36)+Math.random().toString(36).slice(2,5),pid,ts,by:ivBy()},o);(IVS[mo]=IVS[mo]||[]).push(m);put('iv:'+mo,IVS[mo]);ivAutoCmd(pid)}
-/* Alerte WhatsApp au boss : message déjà rédigé, il ne reste qu'à appuyer sur Envoyer */
-function ivWaUrl(p,n){const num=String(CFG.waBoss||'').replace(/\D/g,'');
-  const t='Bonjour Régnier,\n⚠ Stock bas : '+p.nom+' — il en reste '+n+(p.unit?' '+p.unit:'')+'.\nIl faut commander'+(p.caisse?' (1 caisse = '+p.caisse+').':'.')+'\n'+(CFG.nom||'');
+/* Alerte WhatsApp au boss : s'affiche UNIQUEMENT sur le téléphone principal (l'alerte est synchronisée), message déjà rédigé, il ne reste qu'à appuyer sur Envoyer */
+function ivWaUrl(a){const num=String(CFG.waBoss||'').replace(/\D/g,'');
+  const t='Bonjour Régnier,\n⚠ Stock bas : '+a.nom+' — il en reste '+a.n+(a.unit?' '+a.unit:'')+'.\nIl faut commander'+(a.caisse?' (1 caisse = '+a.caisse+').':'.')+'\n'+(CFG.nom||'');
   return 'https://wa.me/'+num+'?text='+encodeURIComponent(t)}
-function ivWaAlert(p,n){try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
-  info(`<h2>⚠ Stock bas</h2><p style="font-size:20px"><b>${esc(p.nom)}</b> : il en reste <b style="color:#dc2626;font-size:30px">${n}</b> ${esc(p.unit||'')}</p><p class="meta">Un message est déjà rédigé pour Régnier. Appuie sur le bouton, WhatsApp s'ouvre, puis appuie sur Envoyer.${CFG.waBoss?'':'<br>Aucun numéro enregistré : tu choisiras le contact dans WhatsApp (ou utilise « 📞 N° WhatsApp du boss » dans Stock).'}</p>
+function ivAlertCheck(){if(!MAIN())return;if(!$('#mInfo').classList.contains('hidden')||($('#mAuth')&&!$('#mAuth').classList.contains('hidden')))return;
+  let seen={};try{seen=JSON.parse(localStorage.getItem('pn_alSeen')||'{}')}catch(e){}
+  const now=Date.now(),a=Object.keys(IVS).filter(k=>k.startsWith('al_')).map(k=>IVS[k]).filter(x=>x&&!x.done&&(!seen[x.id]||now-seen[x.id]>30*60e3)).sort((x,y)=>x.ts-y.ts)[0];
+  if(!a)return;seen[a.id]=now;localStorage.setItem('pn_alSeen',JSON.stringify(seen));ivWaAlert(a)}
+function ivWaAlert(a){try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
+  info(`<h2>⚠ Stock bas</h2><p style="font-size:20px"><b>${esc(a.nom)}</b> : il en reste <b style="color:#dc2626;font-size:30px">${a.n}</b> ${esc(a.unit||'')}</p><p class="meta">Un message est déjà rédigé pour Régnier. Appuie sur le bouton, WhatsApp s'ouvre, puis appuie sur Envoyer.${CFG.waBoss?'':'<br>Aucun numéro enregistré : tu choisiras le contact dans WhatsApp (ou utilise « 📞 N° WhatsApp du boss » dans Stock).'}</p>
     <div class="row" style="margin-top:12px"><button class="btn ghost" id="iClose">Plus tard</button><span class="grow"></span><button class="btn ok" id="ivWaGo" style="background:#16a34a;font-size:18px">💬 Envoyer à Régnier</button></div>`,
-    ()=>{$('#ivWaGo').onclick=()=>{const u=ivWaUrl(p,n);closeInfo();if(native()&&window.Android&&Android.openUrl)Android.openUrl(u);else open(u,'_blank')}})}
+    ()=>{$('#ivWaGo').onclick=()=>{const u=ivWaUrl(a);a.done=1;IVS['al_'+a.id]=a;put('iv:al_'+a.id,a);closeInfo();if(native()&&window.Android&&Android.openUrl)Android.openUrl(u);else open(u,'_blank')}})}
+setInterval(()=>{try{ivAlertCheck()}catch(e){}},15000);
 $('#ivWaNum').onclick=async()=>{const a=await askAuth('Numéro WhatsApp du boss',['admin']);if(!a)return;
   const v=prompt('Numéro WhatsApp de Régnier avec l\'indicatif, ex : +41 79 123 45 67\n(laisser vide pour choisir le contact à chaque fois)',CFG.waBoss||'');if(v==null)return;
   CFG.waBoss=v.trim();put('cfg',CFG);toast(CFG.waBoss?'✔ Numéro enregistré':'Numéro effacé')};
@@ -2380,7 +2385,7 @@ $('#ivWaNum').onclick=async()=>{const a=await askAuth('Numéro WhatsApp du boss'
 function ivAutoCmd(pid){try{const p=ivProds().find(x=>x.id===pid);if(!p||!ivHasMin(p))return;const n=ivStock()[pid]||0;
   if(n>+p.min){if(p.cmdAuto){p.cmdAuto=0;ivSaveP(p)}return}
   if(p.cmdAuto)return;
-  if(p.wa){p.cmdAuto=1;ivSaveP(p);setTimeout(()=>ivWaAlert(p,n),500);return}
+  if(p.wa){p.cmdAuto=1;ivSaveP(p);const a={id:'al'+Date.now().toString(36),pid:p.id,nom:p.nom,n,unit:p.unit||'',caisse:p.caisse||'',ts:Date.now(),done:0};IVS['al_'+a.id]=a;put('iv:al_'+a.id,a);toast('🔔 Alerte envoyée sur le téléphone principal');setTimeout(ivAlertCheck,700);return}
   const z=p.zone==='cuisine'?'cuisine':'salle';CFG.cmdCat=CFG.cmdCat||{};const L=CFG.cmdCat[z]=CFG.cmdCat[z]||[];
   let c=L.find(x=>x.id==='stk_'+z);if(!c){c={id:'stk_'+z,nom:'📦 Stock (auto)',col:'#b91c1c',items:[]};L.unshift(c)}
   const iid='sk_'+p.id;let it=c.items.find(x=>x.id===iid);if(!it){it={id:iid,nom:p.nom};c.items.push(it)}else it.nom=p.nom;put('cfg',CFG);
