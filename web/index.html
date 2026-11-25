@@ -2593,8 +2593,10 @@ let wbBuf='',wbT0=0,wbLast=0,wbEl=null,wbVal=null,wbTimer=null;
 function wbDone(){clearTimeout(wbTimer);const code=wbBuf.replace(/\D/g,'');const fast=wbBuf.length&&(wbLast-wbT0)/Math.max(1,wbBuf.length-1)<45;
   if(code.length>=6&&fast){if(wbEl&&wbVal!=null&&wbEl.value!=null)try{wbEl.value=wbVal;if(wbEl.id==='ivQ')renderStock()}catch(e){}wbBuf='';wbScan(code);return true}wbBuf='';return false}
 function wbScan(code){if(!$('#mScan').classList.contains('hidden')){if(scRes)scRes(code);return}
-  if(VIEW!=='stock'&&!STOCKONLY())return;if(RO())return toast('📱 Consultation seulement');if(!$('#mAuth').classList.contains('hidden'))return;
-  try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}if(!$('#mInfo').classList.contains('hidden'))closeInfo();ivCode(code)}
+  /* depuis n'importe quel onglet : le scan ouvre directement le stock du produit (sauf si une fenêtre est déjà ouverte ailleurs) */
+  if(RO())return toast('📱 Consultation seulement');if(!$('#mAuth').classList.contains('hidden'))return;
+  if(VIEW!=='stock'&&!STOCKONLY()&&!$('#mInfo').classList.contains('hidden'))return;
+  try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}if(!$('#mInfo').classList.contains('hidden'))closeInfo();if(VIEW!=='stock')show('stock');ivCode(code)}
 document.addEventListener('keydown',e=>{const now=Date.now();
   if(e.key==='Enter'||e.key==='Tab'){if(wbBuf.length>=6&&now-wbLast<120){if(wbDone()){e.preventDefault();e.stopPropagation()}}else wbBuf='';return}
   if(e.key&&e.key.length===1&&/[0-9A-Za-z]/.test(e.key)){if(now-wbLast>120||!wbBuf){wbBuf='';wbT0=now;wbEl=document.activeElement;wbVal=wbEl&&'value' in wbEl?wbEl.value:null}wbBuf+=e.key;wbLast=now;
