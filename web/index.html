@@ -401,7 +401,7 @@ body.readonly #roBar{display:block!important}
   <div class="card">
     <div class="row" style="gap:8px;flex-wrap:wrap"><h2 class="grow" style="margin:0">📦 Stock / inventaire</h2>
       <button class="btn ok" id="ivScan" style="font-size:17px">📷 Scanner un code-barre</button><button class="btn sec" id="ivNew">➕ Produit sans code</button>
-      <button class="btn ghost" id="ivHist">🕘 Mouvements</button><button class="btn ghost" id="ivPrint">🖨 Imprimer</button></div>
+      <button class="btn ghost" id="ivHist">🕘 Mouvements</button><button class="btn ghost" id="ivPrint">🖨 Imprimer</button><button class="adm-only btn ghost" id="ivWaNum">📞 N° WhatsApp du boss</button></div>
     <input id="ivQ" placeholder="🔎 Chercher un produit ou un code…" style="margin-top:10px">
     <p class="meta" id="ivSum"></p>
     <div id="ivList"></div>
@@ -2365,10 +2365,22 @@ function ivStock(){const q={};for(const m of ivMoves()){if(m.set!=null)q[m.pid]=
 const ivBy=()=>{const c=CUR_U();return c?c.nom:MAIN()?chMyName():'Tablette'};
 function ivSaveP(p){p.ts=Date.now();const L=IVS.p=IVS.p||[];const i=L.findIndex(x=>x.id===p.id);if(i<0)L.push(p);else L[i]=p;put('iv:p',L)}
 function ivMove(pid,o){const ts=Date.now(),mo=ymd(new Date(ts)).slice(0,7);const m=Object.assign({id:'m'+ts.toString(36)+Math.random().toString(36).slice(2,5),pid,ts,by:ivBy()},o);(IVS[mo]=IVS[mo]||[]).push(m);put('iv:'+mo,IVS[mo]);ivAutoCmd(pid)}
+/* Alerte WhatsApp au boss : message déjà rédigé, il ne reste qu'à appuyer sur Envoyer */
+function ivWaUrl(p,n){const num=String(CFG.waBoss||'').replace(/\D/g,'');
+  const t='Bonjour Régnier,\n⚠ Stock bas : '+p.nom+' — il en reste '+n+(p.unit?' '+p.unit:'')+'.\nIl faut commander'+(p.caisse?' (1 caisse = '+p.caisse+').':'.')+'\n'+(CFG.nom||'');
+  return 'https://wa.me/'+num+'?text='+encodeURIComponent(t)}
+function ivWaAlert(p,n){try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
+  info(`<h2>⚠ Stock bas</h2><p style="font-size:20px"><b>${esc(p.nom)}</b> : il en reste <b style="color:#dc2626;font-size:30px">${n}</b> ${esc(p.unit||'')}</p><p class="meta">Un message est déjà rédigé pour Régnier. Appuie sur le bouton, WhatsApp s'ouvre, puis appuie sur Envoyer.${CFG.waBoss?'':'<br>Aucun numéro enregistré : tu choisiras le contact dans WhatsApp (ou utilise « 📞 N° WhatsApp du boss » dans Stock).'}</p>
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="iClose">Plus tard</button><span class="grow"></span><button class="btn ok" id="ivWaGo" style="background:#16a34a;font-size:18px">💬 Envoyer à Régnier</button></div>`,
+    ()=>{$('#ivWaGo').onclick=()=>{const u=ivWaUrl(p,n);closeInfo();if(native()&&window.Android&&Android.openUrl)Android.openUrl(u);else open(u,'_blank')}})}
+$('#ivWaNum').onclick=async()=>{const a=await askAuth('Numéro WhatsApp du boss',['admin']);if(!a)return;
+  const v=prompt('Numéro WhatsApp de Régnier avec l\'indicatif, ex : +41 79 123 45 67\n(laisser vide pour choisir le contact à chaque fois)',CFG.waBoss||'');if(v==null)return;
+  CFG.waBoss=v.trim();put('cfg',CFG);toast(CFG.waBoss?'✔ Numéro enregistré':'Numéro effacé')};
 /* Commande automatique : quand le stock atteint le minimum (une caisse), le produit est coché dans la commande du jour */
 function ivAutoCmd(pid){try{const p=ivProds().find(x=>x.id===pid);if(!p||!ivHasMin(p))return;const n=ivStock()[pid]||0;
   if(n>+p.min){if(p.cmdAuto){p.cmdAuto=0;ivSaveP(p)}return}
   if(p.cmdAuto)return;
+  if(p.wa){p.cmdAuto=1;ivSaveP(p);setTimeout(()=>ivWaAlert(p,n),500);return}
   const z=p.zone==='cuisine'?'cuisine':'salle';CFG.cmdCat=CFG.cmdCat||{};const L=CFG.cmdCat[z]=CFG.cmdCat[z]||[];
   let c=L.find(x=>x.id==='stk_'+z);if(!c){c={id:'stk_'+z,nom:'📦 Stock (auto)',col:'#b91c1c',items:[]};L.unshift(c)}
   const iid='sk_'+p.id;let it=c.items.find(x=>x.id===iid);if(!it){it={id:iid,nom:p.nom};c.items.push(it)}else it.nom=p.nom;put('cfg',CFG);
@@ -2397,12 +2409,13 @@ function ivEdit(id,code){const p=id?ivProds().find(x=>x.id===id):{id:'iv'+Date.n
       <div style="width:120px"><label>Unité</label><input id="ivU" value="${esc(p.unit||'')}" placeholder="bouteilles"></div><div style="width:110px"><label>Minimum</label><input id="ivMin" type="number" inputmode="numeric" value="${p.min??''}" placeholder="—"></div></div>
     <div class="row" style="gap:8px;flex-wrap:wrap"><div style="width:150px"><label>Par caisse</label><input id="ivCs" type="number" inputmode="numeric" value="${p.caisse??''}" placeholder="ex : 6, 12, 24"></div>
       <div class="grow"><label>Commande automatique dans</label><select id="ivZ"><option value="salle" ${p.zone==='cuisine'?'':'selected'}>Commande salle</option><option value="cuisine" ${p.zone==='cuisine'?'selected':''}>Commande cuisine</option></select></div></div>
+    <label class="row" style="gap:8px;margin-top:8px;font-size:16px"><input type="checkbox" id="ivWa" ${p.wa?'checked':''} style="width:22px;height:22px;margin:0"> <span>💬 Prévenir <b>Régnier</b> sur WhatsApp quand le stock est bas (à la place de la commande Feld)</span></label>
     <p class="meta">Quand le stock descend au <b>Minimum</b> (ou à « Par caisse » si le minimum est vide), le produit se coche tout seul dans la commande du jour.</p>
     ${nw?`<label>Quantité reçue maintenant</label><input id="ivQ0" type="number" inputmode="numeric" value="${code?1:0}">`:''}
     ${!nw&&!p.code?`<button class="btn ghost sm" id="ivAddCode" style="margin-top:8px">📷 Ajouter un code-barre</button>`:''}
     <div class="row" style="margin-top:12px">${!nw?'<button class="btn danger" id="ivDel">🗑 Supprimer</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="ivSave">Enregistrer</button></div>`,
     ()=>{setTimeout(()=>{const n=$('#ivN');if(n&&!n.disabled)n.focus()},80);
-      $('#ivSave').onclick=()=>{const n=$('#ivN').value.trim();if(!n)return toast('Mets le nom du produit');Object.assign(p,{nom:n,cat:$('#ivC').value.trim(),unit:$('#ivU').value.trim(),min:$('#ivMin').value===''?'':+$('#ivMin').value,caisse:$('#ivCs').value===''?'':+$('#ivCs').value,zone:$('#ivZ').value});if(p.min===''&&p.caisse)p.min=p.caisse;ivSaveP(p);
+      $('#ivSave').onclick=()=>{const n=$('#ivN').value.trim();if(!n)return toast('Mets le nom du produit');Object.assign(p,{nom:n,cat:$('#ivC').value.trim(),unit:$('#ivU').value.trim(),min:$('#ivMin').value===''?'':+$('#ivMin').value,caisse:$('#ivCs').value===''?'':+$('#ivCs').value,zone:$('#ivZ').value,wa:$('#ivWa').checked?1:0});if(p.min===''&&p.caisse)p.min=p.caisse;ivSaveP(p);
         if(nw){const q0=+($('#ivQ0').value||0);if(q0)ivMove(p.id,{d:q0,t:'in'})}closeInfo();renderStock();toast('✔ '+n+(nw?' ajouté au stock':' enregistré'));if(!nw)ivOpen(p.id)};
       const ac=$('#ivAddCode');if(ac)ac.onclick=async()=>{closeInfo();const c=await scanCode();if(!c)return ivEdit(id);const o=ivFind(c);if(o&&o.id!==p.id){toast('Ce code est déjà pour : '+o.nom);return ivEdit(id)}p.code=c;ivSaveP(p);ivEdit(id)};
       const dl=$('#ivDel');if(dl)dl.onclick=async()=>{closeInfo();const a=MAIN()?{nom:chMyName()}:await askAuth('Supprimer '+p.nom,['admin']);if(!a)return;p.del=1;ivSaveP(p);renderStock();toast('🗑 '+p.nom+' supprimé')}})}
