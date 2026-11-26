@@ -2379,9 +2379,9 @@ $('#ivWaNum').onclick=async()=>{const a=await askAuth('Numéro WhatsApp du boss'
   const v=prompt('Numéro WhatsApp de Régnier avec l\'indicatif, ex : +41 79 123 45 67\n(laisser vide pour choisir le contact à chaque fois)',CFG.waBoss||'');if(v==null)return;
   CFG.waBoss=v.trim();put('cfg',CFG);toast(CFG.waBoss?'✔ Numéro enregistré':'Numéro effacé')};
 /* Commande automatique : quand il en reste moins que le minimum choisi, la case du produit est cochée dans la commande du jour */
-function ivAutoCmd(pid){try{const p=ivProds().find(x=>x.id===pid);if(!p||!ivHasMin(p))return;const n=ivStock()[pid]||0;
-  if(n>=+p.min){if(p.cmdAuto){p.cmdAuto=0;ivSaveP(p)}return}
-  if(p.cmdAuto)return;
+function ivAutoCmd(pid,force){try{const p=ivProds().find(x=>x.id===pid);if(!p||!ivHasMin(p))return;const n=ivStock()[pid]||0;
+  if(!force&&n>=+p.min){if(p.cmdAuto){p.cmdAuto=0;ivSaveP(p)}return}
+  if(p.cmdAuto&&!force)return;
   if(p.wa){p.cmdAuto=1;ivSaveP(p);const a={id:'al'+Date.now().toString(36),pid:p.id,nom:p.nom,n,unit:p.unit||'',caisse:p.caisse||'',ts:Date.now(),done:0};IVS['al_'+a.id]=a;put('iv:al_'+a.id,a);toast('🔔 Alerte envoyée sur le téléphone principal');setTimeout(ivAlertCheck,700);return}
   const z=p.zone==='cuisine'?'cuisine':'salle';CFG.cmdCat=CFG.cmdCat||{};const L=CFG.cmdCat[z]=CFG.cmdCat[z]||[];
   let c=L.find(x=>x.id==='stk_'+z);if(!c){c={id:'stk_'+z,nom:'📦 Stock (auto)',col:'#b91c1c',items:[]};L.unshift(c)}
@@ -2393,13 +2393,21 @@ function ivAutoCmd(pid){try{const p=ivProds().find(x=>x.id===pid);if(!p||!ivHasM
   const day=todayS(),key=ez+'-'+day,o=CMD[key]||{date:day,zone:ez,items:{},extra:'',st:{}};o.items=o.items||{};
   o.items[iid]={c:true,q:p.caisse?'1 caisse ('+p.caisse+')':'1 caisse'};o.st=o.st||{};o.st.a=true;o.ts=Date.now();CMD[key]=o;put('co:'+key,o);
   p.cmdAuto=1;ivSaveP(p);toast('🛒 '+p.nom+' coché dans la commande '+ez)}catch(e){}}
+function ivLowList(){const Q=ivStock(),L=ivProds().filter(p=>ivHasMin(p)&&(Q[p.id]||0)<+p.min).sort((a,b)=>(a.cat||'~').localeCompare(b.cat||'~')||a.nom.localeCompare(b.nom));
+  if(!L.length)return toast('Rien à commander');
+  info(`<h2>🛒 À commander (${L.length})</h2><p class="meta">Moins que le minimum. Appuie sur « Ajouter » pour cocher le produit dans la commande.</p>
+    ${L.map(p=>`<div class="row" style="gap:8px;border-top:1px solid var(--line);padding:8px 0"><div class="grow"><b>${esc(p.nom)}</b><div class="meta">Stock : <b style="color:#dc2626">${Q[p.id]||0}</b> · minimum ${esc(String(p.min))} ${esc(p.unit||'')}</div></div>${p.cmdAuto?'<span style="color:#15803d;font-weight:700">✔ dans la commande</span>':`<button class="btn ok sm" data-la="${p.id}">➕ Ajouter</button>`}</div>`).join('')}
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="iClose">Fermer</button><span class="grow"></span><button class="btn ok" id="laAll">➕ Tout ajouter</button></div>`,
+    ()=>{const one=b=>{ivAutoCmd(b.dataset.la,true);const r=b.parentElement;b.outerHTML='<span style="color:#15803d;font-weight:700">✔ dans la commande</span>'};
+      document.querySelectorAll('[data-la]').forEach(b=>b.onclick=()=>one(b));
+      $('#laAll').onclick=()=>{document.querySelectorAll('[data-la]').forEach(b=>one(b));toast('✔ Tout est dans la commande')}})}
 const ivFind=code=>ivProds().find(p=>p.code&&p.code===code);
 const ivHasMin=p=>p.min!==''&&p.min!=null;
 function renderStock(){const Q=ivStock(),q=($('#ivQ').value||'').trim().toLowerCase();
   const P=ivProds().filter(p=>!q||p.nom.toLowerCase().includes(q)||(p.code||'').includes(q)||(p.cat||'').toLowerCase().includes(q)).sort((a,b)=>(a.cat||'~').localeCompare(b.cat||'~')||a.nom.localeCompare(b.nom));
-  const low=ivProds().filter(p=>ivHasMin(p)&&(Q[p.id]||0)<=+p.min);
-  $('#ivSum').innerHTML=`${ivProds().length} produit(s)`+(low.length?` · <b style="color:#dc2626">⚠ ${low.length} à commander</b>`:'');
-  let cat=null,h='';for(const p of P){if((p.cat||'')!==cat){cat=p.cat||'';h+=`<h3 style="margin:14px 0 4px">${esc(cat||'Sans catégorie')}</h3>`}const n=Q[p.id]||0,lo=ivHasMin(p)&&n<=+p.min;
+  const low=ivProds().filter(p=>ivHasMin(p)&&(Q[p.id]||0)<+p.min);
+  $('#ivSum').innerHTML=`${ivProds().length} produit(s)`+(low.length?` · <button class="btn danger sm" id="ivLow" style="margin-left:4px">⚠ ${low.length} à commander — voir</button>`:'');const lb=$('#ivLow');if(lb)lb.onclick=ivLowList;
+  let cat=null,h='';for(const p of P){if((p.cat||'')!==cat){cat=p.cat||'';h+=`<h3 style="margin:14px 0 4px">${esc(cat||'Sans catégorie')}</h3>`}const n=Q[p.id]||0,lo=ivHasMin(p)&&n<+p.min;
     h+=`<div class="row" data-ivp="${p.id}" style="border:1px solid var(--line);border-radius:12px;padding:10px;margin:6px 0;cursor:pointer;${lo?'border-color:#dc2626;background:#fef2f2':''}"><div class="grow"><b>${esc(p.nom)}</b><div class="meta">${p.code?'▮▯▮ '+esc(p.code):'sans code'}${ivHasMin(p)?' · minimum '+p.min:''}</div></div><b style="font-size:24px;${lo?'color:#dc2626':''}">${n}</b><span class="meta" style="margin-left:4px">${esc(p.unit||'')}</span></div>`}
   $('#ivList').innerHTML=h||'<p class="meta">Aucun produit. Appuie sur « 📷 Scanner un code-barre » pour ajouter la première bouteille.</p>';
   $('#ivList').querySelectorAll('[data-ivp]').forEach(el=>el.onclick=()=>ivOpen(el.dataset.ivp))}
