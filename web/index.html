@@ -3004,21 +3004,24 @@ function openSyncModal(fromStart){if(cloudOn()&&RESTRICT()){info(`<h2>☁️ Syn
 let APPV=0;
 const SHELL_MIN=92; // version minimale de la coque Android pour cette interface (à monter seulement si le code Java change)
 let updWait=0;
+/* recharge l'interface ; sur le web, adresse neuve pour passer outre le cache ; jamais plus de 2 essais pour la même version */
+function reloadApp(n){let k=0;try{k=+sessionStorage.getItem('pn_try'+n)||0;sessionStorage.setItem('pn_try'+n,String(k+1))}catch(e){}if(k>=2){toast('Mise à jour n° '+n+' en cours de publication : réessaie dans 2 minutes');return}
+  if(native())location.reload();else location.replace(location.pathname+'?v='+n+location.hash)}
 /* recharge l'appli dès qu'on ne fait rien (pas de fenêtre ouverte, pas de saisie en cours) */
 function reloadWhenIdle(n){if(updWait)return;updWait=setInterval(()=>{const busy=!$('#mInfo').classList.contains('hidden')||($('#mAuth')&&!$('#mAuth').classList.contains('hidden'))||/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'');
-  if(busy)return;clearInterval(updWait);localStorage.setItem('pn_updDone',String(n));location.reload()},15000)}
+  if(busy)return;clearInterval(updWait);localStorage.setItem('pn_updDone',String(n));reloadApp(n)},4000)}
 const UPD='https://raw.githubusercontent.com/sarelherbelot-ops/neon-vanguard/plan-nettoyage-apk/';
 async function checkUpdate(manual){try{const r=await fetch(UPD+'version.txt?t='+Date.now(),{cache:'no-store'});
     if(!r.ok){if(manual)toast('Erreur '+r.status);return}
     const n=parseInt((await r.text()).trim())||0;
     if(n>APPV){
-      if(!native()){if(manual){toast('Nouvelle version n° '+n+' : installation…');localStorage.setItem('pn_updDone',String(n));setTimeout(()=>location.reload(),1200);return}reloadWhenIdle(n);return}
+      if(!native()){if(manual){toast('Nouvelle version n° '+n+' : installation…');localStorage.setItem('pn_updDone',String(n));setTimeout(()=>reloadApp(n),1200);return}reloadWhenIdle(n);return}
       if(window.Android&&Android.saveWeb&&Android.shellVer){
         const h=await (await fetch(UPD+'web/index.html?t='+Date.now(),{cache:'no-store'})).text(),m=h.match(/const SHELL_MIN=(\d+)/),need=m?+m[1]:1e9;
-        if(Android.shellVer()>=need&&Android.saveWeb(h,n)){if(manual){toast('Mise à jour n° '+n+' : installation…');localStorage.setItem('pn_updDone',String(n));setTimeout(()=>location.reload(),1200);return}reloadWhenIdle(n);return}}
+        if(Android.shellVer()>=need&&Android.saveWeb(h,n)){if(manual){toast('Mise à jour n° '+n+' : installation…');localStorage.setItem('pn_updDone',String(n));setTimeout(()=>reloadApp(n),1200);return}reloadWhenIdle(n);return}}
       showUpdate('n° '+n,'https://github.com/sarelherbelot-ops/neon-vanguard/raw/plan-nettoyage-apk/PlanNettoyage.apk')}
     else if(manual)toast('Appli à jour (n° '+APPV+')')}
-  catch(e){if(manual)toast('Pas de connexion internet')}}
+  catch(e){if(manual)toast(navigator.onLine===false?'Pas de connexion internet':'Mise à jour impossible : '+(e&&e.message||e))}}
 function showUpdate(tag,url){if(RESTRICT())return;let b=$('#updBar');if(!b){b=document.createElement('div');b.id='updBar';
     b.style.cssText='background:#1d4ed8;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';document.body.insertBefore(b,$('main'))}
   b.innerHTML=`<b class="grow">🔄 Nouvelle version ${esc(tag)} disponible</b><button class="btn sm" style="background:#fff;color:#1d4ed8" id="updGo">Télécharger et installer</button><button class="btn sm ghost" id="updLater">Plus tard</button>`;
@@ -3076,7 +3079,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   CLOUD.__gh=all['gh:state']||null;
   startSync();
   setTimeout(cleanupTickets,20000);setTimeout(()=>{try{ocrWorker().catch(()=>{})}catch(e){}},12000);setInterval(cleanupTickets,6*3600e3);
-  if(localStorage.getItem('pn_autoupd')!=='0'){setTimeout(()=>checkUpdate(false),5000);setInterval(()=>checkUpdate(false),30*60e3)}
+  if(localStorage.getItem('pn_autoupd')!=='0'){setTimeout(()=>checkUpdate(false),1500);setInterval(()=>checkUpdate(false),5*60e3);let lastUp=Date.now();document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastUp>60e3&&localStorage.getItem('pn_autoupd')!=='0'){lastUp=Date.now();checkUpdate(false)}})}
   {const u=localStorage.getItem('pn_updDone');if(u){localStorage.removeItem('pn_updDone');setTimeout(()=>toast('✔ Mise à jour n° '+u+' installée automatiquement'),1500)}}
   window.addEventListener('hashchange',()=>{if((location.hash||'').startsWith('#inscription'))location.reload()});
   /* lien d'inscription : …/web/#inscription=compte → appareil remis à zéro puis connexion au compte du restaurant */
