@@ -468,6 +468,10 @@ body.readonly #roBar{display:block!important}
       <div class="row" style="margin-top:8px"><label class="grow">Semaine<input type="date" id="rcWeek"></label><button class="btn sec" id="rcSee" style="align-self:flex-end">👁 Voir / imprimer</button><button class="btn ok" id="rcNow" style="align-self:flex-end">📧 Envoyer</button></div></div>
     <div class="card"><h2>💾 Sauvegarde automatique chaque soir</h2><p class="meta" id="bkTxt"></p>
       <div class="row" style="margin-top:8px"><button class="btn sec hidden" id="bkDir">📁 Choisir le dossier sur ce PC</button><span class="grow"></span><button class="btn ok" id="bkNow">💾 Sauvegarder maintenant</button></div></div>
+    <div class="card"><h2>🗂 Sauvegarde hebdomadaire des contrôles HACCP</h2><p class="meta">Fiches de nettoyage salle et cuisine, températures et réception des marchandises : un fichier par semaine, enregistré dans <b>Téléchargements/Restaurant/Sauvegardes</b> du téléphone (s'ouvre dans le navigateur, imprimable).</p>
+      <label class="row" style="gap:8px;margin:6px 0;font-size:16px"><input type="checkbox" id="hcAuto" style="width:22px;height:22px;margin:0"> <span>Sauvegarde <b>automatique chaque semaine</b> sur cet appareil (le lundi)</span></label>
+      <p class="meta" id="hcTxt"></p>
+      <div class="row" style="margin-top:6px"><span class="grow"></span><button class="btn ghost" id="hcPrev">🗂 Semaine dernière</button><button class="btn ok" id="hcNow">💾 Cette semaine</button></div></div>
     <div class="card" style="border:2px solid #dc2626"><div class="row"><h2 class="grow" style="color:#dc2626">⚠ Tâches non faites à la fermeture</h2><button class="btn sec sm" id="oVu">Marquer comme vu</button></div><div id="oList"></div></div>
     <div class="card"><h2>🧾 Tickets de clôture refusés</h2><p class="meta">Chaque photo de ticket refusée à la fermeture, avec la raison. Les photos de tickets (refusés et validés) sont gardées 2 jours, puis supprimées. Toucher pour voir la photo.</p><div id="tkrList"></div></div>
     <div class="card">
@@ -1253,6 +1257,23 @@ async function backupHTML(){const T=todayS(),a=CFG.start&&CFG.start<T?CFG.start:
   return`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Sauvegarde ${esc(CFG.nom)} — ${frD(T)}</title><style>${css}
     body{background:#fff;padding:10px}#printArea{display:block!important}.pg{margin-bottom:30px;border-bottom:3px dashed #ccc;padding-bottom:20px}</style></head>
     <body><div id="printArea"><div class="pg"><h1>Sauvegarde du ${frD(T)} à ${hhmm(Date.now())}</h1><p>${esc(CFG.nom)} — toutes les feuilles du ${frD(a)} au ${frD(T)} : nettoyage salle et cuisine, températures, réception des marchandises, planning, feuilles d'heures, réservations, hôtel.</p><p>Pour imprimer : Ctrl + P. Pour remettre les données dans l'appli : Réglages → Restaurer, avec le fichier <b>.json</b> du même jour.</p></div>${body}${resa}${hot}</div></body></html>`}
+/* sauvegarde hebdomadaire des contrôles HACCP (nettoyage, températures, réceptions) : un fichier par semaine dans Téléchargements/Restaurant/Sauvegardes */
+const HCAUTO=()=>{const v=localStorage.getItem('pn_hcAuto');return v==null?(typeof MAIN==='function'&&MAIN()&&native()):v==='1'};
+async function haccpHTML(a,b){const body=await dossierHTML(a,b,['salle','cuisine','temp','recep']);
+  const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n').replace(/@media print\s*\{/g,'@media all{');
+  return`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Contrôles HACCP ${esc(CFG.nom)} — ${frD(a)} au ${frD(b)}</title><style>${css}
+    body{background:#fff;padding:10px}#printArea{display:block!important}.pg{margin-bottom:30px;border-bottom:3px dashed #ccc;padding-bottom:20px}</style></head>
+    <body><div id="printArea"><div class="pg"><h1>Contrôles HACCP — du ${frD(a)} au ${frD(b)}</h1><p>${esc(CFG.nom)} — nettoyage salle et cuisine, températures, réception des marchandises. Enregistré le ${frD(todayS())} à ${hhmm(Date.now())}. Pour imprimer : menu du navigateur → Imprimer.</p></div>${body}</div></body></html>`}
+async function haccpBackup(which,quiet){try{const T=todayS(),mo=monday(T);let a,b;if(which==='prev'){a=addD(mo,-7);b=addD(mo,-1)}else{a=mo;b=T}
+    const h=await haccpHTML(a,b),nm='HACCP_semaine_'+a+'.html';
+    if(native()&&Android.saveBackup)Android.saveBackup(nm,h,'text/html');
+    else{const u=URL.createObjectURL(new Blob([h],{type:'text/html'})),l=document.createElement('a');l.href=u;l.download=nm;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+    localStorage.setItem('pn_hcAt',Date.now());if(which==='prev')localStorage.setItem('pn_hcWk',a);renderHc();if(!quiet)toast('✔ Enregistré : '+nm);return true}
+  catch(e){if(!quiet)toast('⚠ Sauvegarde impossible : '+(e.message||e));return false}}
+function renderHc(){const c=$('#hcAuto');if(!c)return;c.checked=HCAUTO();const at=+localStorage.getItem('pn_hcAt')||0;$('#hcTxt').innerHTML='Dernière sauvegarde HACCP : <b>'+(at?frD(ymd(new Date(at)))+' à '+hhmm(at):'jamais')+'</b>'}
+function hcAutoCheck(){if(!HCAUTO()||!native()||!Android.saveBackup)return;const prev=addD(monday(todayS()),-7);if((localStorage.getItem('pn_hcWk')||'')>=prev)return;if(CFG.start&&addD(prev,6)<CFG.start)return;haccpBackup('prev',true)}
+if($('#hcNow')){$('#hcNow').onclick=()=>haccpBackup('cur');$('#hcPrev').onclick=()=>haccpBackup('prev');$('#hcAuto').onchange=e=>{localStorage.setItem('pn_hcAuto',e.target.checked?'1':'0');if(e.target.checked)hcAutoCheck();renderHc()};setTimeout(renderHc,800)}
+setTimeout(hcAutoCheck,45000);setInterval(hcAutoCheck,3*3600e3);
 let PCDIR=null;
 async function pcDirGet(){if(PCDIR)return PCDIR;if(!idb)return null;return new Promise(res=>{try{const q=idb.transaction(ST).objectStore(ST).get('fsdir');q.onsuccess=()=>{PCDIR=q.result||null;res(PCDIR)};q.onerror=()=>res(null)}catch(e){res(null)}})}
 async function pcWrite(dir,name,content){const f=await dir.getFileHandle(name,{create:true});const w=await f.createWritable();await w.write(content);await w.close()}
@@ -1907,7 +1928,7 @@ window.onNativeSaved=(ok,where)=>toast(ok?'Enregistré dans '+where:'Erreur d\'e
 
 /* ===================== REGLAGES ===================== */
 $('#tpOpen').onclick=()=>{tpUnlock=Date.now()+10*60000;show('tips')};
-$('#pinOk').onclick=async()=>{if(!await askAuth('Accès administrateur',['admin']))return;$('#lockBox').classList.add('hidden');$('#paramBox').classList.remove('hidden');renderParams();renderBk();renderWebAcc();$('#rcMail').value=CFG.recapMail||'';$('#rcWeek').value=addD(monday(todayS()),-7);$('#oList').innerHTML=oubliHTML()};
+$('#pinOk').onclick=async()=>{if(!await askAuth('Accès administrateur',['admin']))return;$('#lockBox').classList.add('hidden');$('#paramBox').classList.remove('hidden');renderParams();renderBk();renderHc();renderWebAcc();$('#rcMail').value=CFG.recapMail||'';$('#rcWeek').value=addD(monday(todayS()),-7);$('#oList').innerHTML=oubliHTML()};
 $('#rcSave').onclick=()=>{const v=$('#rcMail').value.trim();if(v&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return toast('Adresse e-mail invalide');CFG.recapMail=v;put('cfg',CFG);toast(v?'Adresse enregistrée : '+v:'Adresse effacée')};
 $('#rcSee').onclick=()=>{const m=monday($('#rcWeek').value||todayS());$('#printArea').innerHTML='<style>@page{size:A4;margin:8mm}</style>'+recapHTML(m);outDoc('Récap semaine '+isoWeek(m),0)};
 $('#rcNow').onclick=()=>{if(!CFG.recapMail&&!$('#rcMail').value.trim())return toast('Indique d\'abord ton adresse e-mail');if(!CFG.recapMail){CFG.recapMail=$('#rcMail').value.trim();put('cfg',CFG)}sendRecap(monday($('#rcWeek').value||todayS()))};
