@@ -303,6 +303,7 @@ body.readonly #roBar{display:block!important}
   <div id="myPlan" class="card hidden" style="border:2px solid #2563eb"></div>
   <div id="pRemote" class="hidden cons c-b" style="margin-bottom:8px">📱 Accès à distance : pointage possible sur ton téléphone seulement pendant tes heures prévues au planning (ou sur la tablette).</div>
   <div id="pSupp" class="adm-only"></div>
+  <div id="pTkv" class="adm-only"></div>
   <div class="pgrid" id="pGrid"></div>
   <div class="adm-only row" style="margin-top:8px"><button class="btn sec" id="pAvBtn">⏩ Plus tôt / ➕ Ajouter des heures</button><span class="meta grow">Faire commencer quelqu'un plus tôt, ou faire venir quelqu'un qui n'est pas au planning (ex : besoin d'une personne en plus ce soir).</span></div>
   <div class="card" style="margin-top:14px">
@@ -2007,9 +2008,14 @@ setInterval(()=>{if(VIEW==='point')tick()},1000);
 function renderMyPlan(){const el=$('#myPlan');if(!el)return;const me=RO()&&CUR_U();el.classList.toggle('hidden',!me);if(!me)return;const T=todayS();
   const wk=m=>[...Array(7).keys()].map(i=>{const d=addD(m,i),h=planStr(me.id,d);return`<tr style="${d===T?'background:#eff6ff;font-weight:700':''}"><td style="padding:6px 8px;border-bottom:1px solid var(--line)">${JOURS[wd(d)]} ${frD(d).slice(0,5)}${d===T?' · aujourd\'hui':''}</td><td style="padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-size:17px">${h?esc(h):'<span class="meta">repos</span>'}</td></tr>`}).join('');
   const m=monday(T);el.innerHTML=`<h2 style="margin:0 0 6px">📅 Mon planning — ${esc(me.nom)}</h2><table style="width:100%;border-collapse:collapse"><tr><th colspan="2" style="text-align:left;padding:4px 8px;background:#f1f5f9">Cette semaine</th></tr>${wk(m)}<tr><th colspan="2" style="text-align:left;padding:4px 8px;background:#f1f5f9">Semaine prochaine</th></tr>${wk(addD(m,7))}</table><p class="meta" style="margin-top:6px">Le planning de toute l'équipe est plus bas.</p>`}
+function tkvList(){const L=[],lim=addD(todayS(),-14);for(const d in PTS){if(d<lim)continue;for(const e of PTS[d]||[])if(e.tkv==='att'&&e.photo)L.push({d,e})}return L.sort((a,b)=>a.e.out-b.e.out)}
+function renderTkv(){const b=$('#pTkv');if(!b)return;const L=tkvList();b.innerHTML=L.length?`<div class="card" style="border-left:5px solid #2563eb;margin-bottom:8px"><b>🧾 Tickets de clôture à valider (${L.length})</b>${L.map(({d,e})=>`<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><div class="row"><span class="grow">${esc(e.nom)} — ${frD(d)} · fin <b>${hhmm(e.out)}</b></span></div><img data-ph="${e.photo}" style="width:100%;max-height:50vh;object-fit:contain;border-radius:10px;border:1px solid var(--line);margin:6px 0;background:#f1f5f9"><div class="row"><button class="btn danger sm" data-tkn="${d}|${e.id}">✖ Refuser</button><span class="grow"></span><button class="btn ok" data-tky="${d}|${e.id}">✔ Valider</button></div></div>`).join('')}</div>`:'';
+  b.querySelectorAll('img[data-ph]').forEach(async im=>{const x=await photoGet(im.dataset.ph);if(x)im.src=x});
+  const dec=(k,v)=>{const[d,id]=k.split('|');const e=(PTS[d]||[]).find(x=>x.id===id);if(!e)return;e.tkv=v;if(v==='non')e.edit=(e.edit?e.edit+' · ':'')+'ticket de clôture refusé par le responsable';savePts(d);toast(v==='ok'?'✔ Ticket validé':'Ticket refusé');renderTkv();if(VIEW==='point'&&typeof renderPH==='function')renderPH()};
+  b.querySelectorAll('[data-tky]').forEach(x=>x.onclick=()=>dec(x.dataset.tky,'ok'));b.querySelectorAll('[data-tkn]').forEach(x=>x.onclick=()=>dec(x.dataset.tkn,'non'))}
 function renderSupp(){const b=$('#pSupp');if(!b)return;const L=suppList();b.innerHTML=L.length?`<div class="card" style="border-left:5px solid #f59e0b;margin-bottom:8px"><b>⏳ Heures de fin à valider (${L.length})</b>${L.map(({d,e})=>`<div class="row" style="margin-top:6px"><span class="grow">${esc(e.nom)} — ${frD(d)} : fini à <b>${hhmm(e.out)}</b>, prévu ${hhmm(e.supp.fin)} (+${mins(e.supp.min)})</span><button class="btn ok sm" data-sp="${d}|${e.id}">Valider</button></div>`).join('')}</div>`:'';
   b.querySelectorAll('[data-sp]').forEach(x=>x.onclick=()=>{const[d,id]=x.dataset.sp.split('|');suppDecide(d,id)})}
-function renderPoint(){setTimeout(oubliBadge,0);tick();renderMyPlan();renderSupp();
+function renderPoint(){setTimeout(oubliBadge,0);tick();renderMyPlan();renderSupp();renderTkv();
   $('#pRemote')&&$('#pRemote').classList.toggle('hidden',!remoteNoPunch());$('#pGrid').innerHTML=staff().map(u=>{const o=openShift(u.id);
     return `<button class="pbtn ${o?'in':''}" data-u="${u.id}"><b>${esc(u.nom)}</b>
       <span class="meta">${o?'Présent depuis '+hhmm(o.e.in)+(o.d!==todayS()?' ('+frD(o.d)+')':''):'Absent'}${poste(u)==='salle'?' · 🍽 Salle':poste(u)==='chef'?' · 👨‍🍳 Chef':' · 👨‍🍳 Cuisine'}${u.libre?' · sans tâches':''}</span>
@@ -2081,7 +2087,7 @@ async function punch(uid){if(RESTRICT()&&!remoteNoPunch()&&uid!==(CUR_U()||{}).i
     delete PENDCK[uid];photo='ph'+Date.now().toString(36);await photoPut(photo,ck.img)}
   o.e.out=ck?Math.max(ck.ts,tk.end||0):tk?Math.max(Date.now(),tk.end||0):Date.now();o.e.repas=!!repas;if(repas)o.e.repasType=repas;else delete o.e.repasType;if(photo)o.e.photo=photo;
   if(ferm&&zf==='cuisine'){o.e.fermCuis=true;if(tk.by){o.e.oubli=tk.left||[];o.e.ozone='cuisine';o.e.edit='fermé la cuisine sans faire les tâches'}}
-  else if(ferm){o.e.ferm=true;o.e.outSrc=ck.src;o.e.clot=ck.ts;if(tk.end>ck.ts){o.e.outSrc='taches';o.e.choresEnd=tk.end}const notes=[];if(ck.by)notes.push('fermeture validée sans ticket par '+ck.by);if(tk.by){notes.push('fermé sans faire les tâches');o.e.oubli=tk.left||[]}if(notes.length)o.e.edit=notes.join(' · ')}
+  else if(ferm){o.e.ferm=true;o.e.outSrc=ck.src;o.e.clot=ck.ts;if(ck.val)o.e.tkv='att';if(tk.end>ck.ts){o.e.outSrc='taches';o.e.choresEnd=tk.end}const notes=[];if(ck.by)notes.push('fermeture validée sans ticket par '+ck.by);if(tk.by){notes.push('fermé sans faire les tâches');o.e.oubli=tk.left||[]}if(notes.length)o.e.edit=notes.join(' · ')}
   if(mt.left){o.e.oubli=(o.e.oubli||[]).concat(mt.left);o.e.ozone=o.e.ozone||mt.zone;o.e.edit=(o.e.edit?o.e.edit+' · ':'')+'parti sans faire sa tâche de ménage'}
   if(mt.end&&!ck)o.e.out=Math.max(o.e.out,mt.end);
   suppMark(o.d,o.e);
@@ -2315,31 +2321,18 @@ function busy(msg){let b=$('#busyOv');if(!msg){if(b)b.remove();return}
 async function closingTicket(u){
   for(;;){const img=await takePhoto(u.nom,'🧾 Ticket « Clôture de période »',u.nom+' — imprimer la « Clôture de période » sur la caisse et la prendre en photo, bien à plat, toute la partie du haut visible (titre, date et heure).');
     if(!img)return null;
-    const tPhoto=Date.now();let R=null,err=null;busy('Lecture du ticket (la 1re fois : jusqu\'à 30 s)');
-    try{R=await readTicket(img)}catch(e){err=e}finally{busy(null)}
-    const T=todayS(),Y=addD(T,-1);let pb=[],ts=null,src='photo';
-    if(err)pb.push('lecture impossible sur cet appareil ('+(err.message||err)+')');
-    /* « Clôture de période » + date du jour + heure : l'heure de la clôture = l'heure de fin (ex : clôture 21h50, photo 22h00 → fini à 21h50) */
-    else{if(!R.clot)pb.push('ce n\'est pas un ticket « Clôture de période »');
-      if(R.date&&R.date!==T&&R.date!==Y)pb.push('le ticket date du '+frD(R.date)+' : il faut la clôture du jour même');
-      if(R.time&&!pb.length){let t=parse(R.date||T).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;if(!R.date&&t>tPhoto+10*60000)t-=864e5;
-        if(t<=tPhoto+10*60000&&tPhoto-t<5*36e5){ts=t;src='ticket'}}}
+    const tPhoto=Date.now();
     /* fermeture de la caisse interdite avant l'heure minimale (21h00 par défaut) ; après minuit c'est permis */
-    if(!pb.length){const fm=(CFG.fermMin||'21:00').split(':').map(Number),mn=fm[0]*60+(fm[1]||0),x=new Date(ts||tPhoto),xm=x.getHours()*60+x.getMinutes();
-      if(xm>=6*60&&xm<mn)pb.push('fermeture de la caisse interdite avant '+(CFG.fermMin||'21:00').replace(':','h')+' (ticket à '+hhmm(x.getTime())+')')}
-    if(!pb.length){ts=ts||tPhoto;
-      const ok=await new Promise(res=>info(`<h2>✔ Clôture de période reconnue</h2>
-        <p>${R.date?'Date : <b>'+frD(R.date)+'</b><br>':''}Fin de service : <b style="font-size:22px">${hms(ts)}</b><br><span class="meta">${src==='ticket'?'heure lue sur le ticket':'heure de la photo (l\'heure du ticket n\'a pas pu être lue avec certitude)'}</span></p>
+    {const fm=(CFG.fermMin||'21:00').split(':').map(Number),mn=fm[0]*60+(fm[1]||0),x=new Date(tPhoto),xm=x.getHours()*60+x.getMinutes();
+      if(xm>=6*60&&xm<mn){const ch=await new Promise(res=>info(`<h2>⛔ Trop tôt pour fermer la caisse</h2><p>La caisse ne peut pas être fermée avant ${esc((CFG.fermMin||'21:00').replace(':','h'))} (il est ${hhmm(tPhoto)}).</p>
+          <div class="row"><button class="btn ghost" id="ckX">Annuler</button><span class="grow"></span><button class="btn ok" id="ckRe">📸 Reprendre la photo plus tard</button></div>`,()=>{$('#ckRe').onclick=()=>{closeInfo();res('re')};$('#ckX').onclick=()=>{closeInfo();res(null)}}));
+        if(ch==='re')continue;return null}}
+    const ok=await new Promise(res=>info(`<h2>✔ Ticket photographié</h2>
+        <img src="${img}" style="width:100%;max-height:45vh;object-fit:contain;border-radius:10px;border:1px solid var(--line)">
+        <p>Fin de service : <b style="font-size:22px">${hms(tPhoto)}</b><br><span class="meta">Le responsable validera le ticket.</span></p>
         <div class="row"><button class="btn ghost" id="ckRe">Reprendre la photo</button><span class="grow"></span><button class="btn ok" id="ckOk">✔ Valider le départ</button></div>`,
         ()=>{$('#ckOk').onclick=()=>{closeInfo();res(true)};$('#ckRe').onclick=()=>{closeInfo();res(false)}}));
-      if(ok)return{img,ts,src};continue}
-    {const pid='tk'+Date.now().toString(36);photoPut(pid,img);const mo=T.slice(0,7);(TKR[mo]=TKR[mo]||[]).push({id:pid,ts:tPhoto,nom:u.nom,why:pb,photo:pid,lu:R?{clot:R.clot,date:R.date,time:R.time,txt:(R.txt||'').slice(0,600)}:null});put('tr:'+mo,TKR[mo])}
-    const ch=await new Promise(res=>info(`${pb.some(x=>/interdite avant/.test(x))?`<h2>⛔ Trop tôt pour fermer la caisse</h2><p>${pb.map(esc).join('<br>')}</p><p class="meta">La caisse ne peut pas être fermée avant ${esc((CFG.fermMin||'21:00').replace(':','h'))}. Refais la clôture à partir de cette heure.</p>`:`<h2>⚠ Ticket non reconnu</h2><p>${pb.map(esc).join('<br>')}</p><p class="meta">Imprime la « Clôture de période » et reprends la photo bien à plat, sans reflet, avec le titre, la date et l'heure visibles.</p>`}
-      <div class="row"><button class="btn ghost" id="ckX">Annuler</button><button class="btn sec" id="ckAdm">Valider quand même (admin)</button><span class="grow"></span><button class="btn ok" id="ckRe">📸 Reprendre la photo</button></div>`,
-      ()=>{$('#ckRe').onclick=()=>{closeInfo();res('re')};$('#ckX').onclick=()=>{closeInfo();res(null)};$('#ckAdm').onclick=()=>{closeInfo();res('adm')}}));
-    if(ch==='re')continue;if(!ch)return null;
-    const a=await askAuth('Valider la fermeture sans ticket reconnu',['admin']);if(!a)continue;
-    return{img,ts:tPhoto,src:'admin',by:a.nom}}}
+    if(ok)return{img,ts:tPhoto,src:'photo',val:true}}}
 
 setInterval(()=>{try{applyRestrict()}catch(e){}},60000);
 $('#pAvBtn').onclick=async()=>{const d=todayS(),L=staff().filter(u=>u.role!=='boss');if(!L.length)return toast('Aucun employé');
@@ -2685,7 +2678,7 @@ function renderPH(){const R=phRows(),tot={};
   $('#phTotals').innerHTML=Object.keys(tot).length?'<b>Total sur la période :</b> '+Object.entries(tot).map(([n,t])=>`${esc(n)} <b>${dur(t)}</b> · 🍽 ${rp[n]||0} repas${lt[n]?` <span class="late">(${lt[n].n} retard${lt[n].n>1?'s':''}, ${mins(lt[n].m)})</span>`:''}`).join(' · '):'';
   $('#phList').innerHTML=R.length?`<table class="ptab"><tr><th>Date</th><th>Compte</th><th>Prévu</th><th>Arrivée</th><th>Retard</th><th>Départ</th><th>Pause</th><th>Heures comptées</th><th>Repas</th><th>Rapport de caisse</th></tr>`+
     R.slice().reverse().map(({d,e})=>`<tr class="click" data-d="${d}" data-id="${e.id}"><td>${JOURS[wd(d)].slice(0,3)} ${frD(d)}</td><td>${esc(e.nom)}${e.imp?' <span class="meta" title="importé d\'une feuille">📄</span>':''}</td><td class="meta">${planTxt(e.uid,d)||'—'}</td><td>${hms(e.in)}</td><td>${lateCell(d,e)}</td>
-    <td>${e.out?hms(e.out)+(ymd(new Date(e.out))!==d?' (+1j)':'')+suppTxt(e)+(e.autoFin?'<div style="color:#dc2626;font-weight:700">⚠ départ oublié : mis à l\'heure de fin du planning</div>':'')+(e.oubli?`<div style="color:#dc2626;font-weight:700">⚠ tâches non faites : ${esc(e.oubli.join(', '))}</div>`:'')+(e.ferm?`<div class="meta">🧾 clôture${e.choresEnd?' à '+hhmm(e.clot)+' + 🧹 tâches finies':e.outSrc==='ticket'?' (heure du ticket)':e.outSrc==='admin'?' (validée admin)':''}</div>`:''):'<span style="color:var(--grn)">en cours</span>'}</td><td class="meta">${pauseFor(d,e)?pTxt(d,e):''}</td><td>${e.out?dur(countedDur(d,e)):''}</td><td>${e.repas?(e.repasType==='emporter'?'🥡 à emporter':'🍽 sur place'):e.repas===false?'<span class="meta">non</span>':''}</td>
+    <td>${e.out?hms(e.out)+(ymd(new Date(e.out))!==d?' (+1j)':'')+suppTxt(e)+(e.tkv==='att'?'<div style="color:#b45309;font-weight:700">⏳ ticket de clôture à valider</div>':e.tkv==='non'?'<div style="color:#dc2626;font-weight:700">✖ ticket de clôture refusé</div>':e.tkv==='ok'?'<div style="color:#15803d">✔ ticket de clôture validé</div>':'')+(e.autoFin?'<div style="color:#dc2626;font-weight:700">⚠ départ oublié : mis à l\'heure de fin du planning</div>':'')+(e.oubli?`<div style="color:#dc2626;font-weight:700">⚠ tâches non faites : ${esc(e.oubli.join(', '))}</div>`:'')+(e.ferm?`<div class="meta">🧾 clôture${e.choresEnd?' à '+hhmm(e.clot)+' + 🧹 tâches finies':e.outSrc==='ticket'?' (heure du ticket)':e.outSrc==='admin'?' (validée admin)':''}</div>`:''):'<span style="color:var(--grn)">en cours</span>'}</td><td class="meta">${pauseFor(d,e)?pTxt(d,e):''}</td><td>${e.out?dur(countedDur(d,e)):''}</td><td>${e.repas?(e.repasType==='emporter'?'🥡 à emporter':'🍽 sur place'):e.repas===false?'<span class="meta">non</span>':''}</td>
     <td>${e.photoIn?`<img class="thumb" title="Flash Info" data-ph="${e.photoIn}"> `:''}${e.photo?`<img class="thumb" title="Caisse" data-ph="${e.photo}">`:''}</td></tr>`).join('')+'</table>':'<p class="meta">Aucun pointage sur cette période.</p>';
   $('#phList').querySelectorAll('img[data-ph]').forEach(async im=>{im.src=await photoGet(im.dataset.ph)||''});
   $('#phList').querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>showPunch(tr.dataset.d,tr.dataset.id))}
