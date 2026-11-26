@@ -2378,17 +2378,21 @@ setInterval(()=>{try{ivAlertCheck()}catch(e){}},15000);
 $('#ivWaNum').onclick=async()=>{const a=await askAuth('Numéro WhatsApp du boss',['admin']);if(!a)return;
   const v=prompt('Numéro WhatsApp de Régnier avec l\'indicatif, ex : +41 79 123 45 67\n(laisser vide pour choisir le contact à chaque fois)',CFG.waBoss||'');if(v==null)return;
   CFG.waBoss=v.trim();put('cfg',CFG);toast(CFG.waBoss?'✔ Numéro enregistré':'Numéro effacé')};
-/* Commande automatique : quand le stock atteint le minimum (une caisse), le produit est coché dans la commande du jour */
+/* Commande automatique : quand il en reste moins que le minimum choisi, la case du produit est cochée dans la commande du jour */
 function ivAutoCmd(pid){try{const p=ivProds().find(x=>x.id===pid);if(!p||!ivHasMin(p))return;const n=ivStock()[pid]||0;
-  if(n>+p.min){if(p.cmdAuto){p.cmdAuto=0;ivSaveP(p)}return}
+  if(n>=+p.min){if(p.cmdAuto){p.cmdAuto=0;ivSaveP(p)}return}
   if(p.cmdAuto)return;
   if(p.wa){p.cmdAuto=1;ivSaveP(p);const a={id:'al'+Date.now().toString(36),pid:p.id,nom:p.nom,n,unit:p.unit||'',caisse:p.caisse||'',ts:Date.now(),done:0};IVS['al_'+a.id]=a;put('iv:al_'+a.id,a);toast('🔔 Alerte envoyée sur le téléphone principal');setTimeout(ivAlertCheck,700);return}
   const z=p.zone==='cuisine'?'cuisine':'salle';CFG.cmdCat=CFG.cmdCat||{};const L=CFG.cmdCat[z]=CFG.cmdCat[z]||[];
   let c=L.find(x=>x.id==='stk_'+z);if(!c){c={id:'stk_'+z,nom:'📦 Stock (auto)',col:'#b91c1c',items:[]};L.unshift(c)}
-  const iid='sk_'+p.id;let it=c.items.find(x=>x.id===iid);if(!it){it={id:iid,nom:p.nom};c.items.push(it)}else it.nom=p.nom;put('cfg',CFG);
-  const day=todayS(),key=z+'-'+day,o=CMD[key]||{date:day,zone:z,items:{},extra:'',st:{}};o.items=o.items||{};
+  /* on coche d'abord la case déjà existante du produit dans la liste de commande (même nom), sinon on le range dans « Stock (auto) » */
+  const nz=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,''),pn=nz(p.nom);let ex=null,ez=z;
+  if(pn.length>=3)for(const zz of [z,z==='cuisine'?'salle':'cuisine']){for(const cat of (CFG.cmdCat[zz]||[])){if(cat.id==='stk_'+zz)continue;for(const x of (cat.items||[])){const xn=nz(x.nom);if(xn&&(xn===pn||(Math.min(xn.length,pn.length)>=4&&(xn.includes(pn)||pn.includes(xn))))){ex=x;ez=zz;break}}if(ex)break}if(ex)break}
+  if(ex&&!c.items.length){const k=L.indexOf(c);if(k>=0)L.splice(k,1)}
+  const iid=ex?ex.id:'sk_'+p.id;if(!ex){let it=c.items.find(x=>x.id===iid);if(!it){it={id:iid,nom:p.nom};c.items.push(it)}else it.nom=p.nom;put('cfg',CFG)}
+  const day=todayS(),key=ez+'-'+day,o=CMD[key]||{date:day,zone:ez,items:{},extra:'',st:{}};o.items=o.items||{};
   o.items[iid]={c:true,q:p.caisse?'1 caisse ('+p.caisse+')':'1 caisse'};o.st=o.st||{};o.st.a=true;o.ts=Date.now();CMD[key]=o;put('co:'+key,o);
-  p.cmdAuto=1;ivSaveP(p);toast('🛒 '+p.nom+' ajouté à la commande '+z)}catch(e){}}
+  p.cmdAuto=1;ivSaveP(p);toast('🛒 '+p.nom+' coché dans la commande '+ez)}catch(e){}}
 const ivFind=code=>ivProds().find(p=>p.code&&p.code===code);
 const ivHasMin=p=>p.min!==''&&p.min!=null;
 function renderStock(){const Q=ivStock(),q=($('#ivQ').value||'').trim().toLowerCase();
