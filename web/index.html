@@ -2282,20 +2282,24 @@ async function ocrWorker(){if(OCRW)return OCRW;if(ocrLoading)return ocrLoading;
   try{return await ocrLoading}finally{ocrLoading=null}}
 const MOISRX=['janv','f[ée]v','mars','avr','mai','juin','juil','ao[uû]','sept','oct','nov','d[ée]c'];
 /* lit le ticket : est-ce une clôture ? de quel jour ? à quelle heure ? */
-async function readTicket(dataUrl){const w=await Promise.race([ocrWorker(),new Promise((_,ko)=>setTimeout(()=>ko(new Error('délai')),45000))]);
+async function readTicket(dataUrl){const w=await Promise.race([ocrWorker(),new Promise((_,ko)=>setTimeout(()=>ko(new Error('délai')),120000))]);
   await w.setParameters({tessedit_char_whitelist:'',tessedit_pageseg_mode:'3'});
-  // nettoyage de la photo : canal rouge (les taches rouges / roses disparaissent, le texte noir reste), contraste
-  const clean=await new Promise(res=>{const i=new Image();i.onload=()=>{const k=Math.min(2.2,Math.max(1,1800/Math.max(i.width,i.height))),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);
-      const x=c.getContext('2d');x.drawImage(i,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),a=d.data;
-      for(let j=0;j<a.length;j+=4){let v=a[j];v=v<110?0:v>185?255:Math.round((v-110)*255/75);a[j]=a[j+1]=a[j+2]=v}x.putImageData(d,0,0);res(c.toDataURL('image/png'))};i.onerror=()=>res(dataUrl);i.src=dataUrl});
-  let txt='';for(const src of [clean,dataUrl]){const r=await w.recognize(src);txt+='\n'+(r.data.text||'');const f=txt.toLowerCase();if(/\d{1,2}\s?[:.;]\s?\d\d\s?[:.;]\s?\d\d/.test(f)&&/cl[o0]\s*t\s*[uü]\s*r/.test(f.replace(/[^a-z0-9ü]/g,'')))break}
+  // plusieurs versions de la photo, de la plus nette à la plus brute : on s'arrête dès que la clôture, la date et l'heure sont lues
+  const prep=(src,mode,ang)=>new Promise(res=>{const i=new Image();i.onload=()=>{const k=Math.min(2.4,Math.max(1,1800/Math.max(i.width,i.height))),c=document.createElement('canvas'),W=Math.round(i.width*k),H=Math.round(i.height*k),r=(ang||0)*Math.PI/180,cw=Math.round(Math.abs(W*Math.cos(r))+Math.abs(H*Math.sin(r))),ch=Math.round(Math.abs(W*Math.sin(r))+Math.abs(H*Math.cos(r)));c.width=ang?cw:W;c.height=ang?ch:H;
+      const x=c.getContext('2d');if(ang){x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.translate(c.width/2,c.height/2);x.rotate(r);x.drawImage(i,-W/2,-H/2,W,H)}else x.drawImage(i,0,0,W,H);const d=x.getImageData(0,0,c.width,c.height),a=d.data;let lo=255,hi=0;
+      if(mode==='gray'){const h=new Uint32Array(256);for(let j=0;j<a.length;j+=4){h[a[j]]++}let n=a.length/4,c1=0;for(let v=0;v<256;v++){c1+=h[v];if(c1>n*0.02){lo=v;break}}c1=0;for(let v=255;v>=0;v--){c1+=h[v];if(c1>n*0.35){hi=v;break}}if(hi<=lo+20){lo=60;hi=200}}
+      for(let j=0;j<a.length;j+=4){let v=a[j];if(mode==='clean')v=v<110?0:v>185?255:Math.round((v-110)*255/75);else if(mode==='gray')v=Math.max(0,Math.min(255,Math.round((v-lo)*255/(hi-lo))));a[j]=a[j+1]=a[j+2]=v}x.putImageData(d,0,0);res(c.toDataURL('image/png'))};i.onerror=()=>res(src);i.src=src});
+  let txt='';const okTxt=f=>{const n=f.replace(/[^a-z0-9ü]/g,'');return /\d{1,2}\s?[:.;]\s?\d\d\s?[:.;]\s?\d\d/.test(f)&&(/cl[o0]\s*t\s*[uü]\s*r/.test(n)||/fondsde/.test(n))};
+  for(const [mode,ang] of [['clean',0],['gray',0],['raw',0],['gray',-7],['gray',7],['clean',-14],['clean',14],['gray',-3],['gray',3]]){const src=mode==='raw'?dataUrl:await prep(dataUrl,mode,ang);const r=await w.recognize(src);txt+='\n'+(r.data.text||'');if(okTxt(txt.toLowerCase())||(/flash\s?inf/.test(txt.toLowerCase().replace(/[^a-z ]/g,''))&&!/fonds/.test(txt.toLowerCase())))break}
   const flat=txt.toLowerCase().replace(/\s+/g,' '),ns=flat.replace(/[^a-z0-9éü]/g,'');
   /* « Clôture de période » même mal lu (« clotur e ad per coud ») ; un ticket de vente n'a pas de fonds de caisse initial/final */
-  const res={txt,clot:/cl[o0][tf][uü]?r/.test(ns)||/p[eé]r[i1l]od/.test(ns)||(/fondsde/.test(ns)&&/(initial|final)/.test(ns)&&/tickets?/.test(ns))};
+  const fonds=/fondsde/.test(ns)&&/(initial|final)/.test(ns),flash=/flash\s?inf|flashinf/.test(ns);const res={txt,clot:!flash&&(/cl[o0][tf][uü]?r/.test(ns)||/dep[eé]r[i1l][o0]d/.test(ns))||(fonds&&!flash)};
   const now=new Date(),T=todayS(),y=now.getFullYear();
   // date : forme numérique 2026-11-21 ou « samedi 21 novembre 2026 »
   let ds=null;const m1=flat.match(/(20\d\d)\D{1,2}(\d\d)\D{1,2}(\d\d)/);if(m1){const c=m1[1]+'-'+m1[2]+'-'+m1[3];if(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(c))ds=c}
   if(!ds){const m2=flat.match(/(\d{1,2})\s+([a-zéû]{3,9})\.?\s+(20\d\d)/);if(m2){const mi=MOISRX.findIndex(x=>new RegExp('^'+x).test(m2[2]));if(mi>=0)ds=m2[3]+'-'+pad(mi+1)+'-'+pad(+m2[1])}}
+  /* date lue de travers (ex. 2008-11-01) : on l'ignore plutôt que de refuser un bon ticket ; seule une date lue de façon crédible, de cette année et différente, est refusée */
+  if(ds&&+ds.slice(0,4)!==y&&+ds.slice(0,4)!==y-1)ds=null;
   res.date=ds;
   // heure : sur la ligne de la date numérique, après la date
   let tm=null;if(m1){const after=flat.slice(flat.indexOf(m1[0])+m1[0].length,flat.indexOf(m1[0])+m1[0].length+14);const m3=after.match(/(\d{1,2})\s?[:.;]\s?(\d\d)(?:\s?[:.;]\s?(\d\d))?/);
@@ -2311,7 +2315,7 @@ function busy(msg){let b=$('#busyOv');if(!msg){if(b)b.remove();return}
 async function closingTicket(u){
   for(;;){const img=await takePhoto(u.nom,'🧾 Ticket « Clôture de période »',u.nom+' — imprimer la « Clôture de période » sur la caisse et la prendre en photo, bien à plat, toute la partie du haut visible (titre, date et heure).');
     if(!img)return null;
-    const tPhoto=Date.now();let R=null,err=null;busy('Lecture du ticket');
+    const tPhoto=Date.now();let R=null,err=null;busy('Lecture du ticket (la 1re fois : jusqu\'à 30 s)');
     try{R=await readTicket(img)}catch(e){err=e}finally{busy(null)}
     const T=todayS(),Y=addD(T,-1);let pb=[],ts=null,src='photo';
     if(err)pb.push('lecture impossible sur cet appareil ('+(err.message||err)+')');
@@ -2319,7 +2323,7 @@ async function closingTicket(u){
     else{if(!R.clot)pb.push('ce n\'est pas un ticket « Clôture de période »');
       if(R.date&&R.date!==T&&R.date!==Y)pb.push('le ticket date du '+frD(R.date)+' : il faut la clôture du jour même');
       if(R.time&&!pb.length){let t=parse(R.date||T).getTime()+((R.time.h*60+R.time.mi)*60+R.time.s)*1000;if(!R.date&&t>tPhoto+10*60000)t-=864e5;
-        if(t<=tPhoto+10*60000){ts=t;src='ticket'}}}
+        if(t<=tPhoto+10*60000&&tPhoto-t<5*36e5){ts=t;src='ticket'}}}
     /* fermeture de la caisse interdite avant l'heure minimale (21h00 par défaut) ; après minuit c'est permis */
     if(!pb.length){const fm=(CFG.fermMin||'21:00').split(':').map(Number),mn=fm[0]*60+(fm[1]||0),x=new Date(ts||tPhoto),xm=x.getHours()*60+x.getMinutes();
       if(xm>=6*60&&xm<mn)pb.push('fermeture de la caisse interdite avant '+(CFG.fermMin||'21:00').replace(':','h')+' (ticket à '+hhmm(x.getTime())+')')}
@@ -3071,7 +3075,7 @@ function migrateCfg(){let ch=0;if(CFG.cmdCat&&!CFG.cmdSalle2){CFG.cmdCat.salle=C
   for(const k in all)if(k.startsWith('cl:')&&all[k]!=null)CLOUD[k.slice(3)]=all[k];
   CLOUD.__gh=all['gh:state']||null;
   startSync();
-  setTimeout(cleanupTickets,20000);setInterval(cleanupTickets,6*3600e3);
+  setTimeout(cleanupTickets,20000);setTimeout(()=>{try{ocrWorker().catch(()=>{})}catch(e){}},12000);setInterval(cleanupTickets,6*3600e3);
   if(localStorage.getItem('pn_autoupd')!=='0'){setTimeout(()=>checkUpdate(false),5000);setInterval(()=>checkUpdate(false),30*60e3)}
   {const u=localStorage.getItem('pn_updDone');if(u){localStorage.removeItem('pn_updDone');setTimeout(()=>toast('✔ Mise à jour n° '+u+' installée automatiquement'),1500)}}
   window.addEventListener('hashchange',()=>{if((location.hash||'').startsWith('#inscription'))location.reload()});
