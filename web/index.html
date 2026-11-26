@@ -1408,17 +1408,32 @@ $('#cmDate').onchange=e=>{if(e.target.value){cmDay=e.target.value;renderCmd()}};
 $('#cmExtra').oninput=e=>{const o=cmGet();o.extra=e.target.value;cmSave(o)};
 $('#cmCopy').onclick=()=>{const prev=Object.keys(CMD).filter(k=>k.startsWith(cmZone+'-')&&k<cmKey()).sort().pop();if(!prev)return toast('Pas de commande précédente');
   if(!confirm('Reprendre les articles de la commande du '+frD(prev.slice(cmZone.length+1))+' ?'))return;const o=cmGet(),P=CMD[prev];o.items=JSON.parse(JSON.stringify(P.items||{}));cmSave(o);renderCmd()};
-$('#cmPrint').onclick=()=>{const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[],ck=v=>v?'☑':'☐';
+/* à quel fournisseur va un article : vins, Feld (samedi), magasin ou le 20 — d'après la rubrique, le produit du stock (même nom) ou le nom */
+function cmGroup(it,c){const nz=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,''),P=ivProds(),n=nz(it.nom);
+  let p=P.find(x=>'sk_'+x.id===it.id)||P.find(x=>nz(x.nom)===n)||(n.length>=4?P.find(x=>{const xn=nz(x.nom);return xn.length>=4&&(xn.includes(n)||n.includes(xn))}):null);
+  if((p&&p.wa)||/vin/i.test(c.nom))return'vin';return ivOrd(p||{nom:it.nom})}
+$('#cmPrint').onclick=()=>{const o=cmGet(),cats=(CFG.cmdCat||{})[cmZone]||[],cnt={};
+  for(const c of cats)for(const it of c.items){const x=(o.items||{})[it.id];if(x&&x.c){const g=cmGroup(it,c);cnt[g]=(cnt[g]||0)+1}}
+  info(`<h2>🖨 Quelle commande imprimer ?</h2><p class="meta">Une feuille par fournisseur : chaque commande contient seulement ses articles.</p>
+    <label class="row" style="gap:8px;margin:6px 0 10px;font-size:16px"><input type="checkbox" id="pcOnly" checked style="width:22px;height:22px;margin:0"> <span>Seulement les articles <b>cochés</b></span></label>
+    <div style="display:flex;flex-direction:column;gap:8px">${['feld','vin','mag','v20'].map(g=>`<button class="btn ${cnt[g]?'ok':'ghost'}" data-pg="${g}" style="font-size:17px;text-align:left">${ORD[g][0]} ${g==='vin'?'Commande vins':ORD[g][1]} <span class="meta" style="margin-left:6px;${cnt[g]?'color:#fff':''}">${cnt[g]?cnt[g]+' coché(s)':'rien de coché'}${ORD[g][2]&&g!=='vin'?' · '+ORD[g][2]:''}</span></button>`).join('')}
+    <button class="btn sec" data-pg="" style="font-size:17px;text-align:left">📄 Toute la liste (feuille complète pour le patron)</button></div>
+    <div class="row" style="margin-top:10px"><span class="grow"></span><button class="btn ghost" id="iClose">Fermer</button></div>`,
+    ()=>{document.querySelectorAll('[data-pg]').forEach(b=>b.onclick=()=>{const g=b.dataset.pg,only=$('#pcOnly').checked;if(g&&only&&!cnt[g])return toast('Rien de coché dans cette commande');closeInfo();cmPrintDoc(g,g?only:false)})})};
+function cmPrintDoc(grp,only){const o=cmGet(),ck=v=>v?'☑':'☐';
+  const cats=((CFG.cmdCat||{})[cmZone]||[]).map(c=>({...c,items:c.items.filter(it=>{const x=(o.items||{})[it.id]||{};return(!grp||cmGroup(it,c)===grp)&&(!only||x.c)})})).filter(c=>c.items.length);
+  if(!cats.length)return toast('Aucun article à imprimer');
+  const T=grp?(grp==='vin'?'COMMANDE VINS':ORD[grp][1].toUpperCase()):'LISTE DE COURSES & COMMANDES';
   const col=c=>`<div style="break-inside:avoid;margin-bottom:8px"><div style="background:${c.col};color:#fff;font-weight:800;padding:3px 6px;font-size:10px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${esc(c.nom)}</div>
     <table style="border-collapse:collapse;width:100%;font-size:10px"><tr><th style="text-align:left;padding:1px 4px;font-weight:600">Article</th><th style="text-align:left;width:80px;padding:1px 4px;font-weight:600">Quantité</th></tr>
     ${c.items.map(it=>{const x=(o.items||{})[it.id]||{};return`<tr><td style="padding:1px 4px;border-bottom:1px dotted #bbb;${x.c?'font-weight:700':''}">${ck(x.c)} ${esc(it.nom)}</td><td style="padding:1px 4px;border-bottom:1px dotted #bbb;font-weight:700">${esc(x.q||'')}</td></tr>`}).join('')}</table></div>`;
   const st=o.st||{};
   $('#printArea').innerHTML=`<style>@page{size:A4;margin:9mm}</style><div class="pg"><div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:4px">
-    <div><h1 style="font-size:18px;margin:0">LISTE DE COURSES & COMMANDES ${cmZone==='cuisine'?'CUISINE':'SALLE'}</h1><div>${esc(CFG.nom)}</div></div><div style="font-weight:700">${st.t?'☑':'☐'} Transmis à la Direction</div></div>
+    <div><h1 style="font-size:18px;margin:0">${T} ${cmZone==='cuisine'?'CUISINE':'SALLE'}</h1><div>${esc(CFG.nom)}</div></div><div style="font-weight:700">${st.t?'☑':'☐'} Transmis à la Direction</div></div>
     <div style="display:flex;gap:30px;margin:6px 0 8px;font-size:11px"><b>Date : ${longD(cmDay)}</b><span>Service : ${cmZone==='cuisine'?'Cuisine':'Salle'} & Approvisionnement</span><span>Statut : ${ck(st.a)} À commander ${ck(st.v)} Validé patron</span></div>
     <div style="columns:2;column-gap:14px">${cats.map(col).join('')}</div>
     <div style="margin-top:6px;font-size:11px"><b>ARTICLES SUPPLÉMENTAIRES / NOTES PATRON :</b><div style="white-space:pre-line;border:1px solid #999;min-height:40px;padding:4px;margin-top:3px">${esc(o.extra||'')}</div></div></div>`;
-  outDoc('Commande '+cmZone+' '+frD(cmDay),0)};
+  outDoc((grp?T.toLowerCase().replace(/^./,x=>x.toUpperCase()):'Commande')+' '+cmZone+' '+frD(cmDay),0)}
 
 /* ---- notifications même quand l'appli est en arrière-plan (téléphone) ---- */
 const BG=()=>{const v=localStorage.getItem('pn_bg');return v==null?MAIN():v==='1'};
