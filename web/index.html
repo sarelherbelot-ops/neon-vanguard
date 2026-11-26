@@ -404,6 +404,7 @@ body.readonly #roBar{display:block!important}
       <button class="btn ok" id="ivScan" style="font-size:17px">📷 Scanner un code-barre</button><button class="btn sec" id="ivNew">➕ Produit sans code</button>
       <button class="btn ghost" id="ivHist">🕘 Mouvements</button><button class="btn ghost" id="ivPrint">🖨 Imprimer</button><button class="adm-only btn ghost" id="ivWaNum">📞 N° WhatsApp du boss</button></div>
     <input id="ivQ" placeholder="🔎 Chercher un produit ou un code…" style="margin-top:10px">
+    <div id="ivChips" class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"></div>
     <p class="meta" id="ivSum"></p>
     <div id="ivList"></div>
   </div>
@@ -2393,22 +2394,32 @@ function ivAutoCmd(pid,force){try{const p=ivProds().find(x=>x.id===pid);if(!p||!
   const day=todayS(),key=ez+'-'+day,o=CMD[key]||{date:day,zone:ez,items:{},extra:'',st:{}};o.items=o.items||{};
   o.items[iid]={c:true,q:p.caisse?'1 caisse ('+p.caisse+')':'1 caisse'};o.st=o.st||{};o.st.a=true;o.ts=Date.now();CMD[key]=o;put('co:'+key,o);
   p.cmdAuto=1;ivSaveP(p);toast('🛒 '+p.nom+' coché dans la commande '+ez)}catch(e){}}
-function ivLowList(){const Q=ivStock(),L=ivProds().filter(p=>ivHasMin(p)&&(Q[p.id]||0)<+p.min).sort((a,b)=>(a.cat||'~').localeCompare(b.cat||'~')||a.nom.localeCompare(b.nom));
+function ivLowList(){const Q=ivStock(),L=ivProds().filter(p=>ivHasMin(p)&&(Q[p.id]||0)<+p.min).sort((a,b)=>a.nom.localeCompare(b.nom));
   if(!L.length)return toast('Rien à commander');
-  info(`<h2>🛒 À commander (${L.length})</h2><p class="meta">Moins que le minimum. Appuie sur « Ajouter » pour cocher le produit dans la commande.</p>
-    ${L.map(p=>`<div class="row" style="gap:8px;border-top:1px solid var(--line);padding:8px 0"><div class="grow"><b>${esc(p.nom)}</b><div class="meta">Stock : <b style="color:#dc2626">${Q[p.id]||0}</b> · minimum ${esc(String(p.min))} ${esc(p.unit||'')}</div></div>${p.cmdAuto?'<span style="color:#15803d;font-weight:700">✔ dans la commande</span>':`<button class="btn ok sm" data-la="${p.id}">➕ Ajouter</button>`}</div>`).join('')}
+  const grp=['feld','v20','mag','vin'].map(k=>[k,L.filter(p=>ivOrd(p)===k)]).filter(g=>g[1].length);
+  const row=p=>`<div class="row" style="gap:8px;border-top:1px solid var(--line);padding:7px 0"><div class="grow"><b>${esc(p.nom)}</b><div class="meta">Stock : <b style="color:#dc2626">${Q[p.id]||0}</b> · minimum ${esc(String(p.min))} ${esc(p.unit||'')}</div></div>${p.cmdAuto?'<span style="color:#15803d;font-weight:700">✔ dans la commande</span>':`<button class="btn ok sm" data-la="${p.id}">➕ Ajouter</button>`}</div>`;
+  info(`<h2>🛒 À commander (${L.length})</h2>
+    ${grp.map(([k,A])=>`<div style="margin-top:10px;padding:8px;border-radius:12px;background:#f8fafc;border-left:5px solid ${ORD[k][3]}"><div class="row"><div class="grow"><b style="font-size:17px">${ORD[k][0]} ${ORD[k][1]} (${A.length})</b>${ORD[k][2]?`<div class="meta">${ORD[k][2]}</div>`:''}</div>${k==='vin'?'':`<button class="btn ghost sm" data-lg="${k}">➕ Tout ce groupe</button>`}</div>${A.map(row).join('')}</div>`).join('')}
     <div class="row" style="margin-top:12px"><button class="btn ghost" id="iClose">Fermer</button><span class="grow"></span><button class="btn ok" id="laAll">➕ Tout ajouter</button></div>`,
-    ()=>{const one=b=>{ivAutoCmd(b.dataset.la,true);const r=b.parentElement;b.outerHTML='<span style="color:#15803d;font-weight:700">✔ dans la commande</span>'};
+    ()=>{const one=b=>{ivAutoCmd(b.dataset.la,true);b.outerHTML='<span style="color:#15803d;font-weight:700">✔ dans la commande</span>'};
       document.querySelectorAll('[data-la]').forEach(b=>b.onclick=()=>one(b));
-      $('#laAll').onclick=()=>{document.querySelectorAll('[data-la]').forEach(b=>one(b));toast('✔ Tout est dans la commande')}})}
+      document.querySelectorAll('[data-lg]').forEach(g=>g.onclick=()=>{g.parentElement.parentElement.querySelectorAll('[data-la]').forEach(one);toast('✔ Groupe ajouté à la commande')});
+      $('#laAll').onclick=()=>{document.querySelectorAll('[data-la]').forEach(one);toast('✔ Tout est dans la commande')}})}
+const ORD={feld:['🥤','Commande Feld','à passer le samedi','#0e7490'],mag:['🛒','Commande magasin','','#92400e'],v20:['🏪','Commande le 20','à passer n\'importe quand','#6d28d9'],vin:['🍷','Vins (message Régnier)','','#7f1d1d']};
+const FELD_KW=['alpina','alpine','alpin','biere sans alcool','cocazero','evian','eaugazeuse','eauplate','fanta','asti','jusdetomate','rivella','sanmiguel','saintmiguel','sirop','sprite','coca'];
+function ivOrd(p){if(p.wa)return'vin';if(p.ord&&ORD[p.ord])return p.ord;const n=String(p.nom||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'');const m=n.replace(/ /g,'');return FELD_KW.some(k=>m.includes(k.replace(/ /g,'')))?'feld':'mag'}
+let ivFilt='';
 const ivFind=code=>ivProds().find(p=>p.code&&p.code===code);
 const ivHasMin=p=>p.min!==''&&p.min!=null;
 function renderStock(){const Q=ivStock(),q=($('#ivQ').value||'').trim().toLowerCase();
-  const P=ivProds().filter(p=>!q||p.nom.toLowerCase().includes(q)||(p.code||'').includes(q)||(p.cat||'').toLowerCase().includes(q)).sort((a,b)=>(a.cat||'~').localeCompare(b.cat||'~')||a.nom.localeCompare(b.nom));
+  const P=ivProds().filter(p=>(!ivFilt||ivOrd(p)===ivFilt)&&(!q||p.nom.toLowerCase().includes(q)||(p.code||'').includes(q)||(p.cat||'').toLowerCase().includes(q))).sort((a,b)=>(a.cat||'~').localeCompare(b.cat||'~')||a.nom.localeCompare(b.nom));
   const low=ivProds().filter(p=>ivHasMin(p)&&(Q[p.id]||0)<+p.min);
+  {const cnt={};for(const x of low){const o=ivOrd(x);cnt[o]=(cnt[o]||0)+1}const bt=(k,t)=>`<button class="btn ${ivFilt===k?'ok':'ghost'} sm" data-ivf="${k}">${t}</button>`;
+    $('#ivChips').innerHTML=bt('','Tout')+['feld','mag','v20'].map(k=>bt(k,ORD[k][0]+' '+ORD[k][1].replace('Commande ','')+(cnt[k]?` <b style="color:#dc2626">(${cnt[k]})</b>`:''))).join('');
+    $('#ivChips').querySelectorAll('[data-ivf]').forEach(b=>b.onclick=()=>{ivFilt=b.dataset.ivf;renderStock()})}
   $('#ivSum').innerHTML=`${ivProds().length} produit(s)`+(low.length?` · <button class="btn danger sm" id="ivLow" style="margin-left:4px">⚠ ${low.length} à commander — voir</button>`:'');const lb=$('#ivLow');if(lb)lb.onclick=ivLowList;
   let cat=null,h='';for(const p of P){if((p.cat||'')!==cat){cat=p.cat||'';h+=`<h3 style="margin:14px 0 4px">${esc(cat||'Sans catégorie')}</h3>`}const n=Q[p.id]||0,lo=ivHasMin(p)&&n<+p.min;
-    h+=`<div class="row" data-ivp="${p.id}" style="border:1px solid var(--line);border-radius:12px;padding:10px;margin:6px 0;cursor:pointer;${lo?'border-color:#dc2626;background:#fef2f2':''}"><div class="grow"><b>${esc(p.nom)}</b><div class="meta">${p.code?'▮▯▮ '+esc(p.code):'sans code'}${ivHasMin(p)?' · minimum '+p.min:''}</div></div><b style="font-size:24px;${lo?'color:#dc2626':''}">${n}</b><span class="meta" style="margin-left:4px">${esc(p.unit||'')}</span></div>`}
+    h+=`<div class="row" data-ivp="${p.id}" style="border:1px solid var(--line);border-radius:12px;padding:10px;margin:6px 0;cursor:pointer;${lo?'border-color:#dc2626;background:#fef2f2':''}"><div class="grow"><b>${esc(p.nom)}</b><div class="meta">${p.code?'▮▯▮ '+esc(p.code):'sans code'}${ivHasMin(p)?' · minimum '+p.min:''} · <span style="color:${ORD[ivOrd(p)][3]}">${ORD[ivOrd(p)][0]} ${esc(ORD[ivOrd(p)][1].replace('Commande ',''))}</span></div></div><b style="font-size:24px;${lo?'color:#dc2626':''}">${n}</b><span class="meta" style="margin-left:4px">${esc(p.unit||'')}</span></div>`}
   $('#ivList').innerHTML=h||'<p class="meta">Aucun produit. Appuie sur « 📷 Scanner un code-barre » pour ajouter la première bouteille.</p>';
   $('#ivList').querySelectorAll('[data-ivp]').forEach(el=>el.onclick=()=>ivOpen(el.dataset.ivp))}
 $('#ivQ').oninput=renderStock;
@@ -2423,13 +2434,14 @@ function ivEdit(id,code){const p=id?ivProds().find(x=>x.id===id):{id:'iv'+Date.n
       <div style="width:120px"><label>Unité</label><input id="ivU" value="${esc(p.unit||'')}" placeholder="bouteilles"></div><div style="width:110px"><label>Minimum</label><input id="ivMin" type="number" inputmode="numeric" value="${p.min??''}" placeholder="—"></div></div>
     <div class="row" style="gap:8px;flex-wrap:wrap"><div style="width:150px"><label>Par caisse</label><input id="ivCs" type="number" inputmode="numeric" value="${p.caisse??''}" placeholder="ex : 6, 12, 24"></div>
       <div class="grow"><label>Commande automatique dans</label><select id="ivZ"><option value="salle" ${p.zone==='cuisine'?'':'selected'}>Commande salle</option><option value="cuisine" ${p.zone==='cuisine'?'selected':''}>Commande cuisine</option></select></div></div>
+    <label style="margin-top:8px">Type de commande</label><select id="ivO"><option value="">Automatique (selon le nom : ${esc(ORD[ivOrd(p)][1])})</option>${['feld','mag','v20'].map(k=>`<option value="${k}" ${p.ord===k?'selected':''}>${ORD[k][0]} ${ORD[k][1]}${ORD[k][2]?' — '+ORD[k][2]:''}</option>`).join('')}</select>
     <label class="row" style="gap:8px;margin-top:8px;font-size:16px"><input type="checkbox" id="ivWa" ${p.wa?'checked':''} style="width:22px;height:22px;margin:0"> <span>💬 Prévenir <b>Régnier</b> sur WhatsApp quand le stock est bas (à la place de la commande Feld)</span></label>
     <p class="meta">Quand le stock descend au <b>Minimum</b> (ou à « Par caisse » si le minimum est vide), le produit se coche tout seul dans la commande du jour.</p>
     ${nw?`<label>Quantité reçue maintenant</label><input id="ivQ0" type="number" inputmode="numeric" value="${code?1:0}">`:''}
     ${!nw&&!p.code?`<button class="btn ghost sm" id="ivAddCode" style="margin-top:8px">📷 Ajouter un code-barre</button>`:''}
     <div class="row" style="margin-top:12px">${!nw?'<button class="btn danger" id="ivDel">🗑 Supprimer</button>':''}<span class="grow"></span><button class="btn ghost" id="iClose">Annuler</button><button class="btn ok" id="ivSave">Enregistrer</button></div>`,
     ()=>{setTimeout(()=>{const n=$('#ivN');if(n&&!n.disabled)n.focus()},80);
-      $('#ivSave').onclick=()=>{const n=$('#ivN').value.trim();if(!n)return toast('Mets le nom du produit');Object.assign(p,{nom:n,cat:$('#ivC').value.trim(),unit:$('#ivU').value.trim(),min:$('#ivMin').value===''?'':+$('#ivMin').value,caisse:$('#ivCs').value===''?'':+$('#ivCs').value,zone:$('#ivZ').value,wa:$('#ivWa').checked?1:0});if(p.min===''&&p.caisse)p.min=p.caisse;ivSaveP(p);
+      $('#ivSave').onclick=()=>{const n=$('#ivN').value.trim();if(!n)return toast('Mets le nom du produit');Object.assign(p,{nom:n,cat:$('#ivC').value.trim(),unit:$('#ivU').value.trim(),min:$('#ivMin').value===''?'':+$('#ivMin').value,caisse:$('#ivCs').value===''?'':+$('#ivCs').value,zone:$('#ivZ').value,ord:$('#ivO').value,wa:$('#ivWa').checked?1:0});if(p.min===''&&p.caisse)p.min=p.caisse;ivSaveP(p);
         if(nw){const q0=+($('#ivQ0').value||0);if(q0)ivMove(p.id,{d:q0,t:'in'})}closeInfo();renderStock();toast('✔ '+n+(nw?' ajouté au stock':' enregistré'));if(!nw)ivOpen(p.id)};
       const ac=$('#ivAddCode');if(ac)ac.onclick=async()=>{closeInfo();const c=await scanCode();if(!c)return ivEdit(id);const o=ivFind(c);if(o&&o.id!==p.id){toast('Ce code est déjà pour : '+o.nom);return ivEdit(id)}p.code=c;ivSaveP(p);ivEdit(id)};
       const dl=$('#ivDel');if(dl)dl.onclick=async()=>{closeInfo();const a=MAIN()?{nom:chMyName()}:await askAuth('Supprimer '+p.nom,['admin']);if(!a)return;p.del=1;ivSaveP(p);renderStock();toast('🗑 '+p.nom+' supprimé')}})}
